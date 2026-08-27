@@ -19,6 +19,10 @@ class SecureTokenStorage {
   static const _refreshTokenKey = 'ani_refresh_token';
   static const _expiresAtKey = 'ani_expires_at_millis';
 
+  /// Persists [tokens]. Note: [AniTokens.bangumiAccessToken] is not stored
+  /// (Phase 1a only needs the Ani JWT pair), and `expiresAtMillis` is
+  /// currently write-only — reading it back for expiry checks is deferred
+  /// to the session-restore work in Plan 1b.
   Future<void> saveTokens(AniTokens tokens) async {
     await _backing.write(key: _accessTokenKey, value: tokens.accessToken);
     await _backing.write(key: _refreshTokenKey, value: tokens.refreshToken);
