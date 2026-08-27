@@ -62,8 +62,41 @@ Drift 类型安全 SQL，语义最接近现有 Room（表结构/DAO/迁移可照
 ### 5. 弹幕引擎 —— 自建 `CustomPainter` + `Ticker`
 无成熟 Flutter 弹幕库能满足“双源合并 + 性能”要求。弹幕轨道分配算法可直接照搬现有 Compose Canvas 层逻辑（纯算法，无 UI 框架依赖，迁移成本主要是语言转换而非重新设计）。
 
-### 6. Bangumi OAuth（macOS 桌面）—— 本地回环 HTTP 服务器
-用 `shelf` 起一个 `localhost:PORT` 临时监听，系统默认浏览器打开授权页，回调重定向到 `http://localhost:PORT/callback` 拿 code，随后关闭临时服务器。这是桌面 OAuth 的标准做法（VSCode/gh cli 同款套路），无需注册自定义 URL scheme，避免 macOS `CFBundleURLTypes` 注册和焦点处理的额外复杂度。
+### 6. Bangumi OAuth（macOS 桌面）—— 服务器托管回调 + 客户端轮询
+
+> **修正说明**：本节原方案（本地回环 HTTP 服务器）基于对登录序列的错误假设。经对 `ani-api-server` 生成客户端代码（`BangumiAniApi` 及其调用方 `OAuthConfigurator`/`OAuthClient`）的逐字核实，**真实机制是服务器托管 OAuth 回调、客户端仅轮询结果**，完全不需要客户端本地监听任何端口，也不涉及自定义 URL scheme。以下为修正后的方案。
+
+**真实流程（与现有 Kotlin 客户端完全一致，跨平台通用，仅“打开系统浏览器”这一步是 platform-specific）：**
+
+1. 客户端本地生成 `requestId`（UUID）。
+2. 调用 `GET /v2/users/bangumi/oauth?requestId=...&os=...&arch=...`（注册新账号）或 `GET /v2/users/bangumi/bind?requestId=...&os=...&arch=...`（绑定已登录账号），服务端返回 `{ "url": "<Bangumi 授权页 URL>" }`——该 URL 的 `redirect_uri` 早已被服务端设置为指向**服务器自己的** `/v2/users/bangumi/oauth/callback`，不是任何本地地址。
+3. 客户端用 `url_launcher` 包调用系统默认浏览器打开该 URL。
+4. 用户在 Bangumi.tv 上完成授权后，Bangumi 直接重定向到服务端的 `GET /v2/users/bangumi/oauth/callback?code=...&state=<requestId>`——这是服务器到服务器的过程，客户端完全不参与、不监听任何端口。
+5. 客户端在此期间以 1 秒间隔轮询 `GET /v2/users/bangumi/result?requestId=...`；服务端未完成时返回 HTTP 425 Too Early（客户端将其视为“继续轮询”信号，不当错误处理），完成后返回 200 及登录结果。
+6. 客户端拿到 `tokens.accessToken`/`refreshToken` 后存入 `flutter_secure_storage`，流程结束。
+
+**关键模型字段（与生成的 Kotlin client 逐字核对一致）：**
+
+```dart
+class OAuthRedirectResponse {
+  final String url; // GET /v2/users/bangumi/oauth 和 /bind 的响应
+}
+
+class AniTokens {
+  final String accessToken;
+  final String refreshToken;
+  final int expiresAtMillis;
+  final String? bangumiAccessToken; // 可空
+}
+
+class UserAuthRoutingLoginResponse {
+  final String userId;
+  final AniTokens tokens;
+  // user 字段暂不需要展开，Phase 1 只需 userId 存在即可
+}
+```
+
+这几个端点（`oauth`/`bind`/`result`）冷启动时无需任何预先鉴权——首个 Ani JWT 就是该 OAuth 流程本身的产物，不存在匿名 bootstrap 接口。由于端点数量少（3 个）且字段已通过源码核实，Phase 1 中这几个端点**手写 `dio` 调用**，不依赖 openapi-generator（因暂无生产环境 API token 无法验证生成产物；更大量的 Subjects/Danmaku 等端点留给 Plan 1b 用 openapi-generator 生成）。
 
 ## 项目结构与分层
 
@@ -106,7 +139,7 @@ lib/
 | 功能域 | Flutter 方案 | 风险 | Web 可行性 |
 |---|---|---|---|
 | Bangumi 浏览/搜索/时间表 | dio/OpenAPI client | 低 | 可行 |
-| OAuth 登录同步 | 回环服务器 / `flutter_web_auth_2` | 中（各平台配置不同） | 需不同重定向流程 |
+| OAuth 登录同步 | 服务器托管回调 + 客户端轮询（手写 dio） | 低（核心逻辑跨平台一致，仅“打开浏览器”一步 platform-specific） | 需不同重定向流程 |
 | 在线源播放 | 直接移植 REST 调用 | 低 | 可行 |
 | BT 源解析（dmhy/mikan） | html 包解析 | 中 | 基本不可行（CORS） |
 | 自定义 web-selector 源 | webview_flutter/flutter_inappwebview | 中高 | 不可行 |
