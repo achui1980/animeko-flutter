@@ -83,6 +83,8 @@ Expected: `pubspec.yaml` gains these under `dev_dependencies:`. Command exits 0.
 
 (`riverpod_lint`/`custom_lint` are optional but catch the common "missing ref parameter" mistakes described by riverpod_generator's own lint package; keep them since they cost nothing at build time.)
 
+> **Execution note (recorded after implementing this task):** `custom_lint`/`riverpod_lint` could **not** be added on this Flutter SDK (3.41.6) — `dart pub add --dev custom_lint riverpod_lint` fails version solving because `riverpod_generator 4.0.3` (the only version compatible with `meta 1.17.0`, which this Flutter SDK pins) depends on `riverpod_analyzer_utils 1.0.0-dev.9`, which requires `uuid ^3.0.6`, conflicting with this project's `uuid ^4.6.0`. This is a genuine, currently-unresolvable pub registry conflict, not an environment misconfiguration. Both packages were omitted; `flutter_riverpod` was pinned to `3.3.1` and `riverpod_annotation` to `4.0.2` (one patch version below the plan's implicit `^4.0.3`/`3.3.x` expectation) to satisfy `riverpod_generator 4.0.3`'s exact-version requirements. Revisit if a future `custom_lint` release supports `uuid ^4.x`.
+
 - [ ] **Step 4: Verify the default app still builds for macOS**
 
 ```bash
