@@ -8,7 +8,10 @@ void main() {
       final result = OAuthRedirectResponse.fromJson({
         'url': 'https://bgm.tv/oauth/authorize?client_id=1&state=req-1',
       });
-      expect(result.url, 'https://bgm.tv/oauth/authorize?client_id=1&state=req-1');
+      expect(
+        result.url,
+        'https://bgm.tv/oauth/authorize?client_id=1&state=req-1',
+      );
     });
   });
 
