@@ -43,4 +43,37 @@ void main() {
     expect(mapped, isA<UnknownAppError>());
     expect(mapped.message, contains('boom'));
   });
+
+  test('a badResponse with no status code maps to UnknownAppError without '
+      'leaking DioException diagnostic text', () {
+    final error = DioException(
+      requestOptions: options,
+      type: DioExceptionType.badResponse,
+    );
+
+    final mapped = mapToAppError(error);
+    expect(mapped, isA<UnknownAppError>());
+    expect(mapped.message, isNot(contains('DioException')));
+  });
+
+  test('an unknown-type DioException maps to UnknownAppError without leaking '
+      'DioException diagnostic text', () {
+    final error = DioException(
+      requestOptions: options,
+      type: DioExceptionType.unknown,
+    );
+
+    final mapped = mapToAppError(error);
+    expect(mapped, isA<UnknownAppError>());
+    expect(mapped.message, isNot(contains('DioException')));
+  });
+
+  test('a cancel-type DioException maps to UnknownAppError', () {
+    final error = DioException(
+      requestOptions: options,
+      type: DioExceptionType.cancel,
+    );
+
+    expect(mapToAppError(error), isA<UnknownAppError>());
+  });
 }

@@ -18,11 +18,18 @@ AppError mapToAppError(Object error) {
         final status = error.response?.statusCode;
         if (status == 401) return const AuthExpiredError();
         if (status != null) return ServerError(status);
-        return UnknownAppError(error);
+        // No status code available; avoid wrapping the raw DioException
+        // (its toString() is a verbose, Dio-flavored diagnostic dump) so
+        // UnknownAppError.message never leaks that text to the UI.
+        return const UnknownAppError(
+          'the server response could not be understood',
+        );
       case DioExceptionType.cancel:
       case DioExceptionType.badCertificate:
       case DioExceptionType.unknown:
-        return UnknownAppError(error);
+        // Same reasoning as above: pass a fixed, human-readable cause
+        // instead of the DioException itself.
+        return const UnknownAppError('a network error occurred');
     }
   }
   return UnknownAppError(error);

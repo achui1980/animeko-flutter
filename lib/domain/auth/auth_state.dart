@@ -34,8 +34,8 @@ class AuthAuthenticated extends AuthState {
   final String userId;
 }
 
-/// Login failed. `message` is a human-readable description, not parsed
-/// from any particular exception type.
+/// Login failed. `message` is forwarded from the typed [AppError] produced
+/// by `mapToAppError` for the exception that was caught.
 class AuthError extends AuthState {
   const AuthError(this.error);
   final AppError error;

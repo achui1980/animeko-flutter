@@ -75,7 +75,9 @@ void main() {
   });
 
   testWidgets('shows the error message on error', (tester) async {
-    await tester.pumpWidget(wrap(const AuthError(UnknownAppError('network down'))));
+    await tester.pumpWidget(
+      wrap(const AuthError(UnknownAppError('network down'))),
+    );
 
     expect(find.textContaining('network down'), findsOneWidget);
   });
