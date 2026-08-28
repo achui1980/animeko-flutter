@@ -9,7 +9,24 @@ part 'api_client.g.dart';
 /// — see design doc "本地持久化"/服务器地址处理 note under Phase 1 scope.
 const aniApiBaseUrl = 'https://api.animeko.org';
 
+const _connectTimeout = Duration(seconds: 15);
+const _receiveTimeout = Duration(seconds: 15);
+
+/// A plain `Dio` pointed at [aniApiBaseUrl] with no interceptors attached.
+/// Used both by the main `dio()` provider (as its starting point, before
+/// interceptors are added) and by anything that must never recurse
+/// through [AuthInterceptor] -- see `SessionRefresher`.
+Dio rawAniDio() {
+  return Dio(
+    BaseOptions(
+      baseUrl: aniApiBaseUrl,
+      connectTimeout: _connectTimeout,
+      receiveTimeout: _receiveTimeout,
+    ),
+  );
+}
+
 @riverpod
 Dio dio(Ref ref) {
-  return Dio(BaseOptions(baseUrl: aniApiBaseUrl));
+  return rawAniDio();
 }
