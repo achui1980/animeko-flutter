@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../../data/auth/bangumi_oauth_api.dart';
 import '../../data/auth/bangumi_oauth_models.dart';
 import '../../data/auth/secure_token_storage.dart';
+import '../../data/auth/session_refresher.dart';
 import '../../data/dio_error_mapper.dart';
 import '../../platform/browser_launcher.dart';
 import '../../platform/platform_info.dart';
@@ -65,6 +66,34 @@ class AuthController extends _$AuthController {
     } catch (e) {
       state = AuthError(mapToAppError(e));
     }
+  }
+
+  /// Called once at app startup. Restores an authenticated session
+  /// without a fresh Bangumi OAuth round trip if a valid (or refreshable)
+  /// session is already stored.
+  Future<void> restoreSession() async {
+    final storage = ref.read(secureTokenStorageProvider);
+    final session = await storage.readSession();
+    if (session == null) return;
+
+    const safetyMargin = Duration(minutes: 5);
+    final expiresAt = DateTime.fromMillisecondsSinceEpoch(
+      session.tokens.expiresAtMillis,
+    );
+    final isStillValid = DateTime.now().add(safetyMargin).isBefore(expiresAt);
+
+    if (isStillValid) {
+      state = AuthAuthenticated(session.userId);
+      return;
+    }
+
+    final refresher = ref.read(sessionRefresherProvider);
+    final refreshed = await refresher.refresh(session.tokens.refreshToken);
+    if (refreshed != null) {
+      state = AuthAuthenticated(refreshed.userId);
+    }
+    // else: storage was already cleared by SessionRefresher; state stays
+    // AuthUnauthenticated (the value build() returned).
   }
 
   Future<UserAuthRoutingLoginResponse> _pollUntilReady(

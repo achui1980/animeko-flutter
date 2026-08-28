@@ -2,6 +2,7 @@
 import 'package:animeko_flutter/data/auth/bangumi_oauth_api.dart';
 import 'package:animeko_flutter/data/auth/bangumi_oauth_models.dart';
 import 'package:animeko_flutter/data/auth/secure_token_storage.dart';
+import 'package:animeko_flutter/data/auth/session_refresher.dart';
 import 'package:animeko_flutter/domain/auth/auth_controller.dart';
 import 'package:animeko_flutter/domain/auth/auth_state.dart';
 import 'package:animeko_flutter/platform/browser_launcher.dart';
@@ -16,10 +17,13 @@ class MockSecureTokenStorage extends Mock implements SecureTokenStorage {}
 
 class MockBrowserLauncher extends Mock implements BrowserLauncher {}
 
+class MockSessionRefresher extends Mock implements SessionRefresher {}
+
 void main() {
   late MockBangumiOAuthApi api;
   late MockSecureTokenStorage storage;
   late MockBrowserLauncher launcher;
+  late MockSessionRefresher refresher;
   late ProviderContainer container;
 
   setUpAll(() {
@@ -39,11 +43,13 @@ void main() {
     api = MockBangumiOAuthApi();
     storage = MockSecureTokenStorage();
     launcher = MockBrowserLauncher();
+    refresher = MockSessionRefresher();
     container = ProviderContainer(
       overrides: [
         bangumiOAuthApiProvider.overrideWithValue(api),
         secureTokenStorageProvider.overrideWithValue(storage),
         browserLauncherProvider.overrideWithValue(launcher),
+        sessionRefresherProvider.overrideWithValue(refresher),
         authPollIntervalProvider.overrideWithValue(Duration.zero),
         platformInfoProvider.overrideWithValue(
           const PlatformInfo(os: 'macos', arch: 'aarch64'),
@@ -171,5 +177,72 @@ void main() {
     final state = container.read(authControllerProvider);
     expect(state, isA<AuthError>());
     expect((state as AuthError).message, contains('network down'));
+  });
+
+  test('restoreSession does nothing when no session is stored', () async {
+    when(() => storage.readSession()).thenAnswer((_) async => null);
+
+    final notifier = container.read(authControllerProvider.notifier);
+    await notifier.restoreSession();
+
+    expect(container.read(authControllerProvider), isA<AuthUnauthenticated>());
+  });
+
+  test('restoreSession authenticates immediately for an unexpired token', () async {
+    when(() => storage.readSession()).thenAnswer(
+      (_) async => StoredSession(
+        userId: 'user-3',
+        tokens: AniTokens(
+          accessToken: 'a',
+          refreshToken: 'r',
+          expiresAtMillis: DateTime.now().millisecondsSinceEpoch + const Duration(days: 1).inMilliseconds,
+        ),
+      ),
+    );
+
+    final notifier = container.read(authControllerProvider.notifier);
+    await notifier.restoreSession();
+
+    final state = container.read(authControllerProvider);
+    expect(state, isA<AuthAuthenticated>());
+    expect((state as AuthAuthenticated).userId, 'user-3');
+    verifyNever(() => refresher.refresh(any()));
+  });
+
+  test('restoreSession refreshes an expired token and authenticates on success', () async {
+    when(() => storage.readSession()).thenAnswer(
+      (_) async => const StoredSession(
+        userId: 'user-4',
+        tokens: AniTokens(accessToken: 'stale', refreshToken: 'r', expiresAtMillis: 1),
+      ),
+    );
+    when(() => refresher.refresh('r')).thenAnswer(
+      (_) async => const StoredSession(
+        userId: 'user-4',
+        tokens: AniTokens(accessToken: 'fresh', refreshToken: 'r2', expiresAtMillis: 999999999999),
+      ),
+    );
+
+    final notifier = container.read(authControllerProvider.notifier);
+    await notifier.restoreSession();
+
+    final state = container.read(authControllerProvider);
+    expect(state, isA<AuthAuthenticated>());
+    expect((state as AuthAuthenticated).userId, 'user-4');
+  });
+
+  test('restoreSession stays unauthenticated when refreshing an expired token fails', () async {
+    when(() => storage.readSession()).thenAnswer(
+      (_) async => const StoredSession(
+        userId: 'user-5',
+        tokens: AniTokens(accessToken: 'stale', refreshToken: 'r', expiresAtMillis: 1),
+      ),
+    );
+    when(() => refresher.refresh('r')).thenAnswer((_) async => null);
+
+    final notifier = container.read(authControllerProvider.notifier);
+    await notifier.restoreSession();
+
+    expect(container.read(authControllerProvider), isA<AuthUnauthenticated>());
   });
 }
