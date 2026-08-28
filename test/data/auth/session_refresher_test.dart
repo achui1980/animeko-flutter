@@ -19,7 +19,11 @@ void main() {
     registerFallbackValue(
       const StoredSession(
         userId: '',
-        tokens: AniTokens(accessToken: '', refreshToken: '', expiresAtMillis: 0),
+        tokens: AniTokens(
+          accessToken: '',
+          refreshToken: '',
+          expiresAtMillis: 0,
+        ),
       ),
     );
   });
@@ -34,7 +38,11 @@ void main() {
     when(() => api.refreshToken('old-refresh')).thenAnswer(
       (_) async => const UserAuthRoutingLoginResponse(
         userId: 'user-1',
-        tokens: AniTokens(accessToken: 'new-a', refreshToken: 'new-r', expiresAtMillis: 999),
+        tokens: AniTokens(
+          accessToken: 'new-a',
+          refreshToken: 'new-r',
+          expiresAtMillis: 999,
+        ),
       ),
     );
     when(() => storage.saveSession(any())).thenAnswer((_) async {});
@@ -55,4 +63,38 @@ void main() {
     expect(session, isNull);
     verify(() => storage.clear()).called(1);
   });
+
+  test(
+    'a successful API refresh but a failed local save does NOT clear storage',
+    () async {
+      when(() => api.refreshToken('old-refresh')).thenAnswer(
+        (_) async => const UserAuthRoutingLoginResponse(
+          userId: 'user-1',
+          tokens: AniTokens(
+            accessToken: 'new-a',
+            refreshToken: 'new-r',
+            expiresAtMillis: 999,
+          ),
+        ),
+      );
+      when(() => storage.saveSession(any())).thenThrow(Exception('disk full'));
+
+      final session = await refresher.refresh('old-refresh');
+
+      expect(session, isNull);
+      verifyNever(() => storage.clear());
+    },
+  );
+
+  test(
+    'refresh() never throws even if clearing storage itself fails',
+    () async {
+      when(() => api.refreshToken('expired')).thenThrow(Exception('401'));
+      when(() => storage.clear()).thenThrow(Exception('keychain unavailable'));
+
+      final session = await refresher.refresh('expired');
+
+      expect(session, isNull);
+    },
+  );
 }

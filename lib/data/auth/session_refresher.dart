@@ -2,6 +2,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../api_client.dart';
+import 'bangumi_oauth_models.dart';
 import 'secure_token_storage.dart';
 import 'session_api.dart';
 
@@ -17,17 +18,41 @@ class SessionRefresher {
   final SecureTokenStorage _storage;
 
   /// Attempts to refresh using [refreshToken]. On success, persists and
-  /// returns the new [StoredSession]. On any failure, clears storage and
-  /// returns null.
+  /// returns the new [StoredSession]. Never throws: every failure mode
+  /// returns null instead.
+  ///
+  /// The two failure modes are handled differently on purpose:
+  /// - If the API call itself fails (e.g. the refresh token was rejected),
+  ///   the session really is dead, so storage is cleared.
+  /// - If the API call succeeds but the subsequent local write fails (e.g.
+  ///   a transient keychain I/O error), the *old* session may still be
+  ///   valid -- storage is deliberately left untouched rather than wiped,
+  ///   so a purely local hiccup doesn't force an unrecoverable logout.
   Future<StoredSession?> refresh(String refreshToken) async {
+    final UserAuthRoutingLoginResponse result;
     try {
-      final result = await _api.refreshToken(refreshToken);
-      final session = StoredSession(userId: result.userId, tokens: result.tokens);
+      result = await _api.refreshToken(refreshToken);
+    } catch (_) {
+      await _clearSafely();
+      return null;
+    }
+
+    final session = StoredSession(userId: result.userId, tokens: result.tokens);
+    try {
       await _storage.saveSession(session);
       return session;
     } catch (_) {
-      await _storage.clear();
       return null;
+    }
+  }
+
+  /// Clears storage, swallowing any error from the clear itself -- so that
+  /// a failing cleanup can never cause [refresh] to throw.
+  Future<void> _clearSafely() async {
+    try {
+      await _storage.clear();
+    } catch (_) {
+      // Best-effort cleanup; nothing more we can do if this itself fails.
     }
   }
 }

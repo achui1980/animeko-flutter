@@ -15,31 +15,34 @@ void main() {
     api = SessionApi(dio);
   });
 
-  test('refreshToken POSTs to /v2/users/auth/refresh with the refresh token', () async {
-    when(
-      () => dio.post<Map<String, dynamic>>(
-        '/v2/users/auth/refresh',
-        data: {'refreshToken': 'old-refresh'},
-      ),
-    ).thenAnswer(
-      (_) async => Response(
-        requestOptions: RequestOptions(path: '/v2/users/auth/refresh'),
-        data: {
-          'userId': 'user-1',
-          'tokens': {
-            'accessToken': 'new-access',
-            'refreshToken': 'new-refresh',
-            'expiresAtMillis': 123,
+  test(
+    'refreshToken POSTs to /v2/users/auth/refresh with the refresh token',
+    () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/v2/users/auth/refresh',
+          data: {'refreshToken': 'old-refresh'},
+        ),
+      ).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: '/v2/users/auth/refresh'),
+          data: {
+            'userId': 'user-1',
+            'tokens': {
+              'accessToken': 'new-access',
+              'refreshToken': 'new-refresh',
+              'expiresAtMillis': 123,
+            },
           },
-        },
-      ),
-    );
+        ),
+      );
 
-    final result = await api.refreshToken('old-refresh');
+      final result = await api.refreshToken('old-refresh');
 
-    expect(result.userId, 'user-1');
-    expect(result.tokens.accessToken, 'new-access');
-  });
+      expect(result.userId, 'user-1');
+      expect(result.tokens.accessToken, 'new-access');
+    },
+  );
 
   test('a non-2xx response rethrows the DioException as-is', () async {
     final requestOptions = RequestOptions(path: '/v2/users/auth/refresh');
