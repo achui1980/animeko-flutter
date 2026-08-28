@@ -72,28 +72,39 @@ class AuthController extends _$AuthController {
   /// without a fresh Bangumi OAuth round trip if a valid (or refreshable)
   /// session is already stored.
   Future<void> restoreSession() async {
-    final storage = ref.read(secureTokenStorageProvider);
-    final session = await storage.readSession();
-    if (session == null) return;
+    try {
+      final storage = ref.read(secureTokenStorageProvider);
+      final session = await storage.readSession();
+      if (session == null) return;
 
-    const safetyMargin = Duration(minutes: 5);
-    final expiresAt = DateTime.fromMillisecondsSinceEpoch(
-      session.tokens.expiresAtMillis,
-    );
-    final isStillValid = DateTime.now().add(safetyMargin).isBefore(expiresAt);
+      const safetyMargin = Duration(minutes: 5);
+      final expiresAt = DateTime.fromMillisecondsSinceEpoch(
+        session.tokens.expiresAtMillis,
+      );
+      final isStillValid = DateTime.now().add(safetyMargin).isBefore(expiresAt);
 
-    if (isStillValid) {
-      state = AuthAuthenticated(session.userId);
-      return;
+      if (isStillValid) {
+        state = AuthAuthenticated(session.userId);
+        return;
+      }
+
+      final refresher = ref.read(sessionRefresherProvider);
+      final refreshed = await refresher.refresh(session.tokens.refreshToken);
+      if (refreshed != null) {
+        state = AuthAuthenticated(refreshed.userId);
+      }
+      // else: refresh failed. This means either the refresh token itself was
+      // rejected by the server (storage was cleared by SessionRefresher in
+      // that case), or the refresh succeeded but the local save failed
+      // (storage was left untouched with the old, now-expired tokens in
+      // that case). Either way we stay unauthenticated here; a future
+      // login will overwrite whatever is in storage.
+    } catch (_) {
+      // Defense-in-depth: readSession()/refresher.refresh() are documented
+      // to never throw, but if anything unexpected still does, don't let
+      // it propagate out of restoreSession() -- just leave state as
+      // whatever build() returned (AuthUnauthenticated).
     }
-
-    final refresher = ref.read(sessionRefresherProvider);
-    final refreshed = await refresher.refresh(session.tokens.refreshToken);
-    if (refreshed != null) {
-      state = AuthAuthenticated(refreshed.userId);
-    }
-    // else: storage was already cleared by SessionRefresher; state stays
-    // AuthUnauthenticated (the value build() returned).
   }
 
   Future<UserAuthRoutingLoginResponse> _pollUntilReady(

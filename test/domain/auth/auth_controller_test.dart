@@ -231,6 +231,33 @@ void main() {
     expect((state as AuthAuthenticated).userId, 'user-4');
   });
 
+  test('restoreSession refreshes a token inside the 5-minute safety margin', () async {
+    when(() => storage.readSession()).thenAnswer(
+      (_) async => StoredSession(
+        userId: 'user-6',
+        tokens: AniTokens(
+          accessToken: 'stale',
+          refreshToken: 'r',
+          expiresAtMillis: DateTime.now().millisecondsSinceEpoch + const Duration(minutes: 3).inMilliseconds,
+        ),
+      ),
+    );
+    when(() => refresher.refresh('r')).thenAnswer(
+      (_) async => const StoredSession(
+        userId: 'user-6',
+        tokens: AniTokens(accessToken: 'fresh', refreshToken: 'r2', expiresAtMillis: 999999999999),
+      ),
+    );
+
+    final notifier = container.read(authControllerProvider.notifier);
+    await notifier.restoreSession();
+
+    verify(() => refresher.refresh('r')).called(1);
+    final state = container.read(authControllerProvider);
+    expect(state, isA<AuthAuthenticated>());
+    expect((state as AuthAuthenticated).userId, 'user-6');
+  });
+
   test('restoreSession stays unauthenticated when refreshing an expired token fails', () async {
     when(() => storage.readSession()).thenAnswer(
       (_) async => const StoredSession(

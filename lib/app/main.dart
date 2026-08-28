@@ -6,6 +6,12 @@ import '../domain/auth/auth_controller.dart';
 import 'router.dart';
 
 Future<void> main() async {
+  // Must run before any platform-channel plugin use (e.g. the
+  // flutter_secure_storage read inside restoreSession() below), since
+  // that call happens before runApp(), which is what normally performs
+  // this initialization implicitly.
+  WidgetsFlutterBinding.ensureInitialized();
+
   final container = ProviderContainer();
   await container.read(authControllerProvider.notifier).restoreSession();
 

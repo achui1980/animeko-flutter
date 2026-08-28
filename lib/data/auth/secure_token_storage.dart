@@ -44,20 +44,21 @@ class SecureTokenStorage {
     );
   }
 
-  /// Reads back the stored session, or null if nothing (or a corrupt
-  /// value) is stored.
+  /// Reads back the stored session, or null if nothing is stored, the
+  /// stored value is corrupt, or the underlying platform-channel read
+  /// itself fails for any reason (Keychain I/O failure, binding not yet
+  /// initialized, permissions, etc.) -- this method never throws, mirroring
+  /// the "never throws" contract of `SessionRefresher.refresh()`.
   Future<StoredSession?> readSession() async {
-    final raw = await _backing.read(key: _sessionKey);
-    if (raw == null) return null;
     try {
+      final raw = await _backing.read(key: _sessionKey);
+      if (raw == null) return null;
       final json = jsonDecode(raw) as Map<String, dynamic>;
       return StoredSession(
         userId: json['userId'] as String,
         tokens: AniTokens.fromJson(json),
       );
-    } on FormatException {
-      return null;
-    } on TypeError {
+    } catch (_) {
       return null;
     }
   }
