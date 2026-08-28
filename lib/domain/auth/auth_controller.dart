@@ -57,7 +57,9 @@ class AuthController extends _$AuthController {
       state = AuthPolling(requestId);
 
       final result = await _pollUntilReady(requestId, api);
-      await storage.saveTokens(result.tokens);
+      await storage.saveSession(
+        StoredSession(userId: result.userId, tokens: result.tokens),
+      );
       state = AuthAuthenticated(result.userId);
     } catch (e) {
       state = AuthError(e.toString());

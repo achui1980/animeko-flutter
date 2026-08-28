@@ -24,11 +24,14 @@ void main() {
 
   setUpAll(() {
     // mocktail requires a registered fallback value for any() matchers
-    // whose static type is a custom class (storage.saveTokens(any())
-    // below uses AniTokens, which is not one of mocktail's built-in
+    // whose static type is a custom class (storage.saveSession(any())
+    // below uses StoredSession, which is not one of mocktail's built-in
     // registered types like String/int/bool).
     registerFallbackValue(
-      const AniTokens(accessToken: '', refreshToken: '', expiresAtMillis: 0),
+      const StoredSession(
+        userId: '',
+        tokens: AniTokens(accessToken: '', refreshToken: '', expiresAtMillis: 0),
+      ),
     );
   });
 
@@ -50,7 +53,7 @@ void main() {
     addTearDown(container.dispose);
 
     when(() => launcher.open(any())).thenAnswer((_) async => true);
-    when(() => storage.saveTokens(any())).thenAnswer((_) async {});
+    when(() => storage.saveSession(any())).thenAnswer((_) async {});
   });
 
   test('initial state is AuthUnauthenticated', () {
@@ -106,7 +109,7 @@ void main() {
       expect(captured[1], 'macos');
       expect(captured[2], 'aarch64');
       verify(() => launcher.open('https://bgm.tv/x')).called(1);
-      verify(() => storage.saveTokens(any())).called(1);
+      verify(() => storage.saveSession(any())).called(1);
       final state = container.read(authControllerProvider);
       expect(state, isA<AuthAuthenticated>());
       expect((state as AuthAuthenticated).userId, 'user-1');

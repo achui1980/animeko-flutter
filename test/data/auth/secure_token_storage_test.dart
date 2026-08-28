@@ -1,4 +1,6 @@
 // test/data/auth/secure_token_storage_test.dart
+import 'dart:convert';
+
 import 'package:animeko_flutter/data/auth/bangumi_oauth_models.dart';
 import 'package:animeko_flutter/data/auth/secure_token_storage.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -16,80 +18,71 @@ void main() {
     storage = SecureTokenStorage(backing);
   });
 
-  test(
-    'saveTokens writes accessToken, refreshToken, expiresAtMillis',
-    () async {
-      when(
-        () => backing.write(
-          key: any(named: 'key'),
-          value: any(named: 'value'),
-        ),
-      ).thenAnswer((_) async {});
+  test('saveSession writes userId and the full token triple as one JSON blob', () async {
+    when(
+      () => backing.write(key: any(named: 'key'), value: any(named: 'value')),
+    ).thenAnswer((_) async {});
 
-      await storage.saveTokens(
-        const AniTokens(
+    await storage.saveSession(
+      const StoredSession(
+        userId: 'user-1',
+        tokens: AniTokens(
           accessToken: 'access-1',
           refreshToken: 'refresh-1',
           expiresAtMillis: 1700000000000,
         ),
-      );
+      ),
+    );
 
-      verify(
-        () => backing.write(key: 'ani_access_token', value: 'access-1'),
-      ).called(1);
-      verify(
-        () => backing.write(key: 'ani_refresh_token', value: 'refresh-1'),
-      ).called(1);
-      verify(
-        () =>
-            backing.write(key: 'ani_expires_at_millis', value: '1700000000000'),
-      ).called(1);
-    },
-  );
-
-  test(
-    'readAccessToken reads from the same key saveTokens writes to',
-    () async {
-      when(
-        () => backing.read(key: 'ani_access_token'),
-      ).thenAnswer((_) async => 'stored-token');
-
-      final result = await storage.readAccessToken();
-
-      expect(result, 'stored-token');
-    },
-  );
-
-  test('readAccessToken returns null when nothing stored', () async {
-    when(
-      () => backing.read(key: 'ani_access_token'),
-    ).thenAnswer((_) async => null);
-
-    final result = await storage.readAccessToken();
-
-    expect(result, isNull);
+    final captured = verify(
+      () => backing.write(key: 'ani_session', value: captureAny(named: 'value')),
+    ).captured.single as String;
+    final decoded = jsonDecode(captured) as Map<String, dynamic>;
+    expect(decoded, {
+      'userId': 'user-1',
+      'accessToken': 'access-1',
+      'refreshToken': 'refresh-1',
+      'expiresAtMillis': 1700000000000,
+      'bangumiAccessToken': null,
+    });
   });
 
-  test(
-    'readRefreshToken reads from the same key saveTokens writes to',
-    () async {
-      when(
-        () => backing.read(key: 'ani_refresh_token'),
-      ).thenAnswer((_) async => 'stored-refresh');
+  test('readSession round-trips a previously saved session', () async {
+    when(() => backing.read(key: 'ani_session')).thenAnswer(
+      (_) async => jsonEncode({
+        'userId': 'user-2',
+        'accessToken': 'a',
+        'refreshToken': 'r',
+        'expiresAtMillis': 42,
+        'bangumiAccessToken': 'bgm-token',
+      }),
+    );
 
-      final result = await storage.readRefreshToken();
+    final session = await storage.readSession();
 
-      expect(result, 'stored-refresh');
-    },
-  );
+    expect(session, isNotNull);
+    expect(session!.userId, 'user-2');
+    expect(session.tokens.accessToken, 'a');
+    expect(session.tokens.bangumiAccessToken, 'bgm-token');
+  });
 
-  test('clear deletes all three keys', () async {
+  test('readSession returns null when nothing is stored', () async {
+    when(() => backing.read(key: 'ani_session')).thenAnswer((_) async => null);
+
+    expect(await storage.readSession(), isNull);
+  });
+
+  test('readSession returns null for corrupt JSON instead of throwing', () async {
+    when(() => backing.read(key: 'ani_session')).thenAnswer((_) async => 'not json{{{');
+
+    expect(await storage.readSession(), isNull);
+  });
+
+  test('clear deletes the single session key', () async {
     when(() => backing.delete(key: any(named: 'key'))).thenAnswer((_) async {});
 
     await storage.clear();
 
-    verify(() => backing.delete(key: 'ani_access_token')).called(1);
-    verify(() => backing.delete(key: 'ani_refresh_token')).called(1);
-    verify(() => backing.delete(key: 'ani_expires_at_millis')).called(1);
+    verify(() => backing.delete(key: 'ani_session')).called(1);
   });
 }
