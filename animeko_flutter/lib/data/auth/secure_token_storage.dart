@@ -45,5 +45,16 @@ class SecureTokenStorage {
 
 @riverpod
 SecureTokenStorage secureTokenStorage(Ref ref) {
-  return SecureTokenStorage(const FlutterSecureStorage());
+  // `usesDataProtectionKeychain` defaults to true in flutter_secure_storage,
+  // which makes the plugin pass `kSecUseDataProtectionKeychain` to every
+  // Keychain query. That keychain requires the binary to be signed with a
+  // real Apple Team ID (`application-identifier` /
+  // `keychain-access-groups` entitlements); locally signed builds fail with
+  // `errSecMissingEntitlement` (-34018). We use the legacy file-based
+  // keychain instead, which works for both local and distributed builds.
+  return SecureTokenStorage(
+    const FlutterSecureStorage(
+      mOptions: MacOsOptions(usesDataProtectionKeychain: false),
+    ),
+  );
 }

@@ -6,6 +6,13 @@
 	<true/>
 	<key>com.apple.security.cs.allow-jit</key>
 	<true/>
+	<!--
+	Required for all outbound HTTP: the Flutter macOS template ships only
+	network.server, so without this every request to api.animeko.org fails
+	with "Operation not permitted" (errno 1) under the sandbox.
+	-->
+	<key>com.apple.security.network.client</key>
+	<true/>
 	<key>com.apple.security.network.server</key>
 	<true/>
 </dict>
