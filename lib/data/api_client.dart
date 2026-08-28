@@ -2,6 +2,10 @@
 import 'package:dio/dio.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import 'auth/secure_token_storage.dart';
+import 'auth/session_refresher.dart';
+import 'auth_interceptor.dart';
+
 part 'api_client.g.dart';
 
 /// Single fixed ani-api-server endpoint for Phase 1. No failover to
@@ -28,5 +32,18 @@ Dio rawAniDio() {
 
 @riverpod
 Dio dio(Ref ref) {
-  return rawAniDio();
+  final dio = rawAniDio();
+  final storage = ref.watch(secureTokenStorageProvider);
+  final refresher = ref.watch(sessionRefresherProvider);
+
+  dio.interceptors.add(
+    AuthInterceptor(dio, storage, () async {
+      final session = await storage.readSession();
+      if (session == null) return false;
+      final refreshed = await refresher.refresh(session.tokens.refreshToken);
+      return refreshed != null;
+    }),
+  );
+
+  return dio;
 }
