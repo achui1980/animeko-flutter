@@ -55,4 +55,4 @@ final class SecureTokenStorageProvider
 }
 
 String _$secureTokenStorageHash() =>
-    r'91f0deacaa577ae70fe351207e55a837bd36ec83';
+    r'da54347a15be64fb07762f6de51284affc22f32b';
