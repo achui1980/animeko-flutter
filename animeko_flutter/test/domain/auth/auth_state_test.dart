@@ -29,12 +29,12 @@ void main() {
 
     test('switch exhaustiveness compiles for all variants', () {
       String describe(AuthState s) => switch (s) {
-            AuthUnauthenticated() => 'unauthenticated',
-            AuthAwaitingBrowser(requestId: final id) => 'awaiting:$id',
-            AuthPolling(requestId: final id) => 'polling:$id',
-            AuthAuthenticated(userId: final id) => 'authenticated:$id',
-            AuthError(message: final m) => 'error:$m',
-          };
+        AuthUnauthenticated() => 'unauthenticated',
+        AuthAwaitingBrowser(requestId: final id) => 'awaiting:$id',
+        AuthPolling(requestId: final id) => 'polling:$id',
+        AuthAuthenticated(userId: final id) => 'authenticated:$id',
+        AuthError(message: final m) => 'error:$m',
+      };
       expect(describe(const AuthUnauthenticated()), 'unauthenticated');
     });
   });
