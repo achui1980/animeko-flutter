@@ -2,6 +2,7 @@
 import 'dart:ffi' show Abi;
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../data/auth/bangumi_oauth_api.dart';
 import '../../data/auth/bangumi_oauth_models.dart';
@@ -68,15 +69,21 @@ class AuthController extends _$AuthController {
   }
 
   String _generateRequestId() {
-    // Simple v4-ish UUID without pulling in extra randomness requirements;
-    // the server only needs this to be unique per login attempt.
-    final rand = DateTime.now().microsecondsSinceEpoch;
-    return 'req-$rand-${identityHashCode(this)}';
+    // The server correlates this value with the OAuth `state` parameter and
+    // validates it as a well-formed UUID (matching the Kotlin reference
+    // client's `Uuid.random()`); a non-UUID string is rejected with 400.
+    return const Uuid().v4();
   }
 
   static const _os = 'macos';
+
+  // Must match the Kotlin reference client's `Arch.displayName` values
+  // exactly (see utils/platform/.../Platform.kt in the Ani repo: "Don't
+  // change, used by the server"). The server validates `arch` against
+  // this fixed vocabulary, so "arm64"/"x64" (Dart's own naming) are
+  // rejected with HTTP 400 — it must be "aarch64" / "x86_64".
   static String get _arch =>
       Abi.current().toString().toLowerCase().contains('arm64')
-      ? 'arm64'
-      : 'x64';
+      ? 'aarch64'
+      : 'x86_64';
 }
