@@ -241,7 +241,11 @@ void main() {
     var readCount = 0;
     when(() => storage.readSession()).thenAnswer((_) async {
       readCount++;
-      final token = readCount == 1 ? 'stale-token' : 'fresh-token';
+      // Both concurrently-fired requests' initial token-attach calls
+      // (readCount 1 and 2) must see the stale token so that they both
+      // genuinely 401 and race into the refresh path -- only reads after
+      // that (i.e. the post-refresh retries) should see the fresh token.
+      final token = readCount <= 2 ? 'stale-token' : 'fresh-token';
       return StoredSession(
         userId: 'u',
         tokens: AniTokens(
