@@ -1,3 +1,5 @@
+import '../app_error.dart';
+
 /// State machine for the Bangumi OAuth login flow.
 ///
 /// See docs/superpowers/specs/2026-08-27-flutter-migration-phase1-design.md
@@ -35,6 +37,10 @@ class AuthAuthenticated extends AuthState {
 /// Login failed. `message` is a human-readable description, not parsed
 /// from any particular exception type.
 class AuthError extends AuthState {
-  const AuthError(this.message);
-  final String message;
+  const AuthError(this.error);
+  final AppError error;
+
+  /// Convenience forwarding getter so existing call sites (login_screen,
+  /// tests) that read `.message` keep working unchanged.
+  String get message => error.message;
 }

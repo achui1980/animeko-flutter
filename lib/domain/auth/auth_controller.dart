@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../../data/auth/bangumi_oauth_api.dart';
 import '../../data/auth/bangumi_oauth_models.dart';
 import '../../data/auth/secure_token_storage.dart';
+import '../../data/dio_error_mapper.dart';
 import '../../platform/browser_launcher.dart';
 import '../../platform/platform_info.dart';
 import 'auth_state.dart';
@@ -62,7 +63,7 @@ class AuthController extends _$AuthController {
       );
       state = AuthAuthenticated(result.userId);
     } catch (e) {
-      state = AuthError(e.toString());
+      state = AuthError(mapToAppError(e));
     }
   }
 

@@ -1,4 +1,5 @@
 // test/ui/auth/login_screen_test.dart
+import 'package:animeko_flutter/domain/app_error.dart';
 import 'package:animeko_flutter/domain/auth/auth_controller.dart';
 import 'package:animeko_flutter/domain/auth/auth_state.dart';
 import 'package:animeko_flutter/ui/auth/login_screen.dart';
@@ -74,7 +75,7 @@ void main() {
   });
 
   testWidgets('shows the error message on error', (tester) async {
-    await tester.pumpWidget(wrap(const AuthError('network down')));
+    await tester.pumpWidget(wrap(const AuthError(UnknownAppError('network down'))));
 
     expect(find.textContaining('network down'), findsOneWidget);
   });

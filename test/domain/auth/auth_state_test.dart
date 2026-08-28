@@ -1,3 +1,4 @@
+import 'package:animeko_flutter/domain/app_error.dart';
 import 'package:animeko_flutter/domain/auth/auth_state.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -23,8 +24,8 @@ void main() {
     });
 
     test('AuthError carries a message', () {
-      const state = AuthError('network down');
-      expect(state.message, 'network down');
+      const state = AuthError(UnknownAppError('network down'));
+      expect(state.message, contains('network down'));
     });
 
     test('switch exhaustiveness compiles for all variants', () {
