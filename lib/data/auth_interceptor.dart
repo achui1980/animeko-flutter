@@ -23,9 +23,34 @@ class AuthInterceptor extends Interceptor {
 
   static const _retriedFlag = 'ani_auth_retried';
 
+  /// Tracks a single in-flight refresh attempt so concurrent 401s (e.g.
+  /// several requests failing around the same time) share one refresh
+  /// call instead of each independently racing the server -- important
+  /// because a naive N-way race can have one successful refresh's
+  /// session wiped out by another's "failed" refresh (which clears
+  /// storage) if the server rotates refresh tokens on use.
+  Future<bool>? _inFlightRefresh;
+
+  Future<bool> _refreshOnce() {
+    return _inFlightRefresh ??= _refresh().whenComplete(() {
+      _inFlightRefresh = null;
+    });
+  }
+
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    _attachToken(options).then((_) => handler.next(options));
+    _attachToken(options).then(
+      (_) => handler.next(options),
+      onError: (Object error, StackTrace stackTrace) {
+        // If reading the stored session itself fails (e.g. a Keychain
+        // access error), we must still resolve the interceptor chain --
+        // otherwise the request hangs forever with no way for the caller
+        // to ever see an error. Proceed without a token; the server will
+        // (correctly) respond 401, which the normal onError/refresh path
+        // below already knows how to handle.
+        handler.next(options);
+      },
+    );
   }
 
   Future<void> _attachToken(RequestOptions options) async {
@@ -50,19 +75,24 @@ class AuthInterceptor extends Interceptor {
     DioException err,
     ErrorInterceptorHandler handler,
   ) async {
-    final refreshed = await _refresh();
-    if (!refreshed) {
-      handler.next(err);
-      return;
-    }
-    final options = err.requestOptions;
-    options.extra[_retriedFlag] = true;
-    await _attachToken(options);
     try {
+      final refreshed = await _refreshOnce();
+      if (!refreshed) {
+        handler.next(err);
+        return;
+      }
+      final options = err.requestOptions;
+      options.extra[_retriedFlag] = true;
+      await _attachToken(options);
       final response = await _dio.fetch<dynamic>(options);
       handler.resolve(response);
     } on DioException catch (e) {
       handler.next(e);
+    } catch (_) {
+      // Any other unexpected failure (e.g. the refresh callback itself
+      // throwing) must still resolve the interceptor chain with the
+      // *original* 401 error rather than hanging forever.
+      handler.next(err);
     }
   }
 }
