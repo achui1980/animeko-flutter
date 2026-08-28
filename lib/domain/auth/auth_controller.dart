@@ -1,6 +1,4 @@
 // lib/domain/auth/auth_controller.dart
-import 'dart:ffi' show Abi;
-
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:uuid/uuid.dart';
 
@@ -8,6 +6,7 @@ import '../../data/auth/bangumi_oauth_api.dart';
 import '../../data/auth/bangumi_oauth_models.dart';
 import '../../data/auth/secure_token_storage.dart';
 import '../../platform/browser_launcher.dart';
+import '../../platform/platform_info.dart';
 import 'auth_state.dart';
 
 part 'auth_controller.g.dart';
@@ -35,6 +34,7 @@ class AuthController extends _$AuthController {
   Future<void> login({required bool isRegister}) async {
     final requestId = _generateRequestId();
     state = AuthAwaitingBrowser(requestId);
+    final platform = ref.read(platformInfoProvider);
 
     final api = ref.read(bangumiOAuthApiProvider);
     final launcher = ref.read(browserLauncherProvider);
@@ -42,8 +42,16 @@ class AuthController extends _$AuthController {
 
     try {
       final redirect = isRegister
-          ? await api.oauth(requestId: requestId, os: _os, arch: _arch)
-          : await api.bind(requestId: requestId, os: _os, arch: _arch);
+          ? await api.oauth(
+              requestId: requestId,
+              os: platform.os,
+              arch: platform.arch,
+            )
+          : await api.bind(
+              requestId: requestId,
+              os: platform.os,
+              arch: platform.arch,
+            );
 
       await launcher.open(redirect.url);
       state = AuthPolling(requestId);
@@ -74,16 +82,4 @@ class AuthController extends _$AuthController {
     // client's `Uuid.random()`); a non-UUID string is rejected with 400.
     return const Uuid().v4();
   }
-
-  static const _os = 'macos';
-
-  // Must match the Kotlin reference client's `Arch.displayName` values
-  // exactly (see utils/platform/.../Platform.kt in the Ani repo: "Don't
-  // change, used by the server"). The server validates `arch` against
-  // this fixed vocabulary, so "arm64"/"x64" (Dart's own naming) are
-  // rejected with HTTP 400 — it must be "aarch64" / "x86_64".
-  static String get _arch =>
-      Abi.current().toString().toLowerCase().contains('arm64')
-      ? 'aarch64'
-      : 'x86_64';
 }

@@ -5,6 +5,7 @@ import 'package:animeko_flutter/data/auth/secure_token_storage.dart';
 import 'package:animeko_flutter/domain/auth/auth_controller.dart';
 import 'package:animeko_flutter/domain/auth/auth_state.dart';
 import 'package:animeko_flutter/platform/browser_launcher.dart';
+import 'package:animeko_flutter/platform/platform_info.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:riverpod/riverpod.dart';
@@ -41,6 +42,9 @@ void main() {
         secureTokenStorageProvider.overrideWithValue(storage),
         browserLauncherProvider.overrideWithValue(launcher),
         authPollIntervalProvider.overrideWithValue(Duration.zero),
+        platformInfoProvider.overrideWithValue(
+          const PlatformInfo(os: 'macos', arch: 'aarch64'),
+        ),
       ],
     );
     addTearDown(container.dispose);
@@ -84,6 +88,23 @@ void main() {
       await notifier.login(isRegister: true);
 
       expect(callCount, 2);
+      final captured = verify(
+        () => api.oauth(
+          requestId: captureAny(named: 'requestId'),
+          os: captureAny(named: 'os'),
+          arch: captureAny(named: 'arch'),
+        ),
+      ).captured;
+      expect(
+        captured[0],
+        matches(
+          RegExp(
+            r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
+          ),
+        ),
+      );
+      expect(captured[1], 'macos');
+      expect(captured[2], 'aarch64');
       verify(() => launcher.open('https://bgm.tv/x')).called(1);
       verify(() => storage.saveTokens(any())).called(1);
       final state = container.read(authControllerProvider);
