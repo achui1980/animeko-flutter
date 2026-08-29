@@ -63,6 +63,18 @@ class AppDatabase extends _$AppDatabase {
   @override
   int get schemaVersion => 1;
 
+  /// SQLite does not enforce declared FOREIGN KEY constraints unless this
+  /// pragma is turned on for the connection -- drift does not do this
+  /// automatically. Without it, `Episodes.subjectId`/`SubjectCollections.subjectId`
+  /// referencing a non-existent `Subjects.id` would silently succeed instead
+  /// of throwing.
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        beforeOpen: (details) async {
+          await customStatement('PRAGMA foreign_keys = ON');
+        },
+      );
+
   static QueryExecutor _openConnection() {
     return LazyDatabase(() async {
       final dir = await getApplicationDocumentsDirectory();

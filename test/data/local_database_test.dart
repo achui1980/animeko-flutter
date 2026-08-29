@@ -59,6 +59,7 @@ void main() {
     expect(rows, hasLength(1));
     expect(rows.single.dirty, isTrue);
     expect(rows.single.syncedAt, isNull);
+    expect(rows.single.isPrivate, isFalse);
   });
 
   test('searchHistory table round-trips a row', () async {
@@ -70,5 +71,19 @@ void main() {
 
     expect(rows, hasLength(1));
     expect(rows.single.query, 'mahou shoujo');
+  });
+
+  test('inserting an Episode with a non-existent subjectId throws (FK enforcement)', () async {
+    expect(
+      () async => await db.into(db.episodes).insert(
+            EpisodesCompanion.insert(
+              id: const Value(10),
+              subjectId: 999,
+              sort: '1',
+              name: 'Episode 1',
+            ),
+          ),
+      throwsA(anything),
+    );
   });
 }
