@@ -1,4 +1,6 @@
 // lib/domain/auth/auth_controller.dart
+import 'dart:async';
+
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:uuid/uuid.dart';
 
@@ -17,6 +19,23 @@ part 'auth_controller.g.dart';
 /// `Duration.zero` in tests so the polling loop runs instantly.
 @riverpod
 Duration authPollInterval(Ref ref) => const Duration(seconds: 1);
+
+/// Bound on how long `restoreSession()` will wait for
+/// `SessionRefresher.refresh()` before giving up and treating it as a
+/// failed refresh.
+///
+/// This exists because `restoreSession()` is awaited in `main()` *before*
+/// `runApp()`, specifically so already-authenticated users don't see a
+/// login-screen flash. `refresh()` makes a real HTTP call via
+/// `rawAniDio()`, whose `connectTimeout`/`receiveTimeout` are 15 seconds
+/// each -- on a device with no network yet (e.g. just woken from sleep) or
+/// a slow server, that could block the very first frame from rendering for
+/// up to ~30 seconds. This timeout is deliberately much shorter than that
+/// general 15s Dio timeout: it only needs to cover a normal fast round
+/// trip to a nearby server, because on expiry we fall back to showing the
+/// login screen (the user can just tap "log in" again) rather than leaving
+/// the app blank/frozen indefinitely.
+const _restoreSessionRefreshTimeout = Duration(seconds: 3);
 
 /// Orchestrates the full Bangumi OAuth flow described in the design doc:
 /// generate requestId -> fetch redirect url (oauth or bind) -> open system
@@ -89,7 +108,16 @@ class AuthController extends _$AuthController {
       }
 
       final refresher = ref.read(sessionRefresherProvider);
-      final refreshed = await refresher.refresh(session.tokens.refreshToken);
+      StoredSession? refreshed;
+      try {
+        refreshed = await refresher
+            .refresh(session.tokens.refreshToken)
+            .timeout(_restoreSessionRefreshTimeout);
+      } on TimeoutException {
+        // Took too long for a startup-blocking call; fall through to the
+        // same "stay unauthenticated" branch as a null/failed refresh.
+        refreshed = null;
+      }
       if (refreshed != null) {
         state = AuthAuthenticated(refreshed.userId);
       }

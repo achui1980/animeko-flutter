@@ -272,4 +272,38 @@ void main() {
 
     expect(container.read(authControllerProvider), isA<AuthUnauthenticated>());
   });
+
+  test(
+    'restoreSession stays unauthenticated (and returns quickly) when refresh hangs '
+    'longer than the startup timeout',
+    () async {
+      when(() => storage.readSession()).thenAnswer(
+        (_) async => const StoredSession(
+          userId: 'user-7',
+          tokens: AniTokens(accessToken: 'stale', refreshToken: 'r', expiresAtMillis: 1),
+        ),
+      );
+      // Slower than the 3s startup timeout, but bounded so the test itself
+      // can't hang forever if the fix regresses.
+      when(() => refresher.refresh('r')).thenAnswer(
+        (_) => Future.delayed(
+          const Duration(seconds: 10),
+          () => const StoredSession(
+            userId: 'user-7',
+            tokens: AniTokens(accessToken: 'fresh', refreshToken: 'r2', expiresAtMillis: 999999999999),
+          ),
+        ),
+      );
+
+      final notifier = container.read(authControllerProvider.notifier);
+      final stopwatch = Stopwatch()..start();
+      await notifier.restoreSession();
+      stopwatch.stop();
+
+      // Proves the app-level timeout fired rather than the test just
+      // eventually awaiting the mock's real 10s delayed result.
+      expect(stopwatch.elapsed, lessThan(const Duration(seconds: 5)));
+      expect(container.read(authControllerProvider), isA<AuthUnauthenticated>());
+    },
+  );
 }
