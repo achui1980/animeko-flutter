@@ -1,3 +1,5 @@
+import '../data/home/trends_models.dart';
+
 /// Unified internal representation of an anime "card" shown in Home,
 /// Search, and Schedule lists. None of the four Ani API endpoint groups
 /// (trends, home recommendations, search, schedule) return a shared wire
@@ -25,4 +27,11 @@ class SubjectCard {
   final String? score;
   final List<String>? tags;
   final String? airDate;
+
+  factory SubjectCard.fromTrending(TrendingSubject t) => SubjectCard(
+    id: t.bangumiId,
+    name: t.nameCn,
+    nameCn: t.nameCn,
+    imageUrl: t.imageLarge,
+  );
 }
