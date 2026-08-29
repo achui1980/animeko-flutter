@@ -7,6 +7,7 @@ import 'trends_models.dart';
 
 part 'trends_api.g.dart';
 
+/// GET /v1/trends -- public endpoint, no auth required.
 class TrendsApi {
   TrendsApi(this._dio);
   final Dio _dio;
