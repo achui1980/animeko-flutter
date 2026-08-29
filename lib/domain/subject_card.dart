@@ -1,3 +1,4 @@
+import '../data/home/home_recommendations_models.dart';
 import '../data/home/trends_models.dart';
 
 /// Unified internal representation of an anime "card" shown in Home,
@@ -34,4 +35,12 @@ class SubjectCard {
     nameCn: t.nameCn,
     imageUrl: t.imageLarge,
   );
+
+  factory SubjectCard.fromRecommendation(SubjectRecommendation r) =>
+      SubjectCard(
+        id: r.subjectId,
+        name: r.subjectName,
+        nameCn: r.subjectNameCn,
+        imageUrl: r.imageUrl,
+      );
 }
