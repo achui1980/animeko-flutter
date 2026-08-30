@@ -23,11 +23,12 @@ Future<void> main() async {
   );
 }
 
-class AnimekoFlutterApp extends StatelessWidget {
+class AnimekoFlutterApp extends ConsumerWidget {
   const AnimekoFlutterApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp.router(title: 'Animeko', routerConfig: appRouter);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final router = ref.watch(appRouterProvider);
+    return MaterialApp.router(title: 'Animeko', routerConfig: router);
   }
 }
