@@ -8,9 +8,9 @@ import 'secure_token_storage.dart';
 /// [NetworkError] means the old session may still be valid (the server
 /// was just unreachable), whereas one carrying an [AuthExpiredError]
 /// means the refresh token itself was rejected and the session is
-/// definitively dead. Callers (see `AuthController.restoreSession()` and
-/// `AuthController.refreshSessionForInterceptor()`) use this distinction
-/// to decide whether to sign the user out.
+/// definitively dead. Callers (see `AuthController.restoreSession()`, and
+/// will be used similarly by a future interceptor-refresh path) use this
+/// distinction to decide whether to sign the user out.
 sealed class RefreshResult {
   const RefreshResult();
 }

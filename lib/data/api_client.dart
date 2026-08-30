@@ -2,6 +2,7 @@
 import 'package:dio/dio.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import 'auth/refresh_result.dart';
 import 'auth/secure_token_storage.dart';
 import 'auth/session_refresher.dart';
 import 'auth_interceptor.dart';
@@ -30,6 +31,28 @@ Dio rawAniDio() {
   );
 }
 
+/// Attempts a token refresh and translates the outcome into the plain
+/// boolean contract required by [AuthInterceptor]'s [RefreshTokenFn].
+///
+/// Extracted as a standalone (rather than inline-closure) function so it
+/// can be unit-tested directly with a mocked [SessionRefresher] -- see
+/// `test/data/api_client_test.dart`. This matters because
+/// [SessionRefresher.refresh] returns a non-nullable [RefreshResult]
+/// (never `null`), so the boolean must come from a switch/pattern match
+/// on [RefreshSuccess] vs [RefreshFailure] rather than a null check.
+Future<bool> refreshTokenForInterceptor(
+  SecureTokenStorage storage,
+  SessionRefresher refresher,
+) async {
+  final session = await storage.readSession();
+  if (session == null) return false;
+  final result = await refresher.refresh(session.tokens.refreshToken);
+  return switch (result) {
+    RefreshSuccess() => true,
+    RefreshFailure() => false,
+  };
+}
+
 @riverpod
 Dio dio(Ref ref) {
   final dio = rawAniDio();
@@ -37,12 +60,11 @@ Dio dio(Ref ref) {
   final refresher = ref.watch(sessionRefresherProvider);
 
   dio.interceptors.add(
-    AuthInterceptor(dio, storage, () async {
-      final session = await storage.readSession();
-      if (session == null) return false;
-      final refreshed = await refresher.refresh(session.tokens.refreshToken);
-      return refreshed != null;
-    }),
+    AuthInterceptor(
+      dio,
+      storage,
+      () => refreshTokenForInterceptor(storage, refresher),
+    ),
   );
 
   return dio;
