@@ -1,5 +1,6 @@
 import '../data/home/home_recommendations_models.dart';
 import '../data/home/trends_models.dart';
+import '../data/schedule/schedule_models.dart';
 import '../data/search/search_models.dart';
 
 /// Unified internal representation of an anime "card" shown in Home,
@@ -54,4 +55,12 @@ class SubjectCard {
     tags: s.tags.map((t) => t.name).toList(),
     airDate: s.airDate,
   );
+
+  factory SubjectCard.fromScheduledSubject(ScheduledAnimeSubject s) =>
+      SubjectCard(
+        id: s.subjectId,
+        name: s.name,
+        nameCn: s.nameCn,
+        imageUrl: s.imageLarge,
+      );
 }
