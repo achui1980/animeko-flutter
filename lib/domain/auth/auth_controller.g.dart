@@ -102,7 +102,7 @@ final class AuthControllerProvider
   }
 }
 
-String _$authControllerHash() => r'7ccffcebfbefdae6153104167d15f39cec210f7e';
+String _$authControllerHash() => r'e25475db59be9d39c8e7755ff0b729c8ee8b4215';
 
 /// Orchestrates the full Bangumi OAuth flow described in the design doc:
 /// generate requestId -> fetch redirect url (oauth or bind) -> open system

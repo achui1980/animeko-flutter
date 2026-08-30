@@ -1,8 +1,10 @@
 // test/domain/auth/auth_controller_test.dart
 import 'package:animeko_flutter/data/auth/bangumi_oauth_api.dart';
 import 'package:animeko_flutter/data/auth/bangumi_oauth_models.dart';
+import 'package:animeko_flutter/data/auth/refresh_result.dart';
 import 'package:animeko_flutter/data/auth/secure_token_storage.dart';
 import 'package:animeko_flutter/data/auth/session_refresher.dart';
+import 'package:animeko_flutter/domain/app_error.dart';
 import 'package:animeko_flutter/domain/auth/auth_controller.dart';
 import 'package:animeko_flutter/domain/auth/auth_state.dart';
 import 'package:animeko_flutter/platform/browser_launcher.dart';
@@ -217,9 +219,11 @@ void main() {
       ),
     );
     when(() => refresher.refresh('r')).thenAnswer(
-      (_) async => const StoredSession(
-        userId: 'user-4',
-        tokens: AniTokens(accessToken: 'fresh', refreshToken: 'r2', expiresAtMillis: 999999999999),
+      (_) async => const RefreshSuccess(
+        StoredSession(
+          userId: 'user-4',
+          tokens: AniTokens(accessToken: 'fresh', refreshToken: 'r2', expiresAtMillis: 999999999999),
+        ),
       ),
     );
 
@@ -243,9 +247,11 @@ void main() {
       ),
     );
     when(() => refresher.refresh('r')).thenAnswer(
-      (_) async => const StoredSession(
-        userId: 'user-6',
-        tokens: AniTokens(accessToken: 'fresh', refreshToken: 'r2', expiresAtMillis: 999999999999),
+      (_) async => const RefreshSuccess(
+        StoredSession(
+          userId: 'user-6',
+          tokens: AniTokens(accessToken: 'fresh', refreshToken: 'r2', expiresAtMillis: 999999999999),
+        ),
       ),
     );
 
@@ -265,7 +271,7 @@ void main() {
         tokens: AniTokens(accessToken: 'stale', refreshToken: 'r', expiresAtMillis: 1),
       ),
     );
-    when(() => refresher.refresh('r')).thenAnswer((_) async => null);
+    when(() => refresher.refresh('r')).thenAnswer((_) async => const RefreshFailure(NetworkError()));
 
     final notifier = container.read(authControllerProvider.notifier);
     await notifier.restoreSession();
@@ -288,9 +294,11 @@ void main() {
       when(() => refresher.refresh('r')).thenAnswer(
         (_) => Future.delayed(
           const Duration(seconds: 10),
-          () => const StoredSession(
-            userId: 'user-7',
-            tokens: AniTokens(accessToken: 'fresh', refreshToken: 'r2', expiresAtMillis: 999999999999),
+          () => const RefreshSuccess(
+            StoredSession(
+              userId: 'user-7',
+              tokens: AniTokens(accessToken: 'fresh', refreshToken: 'r2', expiresAtMillis: 999999999999),
+            ),
           ),
         ),
       );

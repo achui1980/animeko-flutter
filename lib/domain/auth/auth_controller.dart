@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../data/auth/bangumi_oauth_api.dart';
 import '../../data/auth/bangumi_oauth_models.dart';
+import '../../data/auth/refresh_result.dart';
 import '../../data/auth/secure_token_storage.dart';
 import '../../data/auth/session_refresher.dart';
 import '../../data/dio_error_mapper.dart';
@@ -108,25 +109,30 @@ class AuthController extends _$AuthController {
       }
 
       final refresher = ref.read(sessionRefresherProvider);
-      StoredSession? refreshed;
+      RefreshResult? result;
       try {
-        refreshed = await refresher
+        result = await refresher
             .refresh(session.tokens.refreshToken)
             .timeout(_restoreSessionRefreshTimeout);
       } on TimeoutException {
         // Took too long for a startup-blocking call; fall through to the
-        // same "stay unauthenticated" branch as a null/failed refresh.
-        refreshed = null;
+        // same "stay unauthenticated" branch as a failed refresh.
+        result = null;
       }
-      if (refreshed != null) {
-        state = AuthAuthenticated(refreshed.userId);
+      switch (result) {
+        case RefreshSuccess(session: final refreshed):
+          state = AuthAuthenticated(refreshed.userId);
+        case RefreshFailure():
+        case null:
+          // Storage handling on failure is `SessionRefresher`'s
+          // responsibility (see RefreshResult's doc comment): a
+          // definitively-dead refresh token has already been cleared;
+          // a transient local-save failure leaves the old (now expired)
+          // session untouched. Either way (and on a `null` here, meaning
+          // the call timed out) we fall back to whatever build() set --
+          // AuthUnauthenticated.
+          break;
       }
-      // else: refresh failed. This means either the refresh token itself was
-      // rejected by the server (storage was cleared by SessionRefresher in
-      // that case), or the refresh succeeded but the local save failed
-      // (storage was left untouched with the old, now-expired tokens in
-      // that case). Either way we stay unauthenticated here; a future
-      // login will overwrite whatever is in storage.
     } catch (_) {
       // Defense-in-depth: readSession()/refresher.refresh() are documented
       // to never throw, but if anything unexpected still does, don't let
