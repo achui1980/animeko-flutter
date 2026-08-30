@@ -12,6 +12,7 @@ import '../../data/auth/session_refresher.dart';
 import '../../data/dio_error_mapper.dart';
 import '../../platform/browser_launcher.dart';
 import '../../platform/platform_info.dart';
+import '../app_error.dart';
 import 'auth_state.dart';
 
 part 'auth_controller.g.dart';
@@ -138,6 +139,42 @@ class AuthController extends _$AuthController {
       // to never throw, but if anything unexpected still does, don't let
       // it propagate out of restoreSession() -- just leave state as
       // whatever build() returned (AuthUnauthenticated).
+    }
+  }
+
+  /// Clears the persisted session and resets [state] to
+  /// [AuthUnauthenticated]. Called directly by the UI's "log out" action,
+  /// and by [refreshSessionForInterceptor] when a background token
+  /// refresh definitively fails (Plan 1a/1b-1 follow-up I-A).
+  Future<void> signOut() async {
+    final storage = ref.read(secureTokenStorageProvider);
+    await storage.clear();
+    state = const AuthUnauthenticated();
+  }
+
+  /// Called by [AuthInterceptor] when a request gets a 401: attempts a
+  /// single token refresh and reports back whether the retry should
+  /// proceed. On [AuthExpiredError] the refresh token itself was
+  /// rejected by the server -- there is no path back to a valid session,
+  /// so this signs the user out (routing the UI back to login) rather
+  /// than leaving [state] stuck at a stale [AuthAuthenticated] forever.
+  /// Any other failure (e.g. [NetworkError]) is treated as transient and
+  /// does not sign the user out.
+  Future<bool> refreshSessionForInterceptor() async {
+    final storage = ref.read(secureTokenStorageProvider);
+    final session = await storage.readSession();
+    if (session == null) return false;
+
+    final refresher = ref.read(sessionRefresherProvider);
+    final result = await refresher.refresh(session.tokens.refreshToken);
+    switch (result) {
+      case RefreshSuccess():
+        return true;
+      case RefreshFailure(error: AuthExpiredError()):
+        await signOut();
+        return false;
+      case RefreshFailure():
+        return false;
     }
   }
 

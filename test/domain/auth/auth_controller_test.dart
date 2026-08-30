@@ -314,4 +314,84 @@ void main() {
       expect(container.read(authControllerProvider), isA<AuthUnauthenticated>());
     },
   );
+
+  group('signOut', () {
+    test('clears storage and resets state to AuthUnauthenticated', () async {
+      when(() => storage.clear()).thenAnswer((_) async {});
+
+      final controller = container.read(authControllerProvider.notifier);
+      await controller.signOut();
+
+      verify(() => storage.clear()).called(1);
+      expect(container.read(authControllerProvider), const AuthUnauthenticated());
+    });
+  });
+
+  group('refreshSessionForInterceptor', () {
+    test('returns true on RefreshSuccess without signing out', () async {
+      final session = const StoredSession(
+        userId: 'user-1',
+        tokens: AniTokens(accessToken: 'a', refreshToken: 'r', expiresAtMillis: 1),
+      );
+      when(() => storage.readSession()).thenAnswer((_) async => session);
+      when(() => refresher.refresh('r')).thenAnswer(
+        (_) async => RefreshSuccess(session),
+      );
+
+      final result = await container
+          .read(authControllerProvider.notifier)
+          .refreshSessionForInterceptor();
+
+      expect(result, isTrue);
+      verifyNever(() => storage.clear());
+    });
+
+    test('signs out and returns false on RefreshFailure(AuthExpiredError)', () async {
+      final session = const StoredSession(
+        userId: 'user-1',
+        tokens: AniTokens(accessToken: 'a', refreshToken: 'r', expiresAtMillis: 1),
+      );
+      when(() => storage.readSession()).thenAnswer((_) async => session);
+      when(() => refresher.refresh('r')).thenAnswer(
+        (_) async => const RefreshFailure(AuthExpiredError()),
+      );
+      when(() => storage.clear()).thenAnswer((_) async {});
+
+      final controller = container.read(authControllerProvider.notifier);
+      final result = await controller.refreshSessionForInterceptor();
+
+      expect(result, isFalse);
+      verify(() => storage.clear()).called(1);
+      expect(container.read(authControllerProvider), const AuthUnauthenticated());
+    });
+
+    test('returns false without signing out on RefreshFailure(NetworkError)', () async {
+      final session = const StoredSession(
+        userId: 'user-1',
+        tokens: AniTokens(accessToken: 'a', refreshToken: 'r', expiresAtMillis: 1),
+      );
+      when(() => storage.readSession()).thenAnswer((_) async => session);
+      when(() => refresher.refresh('r')).thenAnswer(
+        (_) async => const RefreshFailure(NetworkError()),
+      );
+
+      final result = await container
+          .read(authControllerProvider.notifier)
+          .refreshSessionForInterceptor();
+
+      expect(result, isFalse);
+      verifyNever(() => storage.clear());
+    });
+
+    test('returns false immediately when nothing is stored', () async {
+      when(() => storage.readSession()).thenAnswer((_) async => null);
+
+      final result = await container
+          .read(authControllerProvider.notifier)
+          .refreshSessionForInterceptor();
+
+      expect(result, isFalse);
+      verifyNever(() => refresher.refresh(any()));
+    });
+  });
 }
