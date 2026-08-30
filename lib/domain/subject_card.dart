@@ -1,5 +1,6 @@
 import '../data/home/home_recommendations_models.dart';
 import '../data/home/trends_models.dart';
+import '../data/search/search_models.dart';
 
 /// Unified internal representation of an anime "card" shown in Home,
 /// Search, and Schedule lists. None of the four Ani API endpoint groups
@@ -43,4 +44,14 @@ class SubjectCard {
         nameCn: r.subjectNameCn,
         imageUrl: r.imageUrl,
       );
+
+  factory SubjectCard.fromSearchResult(SubjectSearchResult s) => SubjectCard(
+    id: s.id,
+    name: s.name,
+    nameCn: s.nameCn,
+    imageUrl: s.imageLarge,
+    score: s.score,
+    tags: s.tags.map((t) => t.name).toList(),
+    airDate: s.airDate,
+  );
 }
