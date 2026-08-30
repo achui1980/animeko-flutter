@@ -30,7 +30,7 @@ GoRouter appRouter(Ref ref) {
   ref.listen(authControllerProvider, (_, _) => notifier.notify());
   ref.onDispose(notifier.dispose);
 
-  return GoRouter(
+  final router = GoRouter(
     initialLocation: '/login',
     refreshListenable: notifier,
     redirect: (context, state) {
@@ -61,4 +61,6 @@ GoRouter appRouter(Ref ref) {
       ),
     ],
   );
+  ref.onDispose(router.dispose);
+  return router;
 }
