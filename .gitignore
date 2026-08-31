@@ -43,3 +43,6 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Superpowers scratch files (task briefs, brainstorm mockups, progress ledgers)
+.superpowers/
