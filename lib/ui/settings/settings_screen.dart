@@ -36,7 +36,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     } else {
       await ref.read(proxySettingsControllerProvider.notifier).setProxy(trimmed);
     }
-    setState(() => _errorText = null);
+    if (mounted) setState(() => _errorText = null);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已保存')));
     }
@@ -45,7 +45,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _clear() async {
     _controller.clear();
     await ref.read(proxySettingsControllerProvider.notifier).clearProxy();
-    setState(() => _errorText = null);
+    if (mounted) setState(() => _errorText = null);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已清除代理')));
     }
