@@ -1,71 +1,136 @@
-import 'package:animeko_flutter/data/anime1/anime1_api.dart';
-import 'package:animeko_flutter/data/anime1/anime1_models.dart';
+// test/domain/play/subject_episodes_controller_test.dart
+import 'package:animeko_flutter/domain/media/media_registry.dart';
+import 'package:animeko_flutter/domain/media/media_source.dart';
 import 'package:animeko_flutter/domain/play/subject_episodes_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:riverpod/riverpod.dart';
 
+class _FakeCandidate implements MediaCandidate {
+  const _FakeCandidate(this.sourceId, this.title);
+  @override
+  final String sourceId;
+  @override
+  final String title;
+}
+
+class _FakeEpisode implements MediaEpisode {
+  const _FakeEpisode(this.sourceId, this.title);
+  @override
+  final String sourceId;
+  @override
+  final String title;
+}
+
+class MockMediaSource extends Mock implements MediaSource {}
+
 void main() {
+  setUpAll(() {
+    registerFallbackValue(const _FakeCandidate('fallback', 'fallback'));
+  });
+
   group('SubjectEpisodesController', () {
-    late _MockAnime1Api api;
+    late MockMediaSource sourceA;
+    late MockMediaSource sourceB;
     late ProviderContainer container;
 
     setUp(() {
-      api = _MockAnime1Api();
+      sourceA = MockMediaSource();
+      sourceB = MockMediaSource();
+      when(() => sourceA.id).thenReturn('a');
+      when(() => sourceB.id).thenReturn('b');
       container = ProviderContainer(
-        overrides: [anime1ApiProvider.overrideWithValue(api)],
-        // riverpod 3.x's default `retry` re-runs a failed build() several
-        // times with exponential backoff (see
-        // `ProviderContainer.defaultRetry`), which would make the
-        // "throws"/"propagates" tests below spend ~30s retrying against a
-        // mock that always fails before finally giving up. Disable it so
-        // failures surface immediately.
+        overrides: [mediaSourcesProvider.overrideWithValue([sourceA, sourceB])],
+        // See Task 7's precedent (Plan 1c) for why riverpod 3.x's default
+        // retry must be disabled for tests that expect a thrown
+        // exception to propagate immediately from a bare
+        // `container.read(provider.future)`.
         retry: (retryCount, error) => null,
       );
       addTearDown(container.dispose);
     });
 
-    test('matches a category then returns its episodes', () async {
-      when(() => api.searchCategories('葬送的芙莉蓮')).thenAnswer(
-        (_) async => [const Anime1Category(id: 87, title: '葬送的芙莉蓮')],
+    Future<List<MergedEpisode>> read() => container.read(
+          subjectEpisodesControllerProvider(subjectId: 1, subjectName: '目标番剧').future,
+        );
+
+    test('merges episodes from every source that finds a match', () async {
+      when(() => sourceA.search('目标番剧')).thenAnswer(
+        (_) async => [const _FakeCandidate('a', '目标番剧')],
       );
-      when(() => api.fetchCategoryEpisodes(87)).thenAnswer(
-        (_) async => [
-          const Anime1Episode(title: '葬送的芙莉蓮 [1]', pageUrl: 'https://anime1.me/?p=1'),
-        ],
+      when(() => sourceA.listEpisodes(any())).thenAnswer(
+        (_) async => [const _FakeEpisode('a', 'A的第1集')],
+      );
+      when(() => sourceB.search('目标番剧')).thenAnswer(
+        (_) async => [const _FakeCandidate('b', '目标番剧')],
+      );
+      when(() => sourceB.listEpisodes(any())).thenAnswer(
+        (_) async => [const _FakeEpisode('b', 'B的第1集')],
       );
 
-      final result = await container.read(
-        subjectEpisodesControllerProvider(subjectId: 1, subjectName: '葬送的芙莉蓮').future,
+      final result = await read();
+
+      expect(result.map((e) => e.sourceId), containsAll(['a', 'b']));
+      expect(result.map((e) => e.episode.title), containsAll(['A的第1集', 'B的第1集']));
+    });
+
+    test('silently ignores a source that finds no matching candidate', () async {
+      when(() => sourceA.search('目标番剧')).thenAnswer((_) async => []);
+      when(() => sourceB.search('目标番剧')).thenAnswer(
+        (_) async => [const _FakeCandidate('b', '目标番剧')],
       );
+      when(() => sourceB.listEpisodes(any())).thenAnswer(
+        (_) async => [const _FakeEpisode('b', 'B的第1集')],
+      );
+
+      final result = await read();
 
       expect(result, hasLength(1));
-      expect(result.single.title, '葬送的芙莉蓮 [1]');
+      expect(result.single.sourceId, 'b');
+      verifyNever(() => sourceA.listEpisodes(any()));
     });
 
-    test('throws Anime1NotFoundException when no category matches', () async {
-      when(() => api.searchCategories(any())).thenAnswer((_) async => []);
-
-      await expectLater(
-        container.read(
-          subjectEpisodesControllerProvider(subjectId: 1, subjectName: 'unmatched').future,
-        ),
-        throwsA(isA<Anime1NotFoundException>()),
+    test('silently ignores a source whose search throws', () async {
+      when(() => sourceA.search('目标番剧')).thenThrow(Exception('network down'));
+      when(() => sourceB.search('目标番剧')).thenAnswer(
+        (_) async => [const _FakeCandidate('b', '目标番剧')],
       );
-      verifyNever(() => api.fetchCategoryEpisodes(any()));
+      when(() => sourceB.listEpisodes(any())).thenAnswer(
+        (_) async => [const _FakeEpisode('b', 'B的第1集')],
+      );
+
+      final result = await read();
+
+      expect(result, hasLength(1));
+      expect(result.single.sourceId, 'b');
     });
 
-    test('propagates a searchCategories API exception', () async {
-      when(() => api.searchCategories(any())).thenThrow(Exception('network down'));
+    test('throws MediaNotFoundException when every source finds nothing', () async {
+      when(() => sourceA.search(any())).thenAnswer((_) async => []);
+      when(() => sourceB.search(any())).thenThrow(Exception('also down'));
 
-      await expectLater(
-        container.read(
-          subjectEpisodesControllerProvider(subjectId: 1, subjectName: 'x').future,
-        ),
-        throwsA(isA<Exception>()),
-      );
+      await expectLater(read(), throwsA(isA<MediaNotFoundException>()));
+    });
+
+    test('queries all sources concurrently, not sequentially', () async {
+      final order = <String>[];
+      when(() => sourceA.search(any())).thenAnswer((_) async {
+        order.add('a-start');
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        order.add('a-end');
+        return [];
+      });
+      when(() => sourceB.search(any())).thenAnswer((_) async {
+        order.add('b-start');
+        return [];
+      });
+
+      await expectLater(read(), throwsA(isA<MediaNotFoundException>()));
+
+      // If the sources were queried sequentially, 'b-start' could only
+      // appear after 'a-end'. Concurrent querying starts both before
+      // either finishes.
+      expect(order.indexOf('b-start'), lessThan(order.indexOf('a-end')));
     });
   });
 }
-
-class _MockAnime1Api extends Mock implements Anime1Api {}

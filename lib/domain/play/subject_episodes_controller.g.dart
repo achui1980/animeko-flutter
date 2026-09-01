@@ -14,7 +14,7 @@ final subjectEpisodesControllerProvider = SubjectEpisodesControllerFamily._();
 
 final class SubjectEpisodesControllerProvider
     extends
-        $AsyncNotifierProvider<SubjectEpisodesController, List<Anime1Episode>> {
+        $AsyncNotifierProvider<SubjectEpisodesController, List<MergedEpisode>> {
   SubjectEpisodesControllerProvider._({
     required SubjectEpisodesControllerFamily super.from,
     required ({int subjectId, String subjectName}) super.argument,
@@ -53,15 +53,15 @@ final class SubjectEpisodesControllerProvider
 }
 
 String _$subjectEpisodesControllerHash() =>
-    r'5fca0be2f1311258315d04a3e80bdebaf044ccaa';
+    r'6b7ee29939ad52e8ea4774b77a6aa0afe3a3db0a';
 
 final class SubjectEpisodesControllerFamily extends $Family
     with
         $ClassFamilyOverride<
           SubjectEpisodesController,
-          AsyncValue<List<Anime1Episode>>,
-          List<Anime1Episode>,
-          FutureOr<List<Anime1Episode>>,
+          AsyncValue<List<MergedEpisode>>,
+          List<MergedEpisode>,
+          FutureOr<List<MergedEpisode>>,
           ({int subjectId, String subjectName})
         > {
   SubjectEpisodesControllerFamily._()
@@ -86,12 +86,12 @@ final class SubjectEpisodesControllerFamily extends $Family
 }
 
 abstract class _$SubjectEpisodesController
-    extends $AsyncNotifier<List<Anime1Episode>> {
+    extends $AsyncNotifier<List<MergedEpisode>> {
   late final _$args = ref.$arg as ({int subjectId, String subjectName});
   int get subjectId => _$args.subjectId;
   String get subjectName => _$args.subjectName;
 
-  FutureOr<List<Anime1Episode>> build({
+  FutureOr<List<MergedEpisode>> build({
     required int subjectId,
     required String subjectName,
   });
@@ -99,12 +99,12 @@ abstract class _$SubjectEpisodesController
   @override
   void runBuild() {
     final ref =
-        this.ref as $Ref<AsyncValue<List<Anime1Episode>>, List<Anime1Episode>>;
+        this.ref as $Ref<AsyncValue<List<MergedEpisode>>, List<MergedEpisode>>;
     final element =
         ref.element
             as $ClassProviderElement<
-              AnyNotifier<AsyncValue<List<Anime1Episode>>, List<Anime1Episode>>,
-              AsyncValue<List<Anime1Episode>>,
+              AnyNotifier<AsyncValue<List<MergedEpisode>>, List<MergedEpisode>>,
+              AsyncValue<List<MergedEpisode>>,
               Object?,
               Object?
             >;
