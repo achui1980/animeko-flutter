@@ -13,11 +13,10 @@ part of 'episode_play_controller.dart';
 final episodePlayControllerProvider = EpisodePlayControllerFamily._();
 
 final class EpisodePlayControllerProvider
-    extends
-        $AsyncNotifierProvider<EpisodePlayController, Anime1PlaybackSource> {
+    extends $AsyncNotifierProvider<EpisodePlayController, MediaPlaybackSource> {
   EpisodePlayControllerProvider._({
     required EpisodePlayControllerFamily super.from,
-    required String super.argument,
+    required MergedEpisode super.argument,
   }) : super(
          retry: null,
          name: r'episodePlayControllerProvider',
@@ -52,16 +51,16 @@ final class EpisodePlayControllerProvider
 }
 
 String _$episodePlayControllerHash() =>
-    r'b82e415d6731dad91d4b64018b8f1020061c6a68';
+    r'c7e74be1e0b9aa809383ad6d2c848197c9d30698';
 
 final class EpisodePlayControllerFamily extends $Family
     with
         $ClassFamilyOverride<
           EpisodePlayController,
-          AsyncValue<Anime1PlaybackSource>,
-          Anime1PlaybackSource,
-          FutureOr<Anime1PlaybackSource>,
-          String
+          AsyncValue<MediaPlaybackSource>,
+          MediaPlaybackSource,
+          FutureOr<MediaPlaybackSource>,
+          MergedEpisode
         > {
   EpisodePlayControllerFamily._()
     : super(
@@ -72,36 +71,32 @@ final class EpisodePlayControllerFamily extends $Family
         isAutoDispose: true,
       );
 
-  EpisodePlayControllerProvider call({required String episodePageUrl}) =>
-      EpisodePlayControllerProvider._(argument: episodePageUrl, from: this);
+  EpisodePlayControllerProvider call({required MergedEpisode episode}) =>
+      EpisodePlayControllerProvider._(argument: episode, from: this);
 
   @override
   String toString() => r'episodePlayControllerProvider';
 }
 
 abstract class _$EpisodePlayController
-    extends $AsyncNotifier<Anime1PlaybackSource> {
-  late final _$args = ref.$arg as String;
-  String get episodePageUrl => _$args;
+    extends $AsyncNotifier<MediaPlaybackSource> {
+  late final _$args = ref.$arg as MergedEpisode;
+  MergedEpisode get episode => _$args;
 
-  FutureOr<Anime1PlaybackSource> build({required String episodePageUrl});
+  FutureOr<MediaPlaybackSource> build({required MergedEpisode episode});
   @$mustCallSuper
   @override
   void runBuild() {
     final ref =
-        this.ref
-            as $Ref<AsyncValue<Anime1PlaybackSource>, Anime1PlaybackSource>;
+        this.ref as $Ref<AsyncValue<MediaPlaybackSource>, MediaPlaybackSource>;
     final element =
         ref.element
             as $ClassProviderElement<
-              AnyNotifier<
-                AsyncValue<Anime1PlaybackSource>,
-                Anime1PlaybackSource
-              >,
-              AsyncValue<Anime1PlaybackSource>,
+              AnyNotifier<AsyncValue<MediaPlaybackSource>, MediaPlaybackSource>,
+              AsyncValue<MediaPlaybackSource>,
               Object?,
               Object?
             >;
-    element.handleCreate(ref, () => build(episodePageUrl: _$args));
+    element.handleCreate(ref, () => build(episode: _$args));
   }
 }

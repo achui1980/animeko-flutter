@@ -5,12 +5,13 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 import '../../domain/play/episode_play_controller.dart';
+import '../../domain/play/subject_episodes_controller.dart';
 import '../common/error_retry_view.dart';
 
 class PlayerScreen extends ConsumerStatefulWidget {
-  const PlayerScreen({super.key, required this.episodePageUrl});
+  const PlayerScreen({super.key, required this.episode});
 
-  final String episodePageUrl;
+  final MergedEpisode episode;
 
   @override
   ConsumerState<PlayerScreen> createState() => _PlayerScreenState();
@@ -44,16 +45,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   void _retry() {
     setState(() => _playbackError = null);
-    ref.invalidate(
-      episodePlayControllerProvider(episodePageUrl: widget.episodePageUrl),
-    );
+    ref.invalidate(episodePlayControllerProvider(episode: widget.episode));
   }
 
   @override
   Widget build(BuildContext context) {
-    final provider = episodePlayControllerProvider(
-      episodePageUrl: widget.episodePageUrl,
-    );
+    final provider = episodePlayControllerProvider(episode: widget.episode);
     // `player.open` is a command, not a declarative value -- it must run
     // as a side effect exactly once per successful resolution, not on
     // every `build()` (see design doc "数据流" step 3).
@@ -62,9 +59,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         (source) => _player.open(
           Media(
             source.url,
-            // anime1.me's video CDN rejects direct requests without the
-            // exact Referer/Cookie headers `resolvePlaybackUrl` collected
-            // for this specific source -- see Anime1PlaybackSource.headers.
+            // Some sources' video CDNs (e.g. anime1.me) reject direct
+            // requests without specific headers -- see each concrete
+            // MediaPlaybackSource's own `headers` doc comment. Others
+            // (e.g. 稀饭动漫) need none, in which case this is empty.
             httpHeaders: source.headers,
           ),
         ),

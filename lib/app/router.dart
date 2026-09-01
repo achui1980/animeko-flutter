@@ -5,6 +5,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../domain/auth/auth_controller.dart';
 import '../domain/auth/auth_state.dart';
+import '../domain/play/subject_episodes_controller.dart';
 import '../ui/auth/login_screen.dart';
 import '../ui/home/home_screen.dart';
 import '../ui/player/player_screen.dart';
@@ -63,8 +64,8 @@ GoRouter appRouter(Ref ref) {
       GoRoute(
         path: '/subject/:subjectId/play',
         builder: (context, state) {
-          final url = state.uri.queryParameters['url'] ?? '';
-          return PlayerScreen(episodePageUrl: url);
+          final episode = state.extra as MergedEpisode;
+          return PlayerScreen(episode: episode);
         },
       ),
       GoRoute(path: '/settings', builder: (context, state) => const SettingsScreen()),
