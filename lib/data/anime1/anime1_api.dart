@@ -8,6 +8,7 @@ import 'anime1_models.dart';
 part 'anime1_api.g.dart';
 
 const _baseUrl = 'https://anime1.me';
+// ignore: unused_element -- will be used by resolvePlaybackUrl, added in a later task.
 const _apiUrl = 'https://v.anime1.me/api';
 
 /// Direct HTML-scraping client for anime1.me. There is no official API or
