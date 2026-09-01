@@ -1,5 +1,6 @@
 // test/data/anime1/anime1_models_test.dart
 import 'package:animeko_flutter/data/anime1/anime1_models.dart';
+import 'package:animeko_flutter/domain/media/media_source.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -76,6 +77,25 @@ void main() {
       });
 
       expect(source.headers, isEmpty);
+    });
+  });
+
+  group('MediaSource abstractions', () {
+    test('Anime1Category implements MediaCandidate with sourceId "anime1"', () {
+      const category = Anime1Category(id: 1, title: '葬送的芙莉蓮');
+      expect(category, isA<MediaCandidate>());
+      expect(category.sourceId, 'anime1');
+    });
+
+    test('Anime1Episode implements MediaEpisode with sourceId "anime1"', () {
+      const episode = Anime1Episode(title: 'ep1', pageUrl: 'https://anime1.me/1');
+      expect(episode, isA<MediaEpisode>());
+      expect(episode.sourceId, 'anime1');
+    });
+
+    test('Anime1PlaybackSource implements MediaPlaybackSource', () {
+      const source = Anime1PlaybackSource(url: 'https://example.com/v.mp4');
+      expect(source, isA<MediaPlaybackSource>());
     });
   });
 }

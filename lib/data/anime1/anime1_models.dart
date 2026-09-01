@@ -1,35 +1,46 @@
 // lib/data/anime1/anime1_models.dart
 
+import '../../domain/media/media_source.dart';
+
 /// A WordPress category page on anime1.me, corresponding to one anime
 /// series. `id` is the value of the `cat` query parameter
 /// (`https://anime1.me/?cat=<id>`).
-class Anime1Category {
+class Anime1Category implements MediaCandidate {
   const Anime1Category({required this.id, required this.title});
 
   final int id;
+  @override
   final String title;
+
+  @override
+  String get sourceId => 'anime1';
 }
 
 /// A single episode: one WordPress article inside an [Anime1Category].
-class Anime1Episode {
+class Anime1Episode implements MediaEpisode {
   const Anime1Episode({required this.title, required this.pageUrl});
 
   /// Raw article title, e.g. `葬送的芙莉蓮 [12]`. anime1.me embeds the
   /// episode number in free-text form inside the title -- there is no
   /// separate structured episode-number field to parse it out of.
+  @override
   final String title;
 
   /// Absolute URL of the article page. anime1.me has no separate episode
   /// ID concept, so this URL itself is the identifier passed to
   /// [Anime1Api.resolvePlaybackUrl].
   final String pageUrl;
+
+  @override
+  String get sourceId => 'anime1';
 }
 
 /// A resolved, playable video source for one episode.
-class Anime1PlaybackSource {
+class Anime1PlaybackSource implements MediaPlaybackSource {
   const Anime1PlaybackSource({required this.url, this.headers = const {}});
 
   /// Direct mp4/m3u8 URL.
+  @override
   final String url;
 
   /// HTTP headers that must be sent when actually requesting [url] (e.g.
@@ -43,6 +54,7 @@ class Anime1PlaybackSource {
   /// request -- the `Referer` header alone is not sufficient. See
   /// `Anime1Api.resolvePlaybackUrl`, which builds this map from that
   /// response's headers.
+  @override
   final Map<String, String> headers;
 
   /// Parses the JSON body returned by `POST https://v.anime1.me/api`.
