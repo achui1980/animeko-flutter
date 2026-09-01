@@ -95,4 +95,69 @@ void main() {
       expect(results, isEmpty);
     });
   });
+
+  group('listEpisodes', () {
+    // Real bangumi detail-page markup (captured live, 2026-09-01): the
+    // episode list for one "line"/source lives in a
+    // `.anthology-list-play > li > a` list. A bangumi page can offer
+    // several lines (e.g. "稀饭新番主线-1"/"-2", "稀饭备用-1"), each with
+    // its own separate episode list -- this implementation deliberately
+    // only reads the *first* `.anthology-list-play` on the page (v1
+    // simplification: no line-switching/merging within one source, which
+    // is a different axis from the cross-source merge in
+    // `SubjectEpisodesController`).
+    const detailPageHtml = '''
+<html><body>
+  <div class="anthology">
+    <div class="anthology-tab"><a>稀饭新番主线-1</a><a>稀饭新番主线-2</a></div>
+    <div class="anthology-list-box">
+      <ul class="anthology-list-play">
+        <li><a class="hide this-link" href="/watch/1001/1/1.html">第01集</a></li>
+        <li><a class="hide this-link" href="/watch/1001/1/2.html">第02集</a></li>
+      </ul>
+      <ul class="anthology-list-play">
+        <li><a class="hide this-link" href="/watch/1001/2/1.html">第01集</a></li>
+        <li><a class="hide this-link" href="/watch/1001/2/2.html">第02集</a></li>
+      </ul>
+    </div>
+  </div>
+</body></html>
+''';
+
+    test('fetches https://dm1.xfdm.pro/bangumi/<id>.html', () async {
+      when(
+        () => dio.get<String>(any(), options: any(named: 'options')),
+      ).thenAnswer((_) async => htmlResponse('<html><body></body></html>'));
+
+      await api.listEpisodes(1001);
+
+      verify(
+        () => dio.get<String>('https://dm1.xfdm.pro/bangumi/1001.html', options: any(named: 'options')),
+      ).called(1);
+    });
+
+    test('parses episodes from only the first anthology-list-play', () async {
+      when(
+        () => dio.get<String>(any(), options: any(named: 'options')),
+      ).thenAnswer((_) async => htmlResponse(detailPageHtml));
+
+      final episodes = await api.listEpisodes(1001);
+
+      expect(episodes, hasLength(2));
+      expect(episodes[0].title, '第01集');
+      expect(episodes[0].watchPageUrl, 'https://dm1.xfdm.pro/watch/1001/1/1.html');
+      expect(episodes[1].title, '第02集');
+      expect(episodes[1].watchPageUrl, 'https://dm1.xfdm.pro/watch/1001/1/2.html');
+    });
+
+    test('returns an empty list when the page has no anthology-list-play', () async {
+      when(
+        () => dio.get<String>(any(), options: any(named: 'options')),
+      ).thenAnswer((_) async => htmlResponse('<html><body>no episodes</body></html>'));
+
+      final episodes = await api.listEpisodes(9999);
+
+      expect(episodes, isEmpty);
+    });
+  });
 }

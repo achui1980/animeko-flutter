@@ -61,4 +61,33 @@ class XifanApi {
     }
     return results;
   }
+
+  static const _watchBaseUrl = 'https://dm1.xfdm.pro';
+
+  /// GET https://dm1.xfdm.pro/bangumi/`<bangumiId>`.html
+  ///
+  /// NOTE (unverified, v1 simplification): only the *first*
+  /// `.anthology-list-play` list on the page is read, even when the
+  /// bangumi offers multiple lines. See this method's test-file doc
+  /// comment for why.
+  Future<List<XifanEpisode>> listEpisodes(int bangumiId) async {
+    final response = await _dio.get<String>(
+      '$_watchBaseUrl/bangumi/$bangumiId.html',
+      options: Options(responseType: ResponseType.plain),
+    );
+    final document = html_parser.parse(response.data ?? '');
+
+    final list = document.querySelector('.anthology-list-play');
+    if (list == null) return const [];
+
+    final episodes = <XifanEpisode>[];
+    for (final link in list.querySelectorAll('a')) {
+      final href = link.attributes['href'];
+      final title = link.text.trim();
+      if (href == null || title.isEmpty) continue;
+      final url = href.startsWith('http') ? href : '$_watchBaseUrl$href';
+      episodes.add(XifanEpisode(title: title, watchPageUrl: url));
+    }
+    return episodes;
+  }
 }
