@@ -5,6 +5,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../domain/auth/auth_controller.dart';
 import 'auth/secure_token_storage.dart';
 import 'auth_interceptor.dart';
+import 'settings/proxy_dio_config.dart';
 
 part 'api_client.g.dart';
 
@@ -33,6 +34,7 @@ Dio rawAniDio() {
 @riverpod
 Dio dio(Ref ref) {
   final dio = rawAniDio();
+  configureProxy(dio, ref);
   final storage = ref.watch(secureTokenStorageProvider);
 
   dio.interceptors.add(
