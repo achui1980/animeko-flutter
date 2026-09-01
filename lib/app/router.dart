@@ -1,5 +1,5 @@
 // lib/app/router.dart
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -64,8 +64,17 @@ GoRouter appRouter(Ref ref) {
       GoRoute(
         path: '/subject/:subjectId/play',
         builder: (context, state) {
-          final episode = state.extra as MergedEpisode;
-          return PlayerScreen(episode: episode);
+          final extra = state.extra;
+          // Guard against reaching this route without `extra` set (e.g.
+          // app restoration or a future deep link) instead of letting an
+          // unhandled `TypeError` crash the app -- today
+          // `SubjectDetailScreen` always sets `extra` correctly.
+          if (extra is! MergedEpisode) {
+            return const Scaffold(
+              body: Center(child: Text('Invalid navigation')),
+            );
+          }
+          return PlayerScreen(episode: extra);
         },
       ),
       GoRoute(path: '/settings', builder: (context, state) => const SettingsScreen()),

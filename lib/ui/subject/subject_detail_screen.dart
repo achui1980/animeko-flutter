@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../domain/media/media_registry.dart';
+import '../../domain/media/media_source.dart';
 import '../../domain/play/subject_episodes_controller.dart';
 import '../common/error_retry_view.dart';
 
@@ -25,6 +27,7 @@ class SubjectDetailScreen extends ConsumerWidget {
       subjectName: subjectName,
     );
     final episodes = ref.watch(provider);
+    final sources = ref.watch(mediaSourcesProvider);
 
     return Scaffold(
       appBar: AppBar(title: Text(subjectName)),
@@ -54,7 +57,7 @@ class SubjectDetailScreen extends ConsumerWidget {
                   final episode = episodeList[index];
                   return ListTile(
                     title: Text(episode.title),
-                    trailing: Chip(label: Text(_sourceLabel(episode.sourceId))),
+                    trailing: Chip(label: Text(_sourceLabel(sources, episode.sourceId))),
                     onTap: () => context.push(
                       '/subject/$subjectId/play',
                       extra: episode,
@@ -71,16 +74,14 @@ class SubjectDetailScreen extends ConsumerWidget {
 }
 
 /// Human-readable label for the merged-episode-list source badge
-/// (Decision 6). Falls back to the raw `sourceId` for any future source
-/// that forgets to add a case here -- never crashes, just looks slightly
-/// less polished.
-String _sourceLabel(String sourceId) {
-  switch (sourceId) {
-    case 'anime1':
-      return 'anime1.me';
-    case 'xifan':
-      return '稀饭动漫';
-    default:
-      return sourceId;
+/// (Decision 6). Looks up the owning [MediaSource]'s [MediaSource.displayName]
+/// so this stays in sync with the single source of truth instead of
+/// re-deriving it from a hardcoded switch on `sourceId`. Falls back to the
+/// raw `sourceId` for any `sourceId` with no matching registered source --
+/// never crashes, just looks slightly less polished.
+String _sourceLabel(List<MediaSource> sources, String sourceId) {
+  for (final source in sources) {
+    if (source.id == sourceId) return source.displayName;
   }
+  return sourceId;
 }
