@@ -1,5 +1,10 @@
 // lib/domain/play/subject_episodes_controller.dart
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+
+import '../../data/anime1/anime1_api.dart';
 import '../../data/anime1/anime1_models.dart';
+
+part 'subject_episodes_controller.g.dart';
 
 /// Thrown when no anime1.me category matches the requested subject title
 /// with sufficient confidence (see [matchBestCategory]). Not a
@@ -73,4 +78,21 @@ double _similarity(String a, String b) {
   final union = setA.union(setB).length;
   if (union == 0) return 0;
   return setA.intersection(setB).length / union;
+}
+
+@riverpod
+class SubjectEpisodesController extends _$SubjectEpisodesController {
+  @override
+  Future<List<Anime1Episode>> build({
+    required int subjectId,
+    required String subjectName,
+  }) async {
+    final api = ref.watch(anime1ApiProvider);
+    final categories = await api.searchCategories(subjectName);
+    final best = matchBestCategory(categories, subjectName);
+    if (best == null) {
+      throw const Anime1NotFoundException();
+    }
+    return api.fetchCategoryEpisodes(best.id);
+  }
 }
