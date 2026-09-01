@@ -4,6 +4,7 @@ import 'package:html/parser.dart' as html_parser;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'anime1_models.dart';
+import '../settings/proxy_dio_config.dart';
 
 part 'anime1_api.g.dart';
 
@@ -130,7 +131,9 @@ Dio anime1Dio(Ref ref) {
   // anime1.me's only anti-hotlinking check is the Referer header -- see
   // the design doc's "背景与范围" section. No auth, no other headers
   // needed.
-  return Dio(BaseOptions(headers: {'Referer': 'https://anime1.me'}));
+  final dio = Dio(BaseOptions(headers: {'Referer': 'https://anime1.me'}));
+  configureProxy(dio, ref);
+  return dio;
 }
 
 @riverpod
