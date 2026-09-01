@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:html/parser.dart' as html_parser;
 
@@ -89,5 +91,71 @@ class XifanApi {
       episodes.add(XifanEpisode(title: title, watchPageUrl: url));
     }
     return episodes;
+  }
+
+  /// GET the watch page, extract the inline `var player_aaaa = {...};`
+  /// object, and decrypt its `url` field per the `encrypt` field's rule
+  /// (see this task's description above).
+  Future<XifanPlaybackSource> resolvePlaybackUrl(String watchPageUrl) async {
+    final response = await _dio.get<String>(
+      watchPageUrl,
+      options: Options(responseType: ResponseType.plain),
+    );
+    final body = response.data ?? '';
+
+    final json = _extractPlayerJson(body);
+    if (json == null) {
+      throw const FormatException(
+        '稀饭动漫 watch page has no player_aaaa script variable',
+      );
+    }
+
+    final playerData = jsonDecode(json) as Map<String, dynamic>;
+    final rawUrl = playerData['url'] as String?;
+    if (rawUrl == null || rawUrl.isEmpty) {
+      throw const FormatException('稀饭动漫 player_aaaa has no "url" field');
+    }
+
+    final encrypt = playerData['encrypt']?.toString() ?? '0';
+    return XifanPlaybackSource(url: _decryptUrl(rawUrl, encrypt));
+  }
+}
+
+/// Scans forward from `var player_aaaa` for its `{...}` object literal,
+/// tracking brace depth so a nested object (e.g. `vod_data`) doesn't
+/// cause extraction to stop early. Returns `null` if the marker isn't
+/// found or its braces never balance.
+String? _extractPlayerJson(String html) {
+  const marker = 'var player_aaaa';
+  final markerIndex = html.indexOf(marker);
+  if (markerIndex == -1) return null;
+
+  final braceStart = html.indexOf('{', markerIndex);
+  if (braceStart == -1) return null;
+
+  var depth = 0;
+  for (var i = braceStart; i < html.length; i++) {
+    final char = html[i];
+    if (char == '{') depth++;
+    if (char == '}') {
+      depth--;
+      if (depth == 0) return html.substring(braceStart, i + 1);
+    }
+  }
+  return null;
+}
+
+/// Mirrors the real `MacPlayer.Init()` decrypt rule read from the live
+/// `player.js` source (2026-09-01): `'1'` -> percent-decode (JS
+/// `unescape()`); `'2'` -> base64-decode then percent-decode; anything
+/// else (including `'0'`/missing) -> use [url] as-is.
+String _decryptUrl(String url, String encrypt) {
+  switch (encrypt) {
+    case '1':
+      return Uri.decodeComponent(url);
+    case '2':
+      return Uri.decodeComponent(latin1.decode(base64Decode(url)));
+    default:
+      return url;
   }
 }

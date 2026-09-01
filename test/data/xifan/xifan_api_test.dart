@@ -160,4 +160,84 @@ void main() {
       expect(episodes, isEmpty);
     });
   });
+
+  group('resolvePlaybackUrl', () {
+    // Real watch-page script content (captured live, 2026-09-01),
+    // simplified: `player_aaaa` is a JSON-like object containing a
+    // *nested* `vod_data` object -- extraction must brace-balance, not
+    // stop at the first `}`.
+    String watchPageHtml(String encrypt, String url) => '''
+<html><body>
+<script>
+var player_aaaa={"flag":"play","encrypt":$encrypt,"trysee":0,"points":0,
+"link":"/watch/1001/1/1.html","link_next":"/watch/1001/1/2.html","link_pre":"",
+"vod_data":{"vod_name":"鬼灭之刃","vod_actor":"","vod_director":"","vod_class":""},
+"url":"$url","url_next":"","from":"xfxf1","server":"no","note":"","id":"1001","sid":1,"nid":1}
+</script>
+</body></html>
+''';
+
+    test('encrypt=0 (or "0"): uses the url as-is', () async {
+      when(
+        () => dio.get<String>(any(), options: any(named: 'options')),
+      ).thenAnswer((_) async => htmlResponse(
+        watchPageHtml('0', 'https://apn.moedot.net/d/wo/1/a.mp4'),
+      ));
+
+      final source = await api.resolvePlaybackUrl('https://dm1.xfdm.pro/watch/1001/1/1.html');
+
+      expect(source.url, 'https://apn.moedot.net/d/wo/1/a.mp4');
+      expect(source.headers, isEmpty);
+    });
+
+    test('encrypt=1: percent-decodes the url', () async {
+      when(
+        () => dio.get<String>(any(), options: any(named: 'options')),
+      ).thenAnswer((_) async => htmlResponse(
+        watchPageHtml('1', 'https%3A%2F%2Fexample.com%2Fvideo.mp4'),
+      ));
+
+      final source = await api.resolvePlaybackUrl('https://dm1.xfdm.pro/watch/1001/1/1.html');
+
+      expect(source.url, 'https://example.com/video.mp4');
+    });
+
+    test('encrypt=2: base64-decodes then percent-decodes the url', () async {
+      when(
+        () => dio.get<String>(any(), options: any(named: 'options')),
+      ).thenAnswer((_) async => htmlResponse(
+        watchPageHtml('2', 'aHR0cHM6Ly9leGFtcGxlLmNvbS92aWRlby5tcDQ='),
+      ));
+
+      final source = await api.resolvePlaybackUrl('https://dm1.xfdm.pro/watch/1001/1/1.html');
+
+      expect(source.url, 'https://example.com/video.mp4');
+    });
+
+    test('throws FormatException when there is no player_aaaa variable', () async {
+      when(
+        () => dio.get<String>(any(), options: any(named: 'options')),
+      ).thenAnswer((_) async => htmlResponse('<html><body>no player here</body></html>'));
+
+      expect(
+        () => api.resolvePlaybackUrl('https://dm1.xfdm.pro/watch/1001/1/1.html'),
+        throwsFormatException,
+      );
+    });
+
+    test('throws FormatException when player_aaaa has no "url" field', () async {
+      when(
+        () => dio.get<String>(any(), options: any(named: 'options')),
+      ).thenAnswer((_) async => htmlResponse('''
+<html><body><script>
+var player_aaaa={"flag":"play","encrypt":0,"vod_data":{"vod_name":"x"}}
+</script></body></html>
+'''));
+
+      expect(
+        () => api.resolvePlaybackUrl('https://dm1.xfdm.pro/watch/1001/1/1.html'),
+        throwsFormatException,
+      );
+    });
+  });
 }
