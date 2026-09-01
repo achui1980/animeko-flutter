@@ -54,6 +54,14 @@ class Anime1PlaybackSource {
         'anime1.me API response source entry is missing a string "src"',
       );
     }
-    return Anime1PlaybackSource(url: first['src'] as String);
+    var url = first['src'] as String;
+    // Verified against the live site (2026-09-01): the API returns a
+    // protocol-relative URL (e.g. "//chihaya.v.anime1.me/1468/8b.mp4"),
+    // which media_kit/most HTTP clients cannot open directly -- add the
+    // scheme back.
+    if (url.startsWith('//')) {
+      url = 'https:$url';
+    }
+    return Anime1PlaybackSource(url: url);
   }
 }

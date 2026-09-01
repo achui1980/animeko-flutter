@@ -22,10 +22,15 @@ class Anime1Api {
 
   /// GET https://anime1.me/?s=<title>
   ///
-  /// NOTE (unverified): assumes anime1.me's WordPress theme marks each
-  /// article's category link with `rel="category tag"`, which is a common
-  /// WordPress convention but not confirmed for this specific site. If the
-  /// real markup differs, this selector needs updating.
+  /// Verified against the live site (2026-09-01): each search-result
+  /// article's category link is marked `rel="category tag"`, confirming
+  /// that part of the original assumption. However its `href` is a
+  /// WordPress *pretty permalink* (`/category/<season>/<slug>`) and never
+  /// contains a `cat=` query parameter -- the numeric category ID that
+  /// [Anime1Category.id] needs only appears as a `category-<id>` CSS class
+  /// on the enclosing `<article>` element. This was the original (wrong)
+  /// assumption; extraction now reads the ID from that class instead of
+  /// the anchor's href.
   Future<List<Anime1Category>> searchCategories(String title) async {
     final response = await _dio.get<String>(
       '$_baseUrl/',
@@ -34,15 +39,17 @@ class Anime1Api {
     );
     final document = html_parser.parse(response.data ?? '');
 
+    final categoryIdPattern = RegExp(r'\bcategory-(\d+)\b');
     final seenIds = <int>{};
     final categories = <Anime1Category>[];
-    for (final anchor in document.querySelectorAll('a[rel="category tag"]')) {
-      final href = anchor.attributes['href'];
-      final match = href == null ? null : RegExp(r'[?&]cat=(\d+)').firstMatch(href);
-      if (match == null) continue;
-      final id = int.parse(match.group(1)!);
+    for (final article in document.querySelectorAll('article')) {
+      final classMatch = categoryIdPattern.firstMatch(article.className);
+      if (classMatch == null) continue;
+      final id = int.parse(classMatch.group(1)!);
       if (!seenIds.add(id)) continue;
-      final title = anchor.text.trim();
+
+      final anchor = article.querySelector('a[rel="category tag"]');
+      final title = anchor?.text.trim() ?? '';
       if (title.isEmpty) continue;
       categories.add(Anime1Category(id: id, title: title));
     }
@@ -86,12 +93,16 @@ class Anime1Api {
   /// GET the episode page, extract `data-apireq`, then POST it to
   /// https://v.anime1.me/api and parse the response.
   ///
-  /// NOTE (unverified): assumes the raw `data-apireq` attribute string is
-  /// forwarded as-is (not base64-decoded by this client) as
-  /// `application/x-www-form-urlencoded` field `d`. Both this request
-  /// shape and the response shape parsed by
-  /// [Anime1PlaybackSource.fromApiResponse] are third-party
-  /// reverse-engineering assumptions, not confirmed against the live API.
+  /// Verified against the live site (2026-09-01): the raw `data-apireq`
+  /// HTML attribute value is percent-encoded (URL-encoded) JSON, e.g.
+  /// `%7B%22c%22%3A%221468%22...%7D`, which decodes to
+  /// `{"c":"1468","e":"8b",...}`. It must be decoded with
+  /// [Uri.decodeComponent] before being sent as the
+  /// `application/x-www-form-urlencoded` field `d` -- sending the raw
+  /// (still-encoded) string causes the API to respond with HTTP 403,
+  /// because the form encoder then encodes it a second time. The
+  /// response shape parsed by [Anime1PlaybackSource.fromApiResponse] was
+  /// also confirmed live: `{"s":[{"src":"//host/path.mp4","type":...}]}`.
   Future<Anime1PlaybackSource> resolvePlaybackUrl(String episodePageUrl) async {
     final pageResponse = await _dio.get<String>(
       episodePageUrl,
@@ -107,7 +118,7 @@ class Anime1Api {
 
     final apiResponse = await _dio.post<Map<String, dynamic>>(
       _apiUrl,
-      data: {'d': apireq},
+      data: {'d': Uri.decodeComponent(apireq)},
       options: Options(contentType: Headers.formUrlEncodedContentType),
     );
     return Anime1PlaybackSource.fromApiResponse(apiResponse.data ?? {});

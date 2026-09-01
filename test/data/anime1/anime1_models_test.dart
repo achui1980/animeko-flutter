@@ -15,6 +15,18 @@ void main() {
       expect(source.url, 'https://example.com/720p.mp4');
     });
 
+    test('prepends https: to a protocol-relative src', () {
+      // Verified against the live site (2026-09-01): the real API
+      // returns protocol-relative URLs like "//host/path.mp4".
+      final source = Anime1PlaybackSource.fromApiResponse({
+        's': [
+          {'src': '//chihaya.v.anime1.me/1468/8b.mp4', 'type': 'video/mp4'},
+        ],
+      });
+
+      expect(source.url, 'https://chihaya.v.anime1.me/1468/8b.mp4');
+    });
+
     test('throws FormatException when "s" is missing', () {
       expect(
         () => Anime1PlaybackSource.fromApiResponse({}),

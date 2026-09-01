@@ -24,22 +24,29 @@ void main() {
   }
 
   group('searchCategories', () {
+    // Real anime1.me search-result markup (captured live, 2026-09-01): the
+    // `rel="category tag"` anchor's href is a WordPress *pretty permalink*
+    // (`/category/<season>/<slug>`), which never contains a `cat=` query
+    // param. The only place the numeric category ID actually appears is a
+    // `category-<id>` CSS class on the enclosing `<article>`. This fixture
+    // intentionally mirrors that real shape instead of an invented
+    // `?cat=<id>` href, which was the original (wrong) assumption.
     const searchResultsHtml = '''
 <html><body>
-  <article>
-    <h2 class="entry-title"><a href="https://anime1.me/?p=1001">葬送的芙莉蓮 [12]</a></h2>
-    <span class="cat-links">
-      <a href="https://anime1.me/?cat=87" rel="category tag">葬送的芙莉蓮</a>
-    </span>
+  <article id="post-23350" class="post-23350 post type-post status-publish format-standard hentry category-87">
+    <h2 class="entry-title"><a href="https://anime1.me/23350" rel="bookmark">葬送的芙莉蓮 [12]</a></h2>
+    <footer class="entry-footer"><span class="cat-links">分類:
+      <a href="https://anime1.me/category/2023%e5%b9%b4%e7%a7%8b%e5%ad%a3/%e8%91%ac%e9%80%81%e7%9a%84%e8%8a%99%e8%8e%89%e8%98%ad" rel="category tag">葬送的芙莉蓮</a>
+    </span></footer>
   </article>
-  <article>
-    <h2 class="entry-title"><a href="https://anime1.me/?p=1002">葬送的芙莉蓮 [11]</a></h2>
-    <span class="cat-links">
-      <a href="https://anime1.me/?cat=87" rel="category tag">葬送的芙莉蓮</a>
-    </span>
+  <article id="post-23310" class="post-23310 post type-post status-publish format-standard hentry category-87">
+    <h2 class="entry-title"><a href="https://anime1.me/23310" rel="bookmark">葬送的芙莉蓮 [11]</a></h2>
+    <footer class="entry-footer"><span class="cat-links">分類:
+      <a href="https://anime1.me/category/2023%e5%b9%b4%e7%a7%8b%e5%ad%a3/%e8%91%ac%e9%80%81%e7%9a%84%e8%8a%99%e8%8e%89%e8%98%ad" rel="category tag">葬送的芙莉蓮</a>
+    </span></footer>
   </article>
   <div id="sidebar">
-    <a href="https://anime1.me/?cat=999">Unrelated sidebar category widget link</a>
+    <a href="https://anime1.me/category/some-other-unrelated-widget-link" class="widget-link">Unrelated sidebar link (no rel attribute, no enclosing article)</a>
   </div>
 </body></html>
 ''';
@@ -78,6 +85,24 @@ void main() {
       ).thenAnswer((_) async => htmlResponse('<html><body>no results</body></html>'));
 
       final categories = await api.searchCategories('nonexistent');
+
+      expect(categories, isEmpty);
+    });
+
+    test('skips a category-tag link whose enclosing article has no numeric category-N class', () async {
+      when(
+        () => dio.get<String>(any(), queryParameters: any(named: 'queryParameters'), options: any(named: 'options')),
+      ).thenAnswer(
+        (_) async => htmlResponse('''
+<html><body>
+  <article id="post-1" class="post-1 post type-post status-publish format-standard hentry">
+    <footer><span class="cat-links"><a href="https://anime1.me/category/no-id-here" rel="category tag">缺少分類編號</a></span></footer>
+  </article>
+</body></html>
+'''),
+      );
+
+      final categories = await api.searchCategories('anything');
 
       expect(categories, isEmpty);
     });
@@ -154,9 +179,13 @@ void main() {
   });
 
   group('resolvePlaybackUrl', () {
+    // Verified against the live site (2026-09-01): `data-apireq` is
+    // percent-encoded (URL-encoded) JSON, not base64. This fixture's raw
+    // attribute value decodes (via Uri.decodeComponent) to
+    // `{"foo":"bar"}`.
     const episodePageHtml = '''
 <html><body>
-  <div class="video-js" data-apireq="eyJmb28iOiJiYXIifQ=="></div>
+  <div class="video-js" data-apireq="%7B%22foo%22%3A%22bar%22%7D"></div>
 </body></html>
 ''';
 
@@ -168,7 +197,7 @@ void main() {
       );
     }
 
-    test('extracts data-apireq and POSTs it as form field "d"', () async {
+    test('extracts data-apireq, decodes it, and POSTs it as form field "d"', () async {
       when(
         () => dio.get<String>(any(), options: any(named: 'options')),
       ).thenAnswer((_) async => htmlResponse(episodePageHtml));
@@ -189,7 +218,7 @@ void main() {
       verify(
         () => dio.post<Map<String, dynamic>>(
           'https://v.anime1.me/api',
-          data: {'d': 'eyJmb28iOiJiYXIifQ=='},
+          data: {'d': '{"foo":"bar"}'},
           options: any(named: 'options'),
         ),
       ).called(1);
