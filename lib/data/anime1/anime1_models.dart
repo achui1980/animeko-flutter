@@ -27,10 +27,23 @@ class Anime1Episode {
 
 /// A resolved, playable video source for one episode.
 class Anime1PlaybackSource {
-  const Anime1PlaybackSource({required this.url});
+  const Anime1PlaybackSource({required this.url, this.headers = const {}});
 
   /// Direct mp4/m3u8 URL.
   final String url;
+
+  /// HTTP headers that must be sent when actually requesting [url] (e.g.
+  /// via media_kit's `Media(url, httpHeaders: ...)`).
+  ///
+  /// Verified against the live site (2026-09-01): the CDN host serving
+  /// [url] rejects the request with `403 Forbidden` unless the exact
+  /// `Set-Cookie` values returned by the `POST https://v.anime1.me/api`
+  /// call (three short-lived, path-scoped access-token cookies named
+  /// `e`/`p`/`h`) are echoed back as a `Cookie` header on the video
+  /// request -- the `Referer` header alone is not sufficient. See
+  /// `Anime1Api.resolvePlaybackUrl`, which builds this map from that
+  /// response's headers.
+  final Map<String, String> headers;
 
   /// Parses the JSON body returned by `POST https://v.anime1.me/api`.
   ///
@@ -41,7 +54,14 @@ class Anime1PlaybackSource {
   /// "测试策略" section. Adjust this parser if the live response disagrees.
   /// When multiple source entries are present, the *first* one is used;
   /// which entry is "highest quality" is also unconfirmed.
-  factory Anime1PlaybackSource.fromApiResponse(Map<String, dynamic> json) {
+  ///
+  /// [headers] are not parsed from [json] -- they come from the HTTP
+  /// response's headers (see [Anime1PlaybackSource.headers]) and are
+  /// passed through unchanged by the caller.
+  factory Anime1PlaybackSource.fromApiResponse(
+    Map<String, dynamic> json, {
+    Map<String, String> headers = const {},
+  }) {
     final sources = json['s'];
     if (sources is! List || sources.isEmpty) {
       throw const FormatException(
@@ -62,6 +82,6 @@ class Anime1PlaybackSource {
     if (url.startsWith('//')) {
       url = 'https:$url';
     }
-    return Anime1PlaybackSource(url: url);
+    return Anime1PlaybackSource(url: url, headers: headers);
   }
 }

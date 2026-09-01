@@ -51,5 +51,31 @@ void main() {
         throwsFormatException,
       );
     });
+
+    test('passes the headers parameter through unchanged', () {
+      final source = Anime1PlaybackSource.fromApiResponse(
+        {
+          's': [
+            {'src': 'https://example.com/720p.mp4', 'type': 'video/mp4'},
+          ],
+        },
+        headers: {'Referer': 'https://anime1.me', 'Cookie': 'e=1; p=2; h=3'},
+      );
+
+      expect(source.headers, {
+        'Referer': 'https://anime1.me',
+        'Cookie': 'e=1; p=2; h=3',
+      });
+    });
+
+    test('defaults headers to an empty map when omitted', () {
+      final source = Anime1PlaybackSource.fromApiResponse({
+        's': [
+          {'src': 'https://example.com/720p.mp4', 'type': 'video/mp4'},
+        ],
+      });
+
+      expect(source.headers, isEmpty);
+    });
   });
 }

@@ -58,7 +58,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     // as a side effect exactly once per successful resolution, not on
     // every `build()` (see design doc "数据流" step 3).
     ref.listen(provider, (previous, next) {
-      next.whenData((source) => _player.open(Media(source.url)));
+      next.whenData(
+        (source) => _player.open(
+          Media(
+            source.url,
+            // anime1.me's video CDN rejects direct requests without the
+            // exact Referer/Cookie headers `resolvePlaybackUrl` collected
+            // for this specific source -- see Anime1PlaybackSource.headers.
+            httpHeaders: source.headers,
+          ),
+        ),
+      );
     });
     final playback = ref.watch(provider);
 

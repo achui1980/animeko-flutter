@@ -104,6 +104,15 @@ class Anime1Api {
   /// because the form encoder then encodes it a second time. The
   /// response shape parsed by [Anime1PlaybackSource.fromApiResponse] was
   /// also confirmed live: `{"s":[{"src":"//host/path.mp4","type":...}]}`.
+  ///
+  /// Also verified live: the returned `src` URL's CDN host rejects the
+  /// request with HTTP 403 unless the `Set-Cookie` values from *this*
+  /// POST response (three short-lived cookies named `e`/`p`/`h`, scoped
+  /// to that exact video path) are echoed back as a `Cookie` header when
+  /// actually fetching the video -- a `Referer` header alone is not
+  /// enough. Those cookies are collected here and returned via
+  /// [Anime1PlaybackSource.headers] for the caller (the video player) to
+  /// use.
   Future<Anime1PlaybackSource> resolvePlaybackUrl(String episodePageUrl) async {
     final pageResponse = await _dio.get<String>(
       episodePageUrl,
@@ -122,7 +131,21 @@ class Anime1Api {
       data: {'d': Uri.decodeComponent(apireq)},
       options: Options(contentType: Headers.formUrlEncodedContentType),
     );
-    return Anime1PlaybackSource.fromApiResponse(apiResponse.data ?? {});
+
+    final setCookies = apiResponse.headers['set-cookie'] ?? const <String>[];
+    final cookiePairs = setCookies
+        .map((cookie) => cookie.split(';').first.trim())
+        .where((pair) => pair.isNotEmpty)
+        .join('; ');
+    final videoHeaders = <String, String>{
+      'Referer': 'https://anime1.me',
+      if (cookiePairs.isNotEmpty) 'Cookie': cookiePairs,
+    };
+
+    return Anime1PlaybackSource.fromApiResponse(
+      apiResponse.data ?? {},
+      headers: videoHeaders,
+    );
   }
 }
 

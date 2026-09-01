@@ -189,11 +189,17 @@ void main() {
 </body></html>
 ''';
 
-    Response<Map<String, dynamic>> apiJsonResponse(Map<String, dynamic> data) {
+    Response<Map<String, dynamic>> apiJsonResponse(
+      Map<String, dynamic> data, {
+      List<String>? setCookies,
+    }) {
       return Response(
         data: data,
         requestOptions: RequestOptions(path: 'https://v.anime1.me/api'),
         statusCode: 200,
+        headers: setCookies == null
+            ? Headers()
+            : Headers.fromMap({'set-cookie': setCookies}),
       );
     }
 
@@ -254,6 +260,64 @@ void main() {
         () => api.resolvePlaybackUrl('https://anime1.me/?p=1001'),
         throwsFormatException,
       );
+    });
+
+    test('forwards the API response\'s Set-Cookie values as a Cookie header', () async {
+      // Verified against the live site (2026-09-01): the video CDN
+      // returns 403 without these access-token cookies, regardless of
+      // the Referer header. See Anime1Api.resolvePlaybackUrl's doc
+      // comment.
+      when(
+        () => dio.get<String>(any(), options: any(named: 'options')),
+      ).thenAnswer((_) async => htmlResponse(episodePageHtml));
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer((_) async => apiJsonResponse(
+            {
+              's': [
+                {'src': 'https://video.example.com/720p.mp4', 'type': 'video/mp4'},
+              ],
+            },
+            setCookies: [
+              'e=1788288576; expires=Tue, 01 Sep 2026 18:49:36 GMT; path=/1468/8b.mp4; domain=.v.anime1.me; secure; HttpOnly',
+              'p=eyJpc3MiOiJhbmltZTEubWUi; expires=Tue, 01 Sep 2026 18:49:36 GMT; path=/1468/8b.mp4; domain=.v.anime1.me; secure; HttpOnly',
+              'h=SMz56lgMOr86XgcDjpQQ9Q; expires=Tue, 01 Sep 2026 18:49:36 GMT; path=/1468/8b.mp4; domain=.v.anime1.me; secure; HttpOnly',
+            ],
+          ));
+
+      final source = await api.resolvePlaybackUrl('https://anime1.me/?p=1001');
+
+      expect(source.headers['Referer'], 'https://anime1.me');
+      expect(
+        source.headers['Cookie'],
+        'e=1788288576; p=eyJpc3MiOiJhbmltZTEubWUi; h=SMz56lgMOr86XgcDjpQQ9Q',
+      );
+    });
+
+    test('omits the Cookie header when the API response has no Set-Cookie', () async {
+      when(
+        () => dio.get<String>(any(), options: any(named: 'options')),
+      ).thenAnswer((_) async => htmlResponse(episodePageHtml));
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer((_) async => apiJsonResponse({
+            's': [
+              {'src': 'https://video.example.com/720p.mp4', 'type': 'video/mp4'},
+            ],
+          }));
+
+      final source = await api.resolvePlaybackUrl('https://anime1.me/?p=1001');
+
+      expect(source.headers['Referer'], 'https://anime1.me');
+      expect(source.headers.containsKey('Cookie'), isFalse);
     });
   });
 
