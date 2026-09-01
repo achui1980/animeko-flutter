@@ -2,8 +2,12 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:html/parser.dart' as html_parser;
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'xifan_models.dart';
+import '../settings/proxy_dio_config.dart';
+
+part 'xifan_api.g.dart';
 
 /// Direct HTML-scraping client for 稀饭动漫. There is no official API or
 /// documentation -- every parsing rule here is a best-effort assumption
@@ -120,6 +124,16 @@ class XifanApi {
     return XifanPlaybackSource(url: _decryptUrl(rawUrl, encrypt));
   }
 }
+
+@riverpod
+Dio xifanDio(Ref ref) {
+  final dio = Dio(BaseOptions(headers: {'User-Agent': 'Mozilla/5.0'}));
+  configureProxy(dio, ref);
+  return dio;
+}
+
+@riverpod
+XifanApi xifanApi(Ref ref) => XifanApi(ref.watch(xifanDioProvider));
 
 /// Scans forward from `var player_aaaa` for its `{...}` object literal,
 /// tracking brace depth so a nested object (e.g. `vod_data`) doesn't

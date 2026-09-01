@@ -2,6 +2,7 @@ import 'package:animeko_flutter/data/xifan/xifan_api.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:riverpod/riverpod.dart';
 
 class MockDio extends Mock implements Dio {}
 
@@ -239,5 +240,19 @@ var player_aaaa={"flag":"play","encrypt":0,"vod_data":{"vod_name":"x"}}
         throwsFormatException,
       );
     });
+  });
+
+  test('xifanApiProvider builds a XifanApi backed by xifanDioProvider', () {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    final api = container.read(xifanApiProvider);
+    expect(api, isA<XifanApi>());
+  });
+
+  test('xifanDioProvider sets a non-empty User-Agent header', () {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    final dio = container.read(xifanDioProvider);
+    expect(dio.options.headers['User-Agent'], isNotEmpty);
   });
 }
