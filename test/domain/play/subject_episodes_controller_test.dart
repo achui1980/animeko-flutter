@@ -48,6 +48,45 @@ void main() {
       final result = matchBestCategory([partial, exact], '葬送的芙莉蓮');
       expect(result, exact);
     });
+
+    test(
+      'matches a Simplified-Chinese subject name against anime1.me\'s '
+      'Traditional-Chinese title even when word order differs and the '
+      'subject name carries extra subtitle text',
+      () {
+        // Reported bug: Bangumi's Simplified title "恶女不才..." never
+        // matched anime1.me's real Traditional title "我是不才惡女"
+        // because (a) 恶/惡 are different characters and (b) the extra
+        // subtitle text diluted the whole-string character overlap
+        // below matchThreshold even after Simplified->Traditional
+        // conversion.
+        const target = Anime1Category(id: 1948, title: '我是不才惡女');
+        final result = matchBestCategory(
+          [target],
+          '恶女不才，请多关照 〇雏宫蝶鼠换身传〇',
+        );
+        expect(result, target);
+      },
+    );
+
+    test(
+      'matches a reordered core title separated from an unrelated, '
+      'much longer subtitle by a delimiter',
+      () {
+        // Isolates the segment-splitting behavior from Simplified/
+        // Traditional conversion: the core title's characters are
+        // reordered (an anagram) rather than a contiguous substring, so
+        // plain containment can't match it, and the long unrelated
+        // subtitle after the comma would otherwise dilute the
+        // whole-string overlap score below matchThreshold.
+        const target = Anime1Category(id: 1, title: '太喜泼');
+        final result = matchBestCategory(
+          [target],
+          '泼喜太，某个不相关的很长副标题内容',
+        );
+        expect(result, target);
+      },
+    );
   });
 
   group('SubjectEpisodesController', () {
