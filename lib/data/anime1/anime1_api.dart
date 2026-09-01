@@ -10,6 +10,7 @@ part 'anime1_api.g.dart';
 const _baseUrl = 'https://anime1.me';
 // ignore: unused_element -- will be used by resolvePlaybackUrl, added in a later task.
 const _apiUrl = 'https://v.anime1.me/api';
+const _maxPaginationPages = 20;
 
 /// Direct HTML-scraping client for anime1.me. There is no official API or
 /// documentation -- every parsing rule here is a best-effort assumption
@@ -47,6 +48,40 @@ class Anime1Api {
       categories.add(Anime1Category(id: id, title: title));
     }
     return categories;
+  }
+
+  /// GET https://anime1.me/?cat=`<categoryId>`, following pagination.
+  ///
+  /// NOTE (unverified): assumes each episode article has its title+link
+  /// inside `<h2 class="entry-title"><a>`, and that pagination uses a
+  /// `<a class="next page-numbers">` link -- both are common WordPress
+  /// theme defaults, not confirmed for this specific site. `_maxPaginationPages`
+  /// is a defensive bound against a malformed/infinite pagination chain,
+  /// not a meaningful real limit.
+  Future<List<Anime1Episode>> fetchCategoryEpisodes(int categoryId) async {
+    final episodes = <Anime1Episode>[];
+    String? nextPageUrl = '$_baseUrl/?cat=$categoryId';
+    var pagesFetched = 0;
+
+    while (nextPageUrl != null && pagesFetched < _maxPaginationPages) {
+      final response = await _dio.get<String>(
+        nextPageUrl,
+        options: Options(responseType: ResponseType.plain),
+      );
+      final document = html_parser.parse(response.data ?? '');
+
+      for (final titleLink in document.querySelectorAll('h2.entry-title a')) {
+        final href = titleLink.attributes['href'];
+        final title = titleLink.text.trim();
+        if (href == null || title.isEmpty) continue;
+        episodes.add(Anime1Episode(title: title, pageUrl: href));
+      }
+
+      nextPageUrl = document.querySelector('a.next.page-numbers')?.attributes['href'];
+      pagesFetched++;
+    }
+
+    return episodes;
   }
 }
 

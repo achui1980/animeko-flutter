@@ -83,6 +83,76 @@ void main() {
     });
   });
 
+  group('fetchCategoryEpisodes', () {
+    const page1Html = '''
+<html><body>
+  <article><h2 class="entry-title"><a href="https://anime1.me/?p=1002">葬送的芙莉蓮 [12]</a></h2></article>
+  <article><h2 class="entry-title"><a href="https://anime1.me/?p=1001">葬送的芙莉蓮 [11]</a></h2></article>
+  <nav class="pagination">
+    <a class="next page-numbers" href="https://anime1.me/page/2/?cat=87">Next</a>
+  </nav>
+</body></html>
+''';
+    const page2Html = '''
+<html><body>
+  <article><h2 class="entry-title"><a href="https://anime1.me/?p=1000">葬送的芙莉蓮 [10]</a></h2></article>
+</body></html>
+''';
+
+    test('fetches https://anime1.me/?cat=<id>', () async {
+      when(
+        () => dio.get<String>(any(), options: any(named: 'options')),
+      ).thenAnswer((_) async => htmlResponse('<html><body></body></html>'));
+
+      await api.fetchCategoryEpisodes(87);
+
+      verify(
+        () => dio.get<String>('https://anime1.me/?cat=87', options: any(named: 'options')),
+      ).called(1);
+    });
+
+    test('parses episode title and page URL from each article', () async {
+      when(
+        () => dio.get<String>(any(), options: any(named: 'options')),
+      ).thenAnswer((_) async => htmlResponse('''
+<html><body>
+  <article><h2 class="entry-title"><a href="https://anime1.me/?p=1001">葬送的芙莉蓮 [12]</a></h2></article>
+</body></html>
+'''));
+
+      final episodes = await api.fetchCategoryEpisodes(87);
+
+      expect(episodes, hasLength(1));
+      expect(episodes.single.title, '葬送的芙莉蓮 [12]');
+      expect(episodes.single.pageUrl, 'https://anime1.me/?p=1001');
+    });
+
+    test('follows pagination via "next page-numbers" links', () async {
+      when(() => dio.get<String>('https://anime1.me/?cat=87', options: any(named: 'options')))
+          .thenAnswer((_) async => htmlResponse(page1Html));
+      when(() => dio.get<String>('https://anime1.me/page/2/?cat=87', options: any(named: 'options')))
+          .thenAnswer((_) async => htmlResponse(page2Html));
+
+      final episodes = await api.fetchCategoryEpisodes(87);
+
+      expect(episodes.map((e) => e.title), [
+        '葬送的芙莉蓮 [12]',
+        '葬送的芙莉蓮 [11]',
+        '葬送的芙莉蓮 [10]',
+      ]);
+    });
+
+    test('stops when there is no next-page link', () async {
+      when(
+        () => dio.get<String>(any(), options: any(named: 'options')),
+      ).thenAnswer((_) async => htmlResponse(page2Html));
+
+      await api.fetchCategoryEpisodes(87);
+
+      verify(() => dio.get<String>(any(), options: any(named: 'options'))).called(1);
+    });
+  });
+
   test('anime1ApiProvider builds an Anime1Api backed by anime1DioProvider', () {
     final container = ProviderContainer();
     addTearDown(container.dispose);
