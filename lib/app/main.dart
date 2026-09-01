@@ -1,6 +1,7 @@
 // lib/app/main.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:media_kit/media_kit.dart';
 
 import '../domain/auth/auth_controller.dart';
 import 'router.dart';
@@ -11,6 +12,11 @@ Future<void> main() async {
   // that call happens before runApp(), which is what normally performs
   // this initialization implicitly.
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Must run before any Player() is constructed (see
+  // lib/ui/player/player_screen.dart) -- initializes media_kit's native
+  // libmpv bindings for this platform.
+  MediaKit.ensureInitialized();
 
   final container = ProviderContainer();
   await container.read(authControllerProvider.notifier).restoreSession();
