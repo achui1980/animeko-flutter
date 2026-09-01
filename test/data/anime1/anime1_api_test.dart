@@ -153,6 +153,81 @@ void main() {
     });
   });
 
+  group('resolvePlaybackUrl', () {
+    const episodePageHtml = '''
+<html><body>
+  <div class="video-js" data-apireq="eyJmb28iOiJiYXIifQ=="></div>
+</body></html>
+''';
+
+    Response<Map<String, dynamic>> apiJsonResponse(Map<String, dynamic> data) {
+      return Response(
+        data: data,
+        requestOptions: RequestOptions(path: 'https://v.anime1.me/api'),
+        statusCode: 200,
+      );
+    }
+
+    test('extracts data-apireq and POSTs it as form field "d"', () async {
+      when(
+        () => dio.get<String>(any(), options: any(named: 'options')),
+      ).thenAnswer((_) async => htmlResponse(episodePageHtml));
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer((_) async => apiJsonResponse({
+            's': [
+              {'src': 'https://video.example.com/720p.mp4', 'type': 'video/mp4'},
+            ],
+          }));
+
+      await api.resolvePlaybackUrl('https://anime1.me/?p=1001');
+
+      verify(
+        () => dio.post<Map<String, dynamic>>(
+          'https://v.anime1.me/api',
+          data: {'d': 'eyJmb28iOiJiYXIifQ=='},
+          options: any(named: 'options'),
+        ),
+      ).called(1);
+    });
+
+    test('returns the parsed Anime1PlaybackSource from the API response', () async {
+      when(
+        () => dio.get<String>(any(), options: any(named: 'options')),
+      ).thenAnswer((_) async => htmlResponse(episodePageHtml));
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer((_) async => apiJsonResponse({
+            's': [
+              {'src': 'https://video.example.com/720p.mp4', 'type': 'video/mp4'},
+            ],
+          }));
+
+      final source = await api.resolvePlaybackUrl('https://anime1.me/?p=1001');
+
+      expect(source.url, 'https://video.example.com/720p.mp4');
+    });
+
+    test('throws FormatException when the page has no data-apireq attribute', () async {
+      when(
+        () => dio.get<String>(any(), options: any(named: 'options')),
+      ).thenAnswer((_) async => htmlResponse('<html><body>no video here</body></html>'));
+
+      expect(
+        () => api.resolvePlaybackUrl('https://anime1.me/?p=1001'),
+        throwsFormatException,
+      );
+    });
+  });
+
   test('anime1ApiProvider builds an Anime1Api backed by anime1DioProvider', () {
     final container = ProviderContainer();
     addTearDown(container.dispose);

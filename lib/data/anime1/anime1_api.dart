@@ -8,7 +8,6 @@ import 'anime1_models.dart';
 part 'anime1_api.g.dart';
 
 const _baseUrl = 'https://anime1.me';
-// ignore: unused_element -- will be used by resolvePlaybackUrl, added in a later task.
 const _apiUrl = 'https://v.anime1.me/api';
 const _maxPaginationPages = 20;
 
@@ -82,6 +81,36 @@ class Anime1Api {
     }
 
     return episodes;
+  }
+
+  /// GET the episode page, extract `data-apireq`, then POST it to
+  /// https://v.anime1.me/api and parse the response.
+  ///
+  /// NOTE (unverified): assumes the raw `data-apireq` attribute string is
+  /// forwarded as-is (not base64-decoded by this client) as
+  /// `application/x-www-form-urlencoded` field `d`. Both this request
+  /// shape and the response shape parsed by
+  /// [Anime1PlaybackSource.fromApiResponse] are third-party
+  /// reverse-engineering assumptions, not confirmed against the live API.
+  Future<Anime1PlaybackSource> resolvePlaybackUrl(String episodePageUrl) async {
+    final pageResponse = await _dio.get<String>(
+      episodePageUrl,
+      options: Options(responseType: ResponseType.plain),
+    );
+    final document = html_parser.parse(pageResponse.data ?? '');
+    final apireq = document.querySelector('[data-apireq]')?.attributes['data-apireq'];
+    if (apireq == null || apireq.isEmpty) {
+      throw const FormatException(
+        'anime1.me episode page has no data-apireq attribute',
+      );
+    }
+
+    final apiResponse = await _dio.post<Map<String, dynamic>>(
+      _apiUrl,
+      data: {'d': apireq},
+      options: Options(contentType: Headers.formUrlEncodedContentType),
+    );
+    return Anime1PlaybackSource.fromApiResponse(apiResponse.data ?? {});
   }
 }
 
