@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/home/home_controller.dart';
 import '../../domain/subject_card.dart';
+import '../../ui/subject/subject_navigation.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -50,23 +51,26 @@ class _SubjectCardSection extends StatelessWidget {
             itemCount: cards.length,
             itemBuilder: (context, index) {
               final card = cards[index];
-              return SizedBox(
-                width: 120,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: Column(
-                    children: [
-                      Expanded(
-                        child: card.imageUrl != null
-                            ? Image.network(card.imageUrl!, fit: BoxFit.cover)
-                            : Container(color: Colors.grey.shade300),
-                      ),
-                      Text(
-                        card.nameCn ?? card.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
+              return GestureDetector(
+                onTap: () => openSubjectDetail(context, card),
+                child: SizedBox(
+                  width: 120,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Column(
+                      children: [
+                        Expanded(
+                          child: card.imageUrl != null
+                              ? Image.network(card.imageUrl!, fit: BoxFit.cover)
+                              : Container(color: Colors.grey.shade300),
+                        ),
+                        Text(
+                          card.nameCn ?? card.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               );

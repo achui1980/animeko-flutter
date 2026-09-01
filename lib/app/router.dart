@@ -7,9 +7,11 @@ import '../domain/auth/auth_controller.dart';
 import '../domain/auth/auth_state.dart';
 import '../ui/auth/login_screen.dart';
 import '../ui/home/home_screen.dart';
+import '../ui/player/player_screen.dart';
 import '../ui/schedule/schedule_screen.dart';
 import '../ui/search/search_screen.dart';
 import '../ui/shell/main_shell.dart';
+import '../ui/subject/subject_detail_screen.dart';
 
 part 'router.g.dart';
 
@@ -44,6 +46,26 @@ GoRouter appRouter(Ref ref) {
     },
     routes: [
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      GoRoute(
+        path: '/subject/:subjectId',
+        builder: (context, state) {
+          final subjectId = int.parse(state.pathParameters['subjectId']!);
+          final name = state.uri.queryParameters['name'] ?? '';
+          final imageUrl = state.uri.queryParameters['imageUrl'];
+          return SubjectDetailScreen(
+            subjectId: subjectId,
+            subjectName: name,
+            imageUrl: imageUrl,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/subject/:subjectId/play',
+        builder: (context, state) {
+          final url = state.uri.queryParameters['url'] ?? '';
+          return PlayerScreen(episodePageUrl: url);
+        },
+      ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
             MainShell(navigationShell: navigationShell),

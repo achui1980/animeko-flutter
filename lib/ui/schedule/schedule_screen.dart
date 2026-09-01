@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/schedule/schedule_controller.dart';
+import '../../ui/subject/subject_navigation.dart';
 
 class ScheduleScreen extends ConsumerWidget {
   const ScheduleScreen({super.key});
@@ -28,6 +29,7 @@ class ScheduleScreen extends ConsumerWidget {
                           ? Image.network(card.imageUrl!, width: 40, fit: BoxFit.cover)
                           : const SizedBox(width: 40),
                       title: Text(card.nameCn ?? card.name),
+                      onTap: () => openSubjectDetail(context, card),
                     ),
                   )
                   .toList(),

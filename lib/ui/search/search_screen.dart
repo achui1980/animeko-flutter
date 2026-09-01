@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/search/search_controller.dart';
+import '../../ui/subject/subject_navigation.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
@@ -48,6 +49,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               subtitle: card.tags != null && card.tags!.isNotEmpty
                   ? Text(card.tags!.join(', '))
                   : null,
+              onTap: () => openSubjectDetail(context, card),
             );
           },
         ),
