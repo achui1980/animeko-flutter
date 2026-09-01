@@ -10,6 +10,7 @@ import '../ui/home/home_screen.dart';
 import '../ui/player/player_screen.dart';
 import '../ui/schedule/schedule_screen.dart';
 import '../ui/search/search_screen.dart';
+import '../ui/settings/settings_screen.dart';
 import '../ui/shell/main_shell.dart';
 import '../ui/subject/subject_detail_screen.dart';
 
@@ -66,6 +67,7 @@ GoRouter appRouter(Ref ref) {
           return PlayerScreen(episodePageUrl: url);
         },
       ),
+      GoRoute(path: '/settings', builder: (context, state) => const SettingsScreen()),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
             MainShell(navigationShell: navigationShell),

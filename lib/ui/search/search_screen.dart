@@ -1,6 +1,7 @@
 // lib/ui/search/search_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../domain/search/search_controller.dart';
 import '../../ui/subject/subject_navigation.dart';
@@ -33,6 +34,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               .read(searchControllerProvider.notifier)
               .search(keywords: value),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () => context.push('/settings'),
+          ),
+        ],
       ),
       body: results.when(
         loading: () => const Center(child: CircularProgressIndicator()),
