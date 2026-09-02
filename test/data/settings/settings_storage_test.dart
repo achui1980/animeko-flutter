@@ -1,4 +1,5 @@
 import 'package:animeko_flutter/data/settings/settings_storage.dart';
+import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -27,6 +28,35 @@ void main() {
       await storage.setProxyUrl('http://127.0.0.1:2222');
       await storage.setProxyUrl(null);
       expect(storage.getProxyUrl(), isNull);
+    });
+
+    group('theme mode', () {
+      test('getThemeMode returns null when nothing is stored', () async {
+        final prefs = await SharedPreferences.getInstance();
+        final storage = SettingsStorage(prefs);
+        expect(storage.getThemeMode(), isNull);
+      });
+
+      test('setThemeMode persists and getThemeMode reads it back', () async {
+        final prefs = await SharedPreferences.getInstance();
+        final storage = SettingsStorage(prefs);
+        await storage.setThemeMode(ThemeMode.dark);
+        expect(storage.getThemeMode(), ThemeMode.dark);
+      });
+
+      test('getThemeMode returns null for an unrecognized stored value', () async {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('theme_mode', 'bogus');
+        final storage = SettingsStorage(prefs);
+        expect(storage.getThemeMode(), isNull);
+      });
+
+      test('setThemeMode(ThemeMode.system) round-trips', () async {
+        final prefs = await SharedPreferences.getInstance();
+        final storage = SettingsStorage(prefs);
+        await storage.setThemeMode(ThemeMode.system);
+        expect(storage.getThemeMode(), ThemeMode.system);
+      });
     });
   });
 }
