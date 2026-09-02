@@ -143,6 +143,19 @@ void main() {
     });
 
     test(
+      'parses a collection-list item that uses "id" instead of "subjectId" '
+      '(real server observed to omit "subjectId" entirely)',
+      () {
+        final item = MyCollectionSubject.fromJson({
+          'id': 900,
+          'name': 'Nikogyanya',
+          'nameCn': '尼古喵喵',
+        });
+        expect(item.subjectId, 900);
+      },
+    );
+
+    test(
       'parses a response with no total field (real server observed to omit it)',
       () {
         final page = PaginatedCollections.fromJson({

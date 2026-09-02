@@ -93,16 +93,6 @@ Map<String, dynamic> _$StaffMemberToJson(StaffMember instance) =>
       'role': instance.role,
     };
 
-MyCollectionSubject _$MyCollectionSubjectFromJson(Map<String, dynamic> json) =>
-    MyCollectionSubject(
-      subjectId: (json['subjectId'] as num).toInt(),
-      name: json['name'] as String,
-      nameCn: json['nameCn'] as String,
-      collectionType: collectionTypeFromWireNullable(
-        json['collectionType'] as String?,
-      ),
-    );
-
 Map<String, dynamic> _$MyCollectionSubjectToJson(
   MyCollectionSubject instance,
 ) => <String, dynamic>{

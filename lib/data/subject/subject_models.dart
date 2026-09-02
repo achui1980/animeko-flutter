@@ -148,7 +148,7 @@ class StaffMember {
 /// empty-space placeholder with no grey fill, unlike the
 /// `Colors.grey.shade300`-filled `Container` convention used elsewhere,
 /// e.g. `home_screen.dart`).
-@JsonSerializable()
+@JsonSerializable(createFactory: false)
 class MyCollectionSubject {
   const MyCollectionSubject({
     required this.subjectId,
@@ -164,8 +164,23 @@ class MyCollectionSubject {
   @JsonKey(fromJson: collectionTypeFromWireNullable, toJson: collectionTypeToWireNullable)
   final CollectionType? collectionType;
 
+  /// Hand-written (not `json_serializable`-generated) because the real
+  /// per-item id key was CONFIRMED via live testing (2026-09-02) to be
+  /// unreliable: this plan originally guessed `subjectId`, but that key
+  /// is entirely absent from at least some real responses, crashing
+  /// with "type 'Null' is not a subtype of type 'num'". `AniSubjectCollection`
+  /// itself (the full model behind `GET /v2/subjects/{id}`) uses `id`
+  /// for the same underlying value, so this reads either key
+  /// defensively rather than guessing a single one again.
   factory MyCollectionSubject.fromJson(Map<String, dynamic> json) =>
-      _$MyCollectionSubjectFromJson(json);
+      MyCollectionSubject(
+        subjectId: ((json['subjectId'] ?? json['id']) as num).toInt(),
+        name: json['name'] as String,
+        nameCn: json['nameCn'] as String,
+        collectionType: collectionTypeFromWireNullable(
+          json['collectionType'] as String?,
+        ),
+      );
 
   Map<String, dynamic> toJson() => _$MyCollectionSubjectToJson(this);
 }
