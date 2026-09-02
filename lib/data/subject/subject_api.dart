@@ -46,6 +46,34 @@ class SubjectApi {
   Future<void> deleteCollection(int subjectId) async {
     await _dio.delete<void>('/v2/subjects/$subjectId');
   }
+
+  /// GET /v2/subjects/{subjectId}/characters?withActors=true -- always
+  /// requested with voice-actor info included (the UI's cast row shows
+  /// both). Response wrapped in an `items` envelope, matching every
+  /// other list endpoint in this codebase.
+  Future<List<RelatedCharacter>> getCharacters(int subjectId) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/v2/subjects/$subjectId/characters',
+      queryParameters: {'withActors': true},
+    );
+    final items = response.data!['items'] as List<dynamic>;
+    return items
+        .map((e) => RelatedCharacter.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// GET /v2/subjects/{subjectId}/staff.
+  ///
+  /// NOTE: `StaffMember`'s wire shape is an unconfirmed best guess (see
+  /// the plan's Global Constraints and `StaffMember`'s own doc comment
+  /// in `subject_models.dart`).
+  Future<List<StaffMember>> getStaff(int subjectId) async {
+    final response = await _dio.get<Map<String, dynamic>>('/v2/subjects/$subjectId/staff');
+    final items = response.data!['items'] as List<dynamic>;
+    return items
+        .map((e) => StaffMember.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
 }
 
 @riverpod

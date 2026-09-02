@@ -116,4 +116,67 @@ void main() {
       verify(() => dio.delete<void>('/v2/subjects/400602')).called(1);
     });
   });
+
+  group('getCharacters', () {
+    test('GETs with withActors=true query param', () async {
+      when(() => dio.get<Map<String, dynamic>>(any(), queryParameters: any(named: 'queryParameters')))
+          .thenAnswer((_) async => jsonResponse({'items': <Map<String, dynamic>>[]}));
+
+      await api.getCharacters(400602);
+
+      verify(() => dio.get<Map<String, dynamic>>(
+            '/v2/subjects/400602/characters',
+            queryParameters: {'withActors': true},
+          )).called(1);
+    });
+
+    test('parses a list of related characters', () async {
+      when(() => dio.get<Map<String, dynamic>>(any(), queryParameters: any(named: 'queryParameters')))
+          .thenAnswer((_) async => jsonResponse({
+                'items': [
+                  {'index': 0, 'character': {'name': '芙莉莲', 'imageUrl': 'https://example.com/f.jpg'}, 'role': 1},
+                  {'index': 1, 'character': {'name': '费伦', 'imageUrl': null}, 'role': 2},
+                ],
+              }));
+
+      final characters = await api.getCharacters(400602);
+
+      expect(characters, hasLength(2));
+      expect(characters.first.character.name, '芙莉莲');
+      expect(characters.last.character.imageUrl, isNull);
+    });
+
+    test('returns an empty list when the response has no items', () async {
+      when(() => dio.get<Map<String, dynamic>>(any(), queryParameters: any(named: 'queryParameters')))
+          .thenAnswer((_) async => jsonResponse({'items': <Map<String, dynamic>>[]}));
+
+      expect(await api.getCharacters(400602), isEmpty);
+    });
+  });
+
+  group('getStaff', () {
+    test('GETs the exact staff path', () async {
+      when(() => dio.get<Map<String, dynamic>>(any()))
+          .thenAnswer((_) async => jsonResponse({'items': <Map<String, dynamic>>[]}));
+
+      await api.getStaff(400602);
+
+      verify(() => dio.get<Map<String, dynamic>>('/v2/subjects/400602/staff')).called(1);
+    });
+
+    test('parses a list of staff members', () async {
+      when(() => dio.get<Map<String, dynamic>>(any()))
+          .thenAnswer((_) async => jsonResponse({
+                'items': [
+                  {'name': '渡边步', 'imageUrl': 'https://example.com/s.jpg', 'role': '导演'},
+                ],
+              }));
+
+      final staff = await api.getStaff(400602);
+
+      expect(staff, hasLength(1));
+      expect(staff.single.name, '渡边步');
+      expect(staff.single.role, '导演');
+    });
+  });
 }
