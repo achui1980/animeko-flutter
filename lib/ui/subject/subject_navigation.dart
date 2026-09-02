@@ -5,10 +5,10 @@ import 'package:go_router/go_router.dart';
 import '../../domain/subject_card.dart';
 
 /// Pushes to the subject detail route for [card]. Does nothing if the
-/// card has no [SubjectCard.id] -- all four `SubjectCard.from*` factories
+/// card has no [SubjectCard.id] -- all five `SubjectCard.from*` factories
 /// set this from a required wire field, so in practice this should not
-/// happen for cards rendered by Home/Search/Schedule; guarded defensively
-/// so a malformed API response can't crash navigation.
+/// happen for cards rendered by Home/Search/Schedule/My-Collection;
+/// guarded defensively so a malformed API response can't crash navigation.
 void openSubjectDetail(BuildContext context, SubjectCard card) {
   final id = card.id;
   if (id == null) return;

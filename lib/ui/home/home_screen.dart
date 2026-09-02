@@ -18,6 +18,10 @@ class HomeScreen extends ConsumerWidget {
         title: const Text('Animeko'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.bookmark),
+            onPressed: () => context.push('/collection'),
+          ),
+          IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () => context.push('/settings'),
           ),

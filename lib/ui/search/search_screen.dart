@@ -36,6 +36,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.bookmark),
+            onPressed: () => context.push('/collection'),
+          ),
+          IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () => context.push('/settings'),
           ),

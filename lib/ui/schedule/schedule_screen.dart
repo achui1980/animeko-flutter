@@ -17,6 +17,10 @@ class ScheduleScreen extends ConsumerWidget {
         title: const Text('Schedule'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.bookmark),
+            onPressed: () => context.push('/collection'),
+          ),
+          IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () => context.push('/settings'),
           ),

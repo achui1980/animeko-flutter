@@ -7,6 +7,7 @@ import '../domain/auth/auth_controller.dart';
 import '../domain/auth/auth_state.dart';
 import '../domain/play/subject_episodes_controller.dart';
 import '../ui/auth/login_screen.dart';
+import '../ui/collection/my_collection_screen.dart';
 import '../ui/home/home_screen.dart';
 import '../ui/player/player_screen.dart';
 import '../ui/schedule/schedule_screen.dart';
@@ -78,6 +79,7 @@ GoRouter appRouter(Ref ref) {
         },
       ),
       GoRoute(path: '/settings', builder: (context, state) => const SettingsScreen()),
+      GoRoute(path: '/collection', builder: (context, state) => const MyCollectionScreen()),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
             MainShell(navigationShell: navigationShell),
