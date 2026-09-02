@@ -74,6 +74,26 @@ class SubjectApi {
         .map((e) => StaffMember.fromJson(e as Map<String, dynamic>))
         .toList();
   }
+
+  /// GET /v2/subjects/list -- the "My Collection" library page, filtered
+  /// by [type] (null = all 5 states, though the UI always passes a
+  /// concrete type -- see `MyCollectionsController`). Pagination is
+  /// offset-based (see `MyCollectionsController.loadMore`).
+  Future<PaginatedCollections> getMyCollections({
+    CollectionType? type,
+    required int offset,
+    required int limit,
+  }) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/v2/subjects/list',
+      queryParameters: {
+        if (type != null) 'type': type.wireValue,
+        'offset': offset,
+        'limit': limit,
+      },
+    );
+    return PaginatedCollections.fromJson(response.data!);
+  }
 }
 
 @riverpod

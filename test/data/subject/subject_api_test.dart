@@ -179,4 +179,46 @@ void main() {
       expect(staff.single.role, '导演');
     });
   });
+
+  group('getMyCollections', () {
+    test('GETs with type/offset/limit query params when type is given', () async {
+      when(() => dio.get<Map<String, dynamic>>(any(), queryParameters: any(named: 'queryParameters')))
+          .thenAnswer((_) async => jsonResponse({'items': <Map<String, dynamic>>[], 'total': 0}));
+
+      await api.getMyCollections(type: CollectionType.doing, offset: 20, limit: 20);
+
+      verify(() => dio.get<Map<String, dynamic>>(
+            '/v2/subjects/list',
+            queryParameters: {'type': 'DOING', 'offset': 20, 'limit': 20},
+          )).called(1);
+    });
+
+    test('omits the type query param when type is null', () async {
+      when(() => dio.get<Map<String, dynamic>>(any(), queryParameters: any(named: 'queryParameters')))
+          .thenAnswer((_) async => jsonResponse({'items': <Map<String, dynamic>>[], 'total': 0}));
+
+      await api.getMyCollections(offset: 0, limit: 20);
+
+      verify(() => dio.get<Map<String, dynamic>>(
+            '/v2/subjects/list',
+            queryParameters: {'offset': 0, 'limit': 20},
+          )).called(1);
+    });
+
+    test('parses a paginated response', () async {
+      when(() => dio.get<Map<String, dynamic>>(any(), queryParameters: any(named: 'queryParameters')))
+          .thenAnswer((_) async => jsonResponse({
+                'items': [
+                  {'subjectId': 1, 'name': 'A', 'nameCn': 'A-cn', 'collectionType': 'DOING'},
+                ],
+                'total': 1,
+              }));
+
+      final page = await api.getMyCollections(offset: 0, limit: 20);
+
+      expect(page.items, hasLength(1));
+      expect(page.total, 1);
+      expect(page.items.single.nameCn, 'A-cn');
+    });
+  });
 }

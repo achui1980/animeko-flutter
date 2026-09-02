@@ -2,16 +2,17 @@ import '../data/home/home_recommendations_models.dart';
 import '../data/home/trends_models.dart';
 import '../data/schedule/schedule_models.dart';
 import '../data/search/search_models.dart';
+import '../data/subject/subject_models.dart';
 
 /// Unified internal representation of an anime "card" shown in Home,
-/// Search, and Schedule lists. None of the four Ani API endpoint groups
-/// (trends, home recommendations, search, schedule) return a shared wire
+/// Search, Schedule, and My-Collection lists. None of the five Ani API
+/// endpoint groups (trends, home recommendations, search, schedule) return a shared wire
 /// model -- each has its own incompatible field set (different names for
 /// id/image, inconsistent presence of nameCn/score/tags). Rather than
 /// have the UI branch on four different types, every API-specific model
 /// is mapped into this one type via a factory constructor added in the
 /// task that introduces that API (see SubjectCard.fromTrending,
-/// .fromRecommendation, .fromSearchResult, .fromScheduledSubject).
+/// .fromRecommendation, .fromSearchResult, .fromScheduledSubject, .fromMyCollectionSubject).
 class SubjectCard {
   const SubjectCard({
     required this.id,
@@ -63,4 +64,7 @@ class SubjectCard {
         nameCn: s.nameCn,
         imageUrl: s.imageLarge,
       );
+
+  factory SubjectCard.fromMyCollectionSubject(MyCollectionSubject s) =>
+      SubjectCard(id: s.subjectId, name: s.name, nameCn: s.nameCn);
 }
