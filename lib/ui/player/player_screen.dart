@@ -1,4 +1,6 @@
 // lib/ui/player/player_screen.dart
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
@@ -39,8 +41,23 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   @override
   void dispose() {
-    _player.dispose();
+    // media_kit has a known crash where disposing a Player while it is
+    // still playing (i.e. without calling `stop()` first) can invoke a
+    // native FFI callback after it has already been freed, causing a
+    // hard native crash ("Callback invoked after it has been deleted").
+    // Calling `stop()` before `dispose()` is the mitigation recommended
+    // by media_kit maintainers. See media-kit/media-kit#1324, #1340,
+    // #1348 (upstream bug, not fixed in the version pinned in
+    // pubspec.lock as of this fix).
+    //
+    // `State.dispose()` cannot be `async`, so this is fire-and-forget.
+    unawaited(_disposePlayer());
     super.dispose();
+  }
+
+  Future<void> _disposePlayer() async {
+    await _player.stop();
+    await _player.dispose();
   }
 
   void _retry() {
