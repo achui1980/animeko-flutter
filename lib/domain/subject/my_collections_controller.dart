@@ -8,6 +8,19 @@ part 'my_collections_controller.g.dart';
 
 const _pageSize = 20;
 
+/// The loaded slice of the "My Collection" list plus whether another
+/// page might still be available. [hasMore] uses the standard
+/// "short page = last page" heuristic -- a fetched page with fewer
+/// items than [_pageSize] means there's nothing left to load. This
+/// doesn't require trusting [PaginatedCollections.total]'s exact
+/// semantics against the real server (see the NOTE on that class).
+class MyCollectionsPage {
+  const MyCollectionsPage({required this.items, required this.hasMore});
+
+  final List<MyCollectionSubject> items;
+  final bool hasMore;
+}
+
 /// Backs the "My Collection" library page (Task 11), one instance per
 /// segmented-control tab. `type: null` fetches all 5 states -- the UI
 /// itself always passes a concrete [CollectionType] (one per tab), but
@@ -15,11 +28,11 @@ const _pageSize = 20;
 @riverpod
 class MyCollectionsController extends _$MyCollectionsController {
   @override
-  Future<List<MyCollectionSubject>> build({required CollectionType? type}) async {
+  Future<MyCollectionsPage> build({required CollectionType? type}) async {
     final page = await ref
         .watch(subjectApiProvider)
         .getMyCollections(type: type, offset: 0, limit: _pageSize);
-    return page.items;
+    return MyCollectionsPage(items: page.items, hasMore: page.items.length >= _pageSize);
   }
 
   /// Fetches the next page (offset = current list length) and appends
@@ -29,7 +42,12 @@ class MyCollectionsController extends _$MyCollectionsController {
     final current = await future;
     final page = await ref
         .read(subjectApiProvider)
-        .getMyCollections(type: type, offset: current.length, limit: _pageSize);
-    state = AsyncData([...current, ...page.items]);
+        .getMyCollections(type: type, offset: current.items.length, limit: _pageSize);
+    state = AsyncData(
+      MyCollectionsPage(
+        items: [...current.items, ...page.items],
+        hasMore: page.items.length >= _pageSize,
+      ),
+    );
   }
 }

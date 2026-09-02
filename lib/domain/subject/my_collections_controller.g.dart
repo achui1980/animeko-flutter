@@ -21,11 +21,7 @@ final myCollectionsControllerProvider = MyCollectionsControllerFamily._();
 /// itself always passes a concrete [CollectionType] (one per tab), but
 /// this controller doesn't require that.
 final class MyCollectionsControllerProvider
-    extends
-        $AsyncNotifierProvider<
-          MyCollectionsController,
-          List<MyCollectionSubject>
-        > {
+    extends $AsyncNotifierProvider<MyCollectionsController, MyCollectionsPage> {
   /// Backs the "My Collection" library page (Task 11), one instance per
   /// segmented-control tab. `type: null` fetches all 5 states -- the UI
   /// itself always passes a concrete [CollectionType] (one per tab), but
@@ -68,7 +64,7 @@ final class MyCollectionsControllerProvider
 }
 
 String _$myCollectionsControllerHash() =>
-    r'688a4999e050336f745fe6c02f6e62c219f66d9a';
+    r'244515b9a5896be7ee02f30d7975d8e92535ce0f';
 
 /// Backs the "My Collection" library page (Task 11), one instance per
 /// segmented-control tab. `type: null` fetches all 5 states -- the UI
@@ -79,9 +75,9 @@ final class MyCollectionsControllerFamily extends $Family
     with
         $ClassFamilyOverride<
           MyCollectionsController,
-          AsyncValue<List<MyCollectionSubject>>,
-          List<MyCollectionSubject>,
-          FutureOr<List<MyCollectionSubject>>,
+          AsyncValue<MyCollectionsPage>,
+          MyCollectionsPage,
+          FutureOr<MyCollectionsPage>,
           CollectionType?
         > {
   MyCollectionsControllerFamily._()
@@ -111,28 +107,21 @@ final class MyCollectionsControllerFamily extends $Family
 /// this controller doesn't require that.
 
 abstract class _$MyCollectionsController
-    extends $AsyncNotifier<List<MyCollectionSubject>> {
+    extends $AsyncNotifier<MyCollectionsPage> {
   late final _$args = ref.$arg as CollectionType?;
   CollectionType? get type => _$args;
 
-  FutureOr<List<MyCollectionSubject>> build({required CollectionType? type});
+  FutureOr<MyCollectionsPage> build({required CollectionType? type});
   @$mustCallSuper
   @override
   void runBuild() {
     final ref =
-        this.ref
-            as $Ref<
-              AsyncValue<List<MyCollectionSubject>>,
-              List<MyCollectionSubject>
-            >;
+        this.ref as $Ref<AsyncValue<MyCollectionsPage>, MyCollectionsPage>;
     final element =
         ref.element
             as $ClassProviderElement<
-              AnyNotifier<
-                AsyncValue<List<MyCollectionSubject>>,
-                List<MyCollectionSubject>
-              >,
-              AsyncValue<List<MyCollectionSubject>>,
+              AnyNotifier<AsyncValue<MyCollectionsPage>, MyCollectionsPage>,
+              AsyncValue<MyCollectionsPage>,
               Object?,
               Object?
             >;

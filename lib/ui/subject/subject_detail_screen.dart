@@ -150,10 +150,22 @@ class _SubjectInfoSection extends ConsumerWidget {
 /// [SubjectCollectionController]'s optimistic-update methods and shows a
 /// one-off SnackBar on failure (the controller has already rolled back
 /// its own state by the time the exception reaches here).
-class _CollectionButtons extends ConsumerWidget {
+///
+/// Disables all chips while a mutation is in flight (local `_busy`
+/// flag) so two overlapping taps can't race -- the controller itself
+/// has no mutex, so without this guard a second tap's optimistic update
+/// could be stomped by the first tap's failure-triggered rollback.
+class _CollectionButtons extends ConsumerStatefulWidget {
   const _CollectionButtons({required this.subjectId});
 
   final int subjectId;
+
+  @override
+  ConsumerState<_CollectionButtons> createState() => _CollectionButtonsState();
+}
+
+class _CollectionButtonsState extends ConsumerState<_CollectionButtons> {
+  bool _busy = false;
 
   static const _labels = {
     CollectionType.wish: '想看',
@@ -163,33 +175,39 @@ class _CollectionButtons extends ConsumerWidget {
     CollectionType.dropped: '弃番',
   };
 
-  Future<void> _setType(BuildContext context, WidgetRef ref, CollectionType type) async {
+  Future<void> _setType(CollectionType type) async {
+    setState(() => _busy = true);
     try {
       await ref
-          .read(subjectCollectionControllerProvider(subjectId: subjectId).notifier)
+          .read(subjectCollectionControllerProvider(subjectId: widget.subjectId).notifier)
           .setCollectionType(type);
     } catch (e) {
-      if (context.mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('更新收藏状态失败：$e')));
       }
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
-  Future<void> _remove(BuildContext context, WidgetRef ref) async {
+  Future<void> _remove() async {
+    setState(() => _busy = true);
     try {
       await ref
-          .read(subjectCollectionControllerProvider(subjectId: subjectId).notifier)
+          .read(subjectCollectionControllerProvider(subjectId: widget.subjectId).notifier)
           .removeFromCollection();
     } catch (e) {
-      if (context.mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('取消收藏失败：$e')));
       }
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(subjectCollectionControllerProvider(subjectId: subjectId));
+  Widget build(BuildContext context) {
+    final state = ref.watch(subjectCollectionControllerProvider(subjectId: widget.subjectId));
     return state.when(
       loading: () => const SizedBox.shrink(),
       error: (error, stack) => const SizedBox.shrink(),
@@ -200,10 +218,10 @@ class _CollectionButtons extends ConsumerWidget {
             ChoiceChip(
               label: Text(_labels[type]!),
               selected: collection.collectionType == type,
-              onSelected: (_) => _setType(context, ref, type),
+              onSelected: _busy ? null : (_) => _setType(type),
             ),
           if (collection.collectionType != null)
-            ActionChip(label: const Text('移除'), onPressed: () => _remove(context, ref)),
+            ActionChip(label: const Text('移除'), onPressed: _busy ? null : _remove),
         ],
       ),
     );

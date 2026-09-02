@@ -53,7 +53,8 @@ class _MyCollectionScreenState extends ConsumerState<MyCollectionScreen> {
                 message: '加载失败：$error',
                 onRetry: () => ref.invalidate(provider),
               ),
-              data: (subjects) => _CollectionList(type: _selected, subjects: subjects),
+              data: (page) =>
+                  _CollectionList(type: _selected, subjects: page.items, hasMore: page.hasMore),
             ),
           ),
         ],
@@ -65,11 +66,14 @@ class _MyCollectionScreenState extends ConsumerState<MyCollectionScreen> {
 /// The list itself + a "load more on scroll to bottom" footer row
 /// (design doc: no pull-to-refresh, YAGNI). A failed load-more shows a
 /// small retry text button without disturbing the already-loaded items.
+/// Stops firing `loadMore()` (and stops rendering the footer) once
+/// [hasMore] is false -- see `MyCollectionsPage.hasMore`.
 class _CollectionList extends ConsumerStatefulWidget {
-  const _CollectionList({required this.type, required this.subjects});
+  const _CollectionList({required this.type, required this.subjects, required this.hasMore});
 
   final CollectionType type;
   final List<MyCollectionSubject> subjects;
+  final bool hasMore;
 
   @override
   ConsumerState<_CollectionList> createState() => _CollectionListState();
@@ -98,16 +102,17 @@ class _CollectionListState extends ConsumerState<_CollectionList> {
     if (widget.subjects.isEmpty) {
       return const Center(child: Text('还没有收藏任何番剧'));
     }
+    final showFooter = widget.hasMore || _loadMoreFailed;
     return NotificationListener<ScrollEndNotification>(
       onNotification: (notification) {
         final metrics = notification.metrics;
-        if (!_loadingMore && metrics.pixels >= metrics.maxScrollExtent - 40) {
+        if (widget.hasMore && !_loadingMore && metrics.pixels >= metrics.maxScrollExtent - 40) {
           _loadMore();
         }
         return false;
       },
       child: ListView.builder(
-        itemCount: widget.subjects.length + 1,
+        itemCount: widget.subjects.length + (showFooter ? 1 : 0),
         itemBuilder: (context, index) {
           if (index == widget.subjects.length) {
             if (_loadMoreFailed) {

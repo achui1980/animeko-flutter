@@ -5,8 +5,6 @@ import '../api_client.dart';
 import 'collection_type.dart';
 import 'subject_models.dart';
 
-export 'collection_type.dart' show CollectionTypeWireValue;
-
 part 'subject_api.g.dart';
 
 /// Direct calls against the real `https://api.animeko.org` server (via

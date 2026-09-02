@@ -144,8 +144,10 @@ class StaffMember {
 /// One item of `GET /v2/subjects/list` (the "My Collection" library
 /// page). A deliberately lean subset of `AniSubjectCollection` for list
 /// display -- notably, `AniSubjectCollection` has no image field of its
-/// own, so this list has no cover image either (the UI shows a grey
-/// placeholder, matching the existing `SubjectCard` convention).
+/// own, so this list has no cover image either (the UI leaves a plain
+/// empty-space placeholder with no grey fill, unlike the
+/// `Colors.grey.shade300`-filled `Container` convention used elsewhere,
+/// e.g. `home_screen.dart`).
 @JsonSerializable()
 class MyCollectionSubject {
   const MyCollectionSubject({

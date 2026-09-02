@@ -33,6 +33,16 @@ const _detailCollected = SubjectDetail(
   selfRating: _unratedSelfRating,
 );
 
+const _detailWithTags = SubjectDetail(
+  id: 1,
+  name: 'A',
+  nameCn: 'A-cn',
+  summary: 's',
+  airDate: '2026-01-01',
+  tags: [],
+  selfRating: SelfRating(score: 0, tags: ['神作', '完结撒花'], isPrivate: false),
+);
+
 void main() {
   late MockSubjectApi api;
   late ProviderContainer container;
@@ -157,6 +167,22 @@ void main() {
       final result = container.read(provider).value!;
       expect(result.selfRating.score, 8);
       expect(result.selfRating.comment, '好看');
+    });
+
+    test('preserves the existing non-empty tags instead of wiping them', () async {
+      when(() => api.getSubject(1)).thenAnswer((_) async => _detailWithTags);
+      await container.read(provider.future);
+
+      SelfRating? sentRating;
+      when(() => api.updateCollection(1, selfRating: any(named: 'selfRating'))).thenAnswer((invocation) async {
+        sentRating = invocation.namedArguments[#selfRating] as SelfRating;
+      });
+
+      await container.read(provider.notifier).submitRating(8, comment: '好看');
+
+      expect(sentRating!.tags, ['神作', '完结撒花']);
+      final result = container.read(provider).value!;
+      expect(result.selfRating.tags, ['神作', '完结撒花']);
     });
 
     test('leaves state unchanged when the PATCH fails', () async {

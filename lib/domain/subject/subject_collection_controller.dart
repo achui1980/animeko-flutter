@@ -75,13 +75,24 @@ class SubjectCollectionController extends _$SubjectCollectionController {
   /// updated after the `PATCH` succeeds; on failure the caller keeps the
   /// user's input in the still-open rating form for retry rather than
   /// this controller attempting a rollback.
+  ///
+  /// Preserves the existing [SelfRating.tags] from the current state --
+  /// this UI has no tag-editing affordance, and the `PATCH` sends the
+  /// whole `selfRating` object (replacing it wholesale server-side), so
+  /// hardcoding an empty list here would silently wipe out tags set via
+  /// another client.
   Future<void> submitRating(int score, {String? comment, bool isPrivate = false}) async {
     if (score < 1 || score > 10) {
       throw ArgumentError.value(score, 'score', 'must be between 1 and 10');
     }
-    final rating = SelfRating(score: score, tags: const [], isPrivate: isPrivate, comment: comment);
-    await ref.read(subjectApiProvider).updateCollection(subjectId, selfRating: rating);
     final current = await future;
+    final rating = SelfRating(
+      score: score,
+      tags: current.selfRating.tags,
+      isPrivate: isPrivate,
+      comment: comment,
+    );
+    await ref.read(subjectApiProvider).updateCollection(subjectId, selfRating: rating);
     state = AsyncData(current.copyWith(selfRating: rating));
   }
 }
