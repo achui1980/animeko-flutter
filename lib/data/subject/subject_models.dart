@@ -172,18 +172,23 @@ class MyCollectionSubject {
 
 /// Response of `GET /v2/subjects/list`.
 ///
-/// NOTE: the exact wire shape (`items`+`total` vs. something else) is an
-/// **unverified assumption** -- modeled after the sibling paginated Ani
-/// endpoints that *do* have a `total` field (see the comment on
-/// `SearchResponse` in `lib/data/search/search_models.dart`, which
-/// notes search is the one endpoint *without* `total`). Adjust if the
-/// live server disagrees.
+/// CONFIRMED via live testing (2026-09-02): the real server response
+/// omits `total` entirely, unlike sibling paginated Ani endpoints (see
+/// the comment on `SearchResponse` in
+/// `lib/data/search/search_models.dart`). Originally modeled as a
+/// required `int`, which crashed with "type 'Null' is not a subtype
+/// of type 'num'" the first time this endpoint was hit against the
+/// real backend -- [total] is now nullable. No production code reads
+/// [total] (`MyCollectionsController` uses a short-page heuristic
+/// instead, see its doc comment), so this field is effectively
+/// vestigial; kept only in case a future server version starts
+/// sending it.
 @JsonSerializable()
 class PaginatedCollections {
-  const PaginatedCollections({required this.items, required this.total});
+  const PaginatedCollections({required this.items, this.total});
 
   final List<MyCollectionSubject> items;
-  final int total;
+  final int? total;
 
   factory PaginatedCollections.fromJson(Map<String, dynamic> json) =>
       _$PaginatedCollectionsFromJson(json);

@@ -118,7 +118,7 @@ PaginatedCollections _$PaginatedCollectionsFromJson(
   items: (json['items'] as List<dynamic>)
       .map((e) => MyCollectionSubject.fromJson(e as Map<String, dynamic>))
       .toList(),
-  total: (json['total'] as num).toInt(),
+  total: (json['total'] as num?)?.toInt(),
 );
 
 Map<String, dynamic> _$PaginatedCollectionsToJson(

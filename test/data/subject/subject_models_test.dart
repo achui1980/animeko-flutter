@@ -142,6 +142,20 @@ void main() {
       expect(item.collectionType, CollectionType.wish);
     });
 
+    test(
+      'parses a response with no total field (real server observed to omit it)',
+      () {
+        final page = PaginatedCollections.fromJson({
+          'items': [
+            {'subjectId': 1, 'name': 'A', 'nameCn': 'A-cn'},
+          ],
+        });
+
+        expect(page.items, hasLength(1));
+        expect(page.total, isNull);
+      },
+    );
+
     test('parses a paginated response with items and total', () {
       final page = PaginatedCollections.fromJson({
         'items': [
