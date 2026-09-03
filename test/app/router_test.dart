@@ -47,12 +47,14 @@ void main() {
     expect(find.text('Log in with Bangumi'), findsOneWidget);
 
     fake.state = const AuthAuthenticated('user-1');
-    // Not pumpAndSettle(): HomeScreen's homeControllerProvider makes a real
-    // (un-mocked) network call and stays in AsyncLoading, whose
-    // CircularProgressIndicator animates indefinitely -- pumpAndSettle()
-    // never sees "no more frames scheduled" and times out. A couple of
-    // bounded pumps is enough for the refreshListenable-triggered redirect
-    // and the route transition to complete.
+    // Not pumpAndSettle(): HomeScreen's trendingProvider and
+    // homeRecommendationsControllerProvider make real (un-mocked) network
+    // calls and stay in AsyncLoading, and TrendingCarousel's auto-advance
+    // Timer keeps scheduling a new animation frame every simulated 5
+    // seconds for as long as it's mounted -- pumpAndSettle() never sees
+    // "no more frames scheduled" and times out. A couple of bounded pumps
+    // is enough for the refreshListenable-triggered redirect and the
+    // route transition to complete.
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
 
@@ -137,7 +139,14 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
 
     router!.push('/account');
-    await tester.pumpAndSettle();
+    // Not pumpAndSettle(): the previous /home route (with its
+    // auto-advancing TrendingCarousel Timer) stays mounted beneath the
+    // pushed route, so a new frame keeps getting scheduled every
+    // simulated 5 seconds and pumpAndSettle() never settles. A couple of
+    // bounded pumps is enough for the push transition and
+    // selfUserProvider's fake future to resolve.
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
 
     expect(find.text('Alice'), findsOneWidget);
   });
@@ -170,7 +179,11 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
 
     router!.push('/settings/proxy');
-    await tester.pumpAndSettle();
+    // Not pumpAndSettle(): same reason as the /account test above -- the
+    // previous /home route's TrendingCarousel Timer keeps the widget
+    // tree scheduling frames while it's mounted underneath.
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
 
     expect(find.text('代理设置'), findsWidgets);
   });

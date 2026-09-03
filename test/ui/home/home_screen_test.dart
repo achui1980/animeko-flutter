@@ -1,47 +1,65 @@
-import 'package:animeko_flutter/domain/home/home_controller.dart';
+import 'package:animeko_flutter/domain/home/home_recommendations_controller.dart';
+import 'package:animeko_flutter/domain/home/trending_controller.dart';
 import 'package:animeko_flutter/domain/subject_card.dart';
 import 'package:animeko_flutter/ui/common/anime_cover_card.dart';
 import 'package:animeko_flutter/ui/home/home_screen.dart';
+import 'package:animeko_flutter/ui/home/trending_carousel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-class _FakeHomeController extends HomeController {
+class _FakeHomeRecommendationsController extends HomeRecommendationsController {
   @override
-  Future<HomeData> build() async {
-    return const HomeData(
-      trending: [
-        SubjectCard(id: 1, name: 'Foo', nameCn: 'Foo', imageUrl: 'https://example.com/1.png'),
-      ],
-      recommendations: [
+  Future<HomeRecommendationsPage> build() async {
+    return const HomeRecommendationsPage(
+      items: [
         SubjectCard(id: 2, name: 'Bar', nameCn: 'Bar', imageUrl: 'https://example.com/2.png'),
       ],
+      hasMore: false,
     );
   }
 }
 
 Widget _wrap(Widget child) {
   return ProviderScope(
-    overrides: [homeControllerProvider.overrideWith(() => _FakeHomeController())],
+    overrides: [
+      trendingProvider.overrideWith(
+        (ref) async => const [
+          SubjectCard(id: 1, name: 'Foo', nameCn: 'Foo', imageUrl: 'https://example.com/1.png'),
+        ],
+      ),
+      homeRecommendationsControllerProvider.overrideWith(
+        () => _FakeHomeRecommendationsController(),
+      ),
+    ],
     child: MaterialApp(home: child),
   );
 }
 
 void main() {
-  testWidgets('shows trending and recommended sections using AnimeCoverCard', (tester) async {
+  // Bounded pumps, not pumpAndSettle(): TrendingCarousel owns a
+  // Timer.periodic that keeps scheduling frames every simulated 5
+  // seconds for as long as the widget stays mounted, so pumpAndSettle()
+  // would never see "no more frames scheduled".
+  testWidgets('shows the trending carousel and recommendations grid with Chinese titles', (
+    tester,
+  ) async {
     await tester.pumpWidget(_wrap(const HomeScreen()));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump();
 
-    expect(find.text('Trending'), findsOneWidget);
-    expect(find.text('Recommended'), findsOneWidget);
+    expect(find.text('最近热门'), findsOneWidget);
+    expect(find.text('为你推荐'), findsOneWidget);
+    expect(find.byType(TrendingCarousel), findsOneWidget);
     expect(find.text('Foo'), findsOneWidget);
+    expect(find.byType(AnimeCoverCard), findsOneWidget);
     expect(find.text('Bar'), findsOneWidget);
-    expect(find.byType(AnimeCoverCard), findsNWidgets(2));
   });
 
   testWidgets('AppBar shows the unified account/collection/settings actions', (tester) async {
     await tester.pumpWidget(_wrap(const HomeScreen()));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump();
 
     expect(find.byIcon(Icons.account_circle_outlined), findsOneWidget);
     expect(find.byIcon(Icons.bookmark), findsOneWidget);

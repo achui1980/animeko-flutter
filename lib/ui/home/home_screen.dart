@@ -3,27 +3,120 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/theme/app_spacing.dart';
-import '../../domain/home/home_controller.dart';
+import '../../domain/home/home_recommendations_controller.dart';
+import '../../domain/home/trending_controller.dart';
 import '../../domain/subject_card.dart';
-import '../../ui/subject/subject_navigation.dart';
 import '../common/anime_cover_card.dart';
 import '../common/app_action_bar.dart';
+import '../common/error_retry_view.dart';
+import '../subject/subject_navigation.dart';
+import 'trending_carousel.dart';
 
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final homeData = ref.watch(homeControllerProvider);
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  bool _loadingMore = false;
+  bool _loadMoreFailed = false;
+
+  Future<void> _loadMore() async {
+    setState(() {
+      _loadingMore = true;
+      _loadMoreFailed = false;
+    });
+    try {
+      await ref.read(homeRecommendationsControllerProvider.notifier).loadMore();
+    } catch (_) {
+      if (mounted) setState(() => _loadMoreFailed = true);
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final trending = ref.watch(trendingProvider);
+    final recommendations = ref.watch(homeRecommendationsControllerProvider);
+    final padding = pagePadding(context);
+    final width = MediaQuery.of(context).size.width;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Animeko'), actions: buildStandardActions(context)),
-      body: homeData.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stack) => Center(child: Text('Failed to load home: $error')),
-        data: (data) => ListView(
-          children: [
-            _SubjectCardSection(title: 'Trending', cards: data.trending),
-            _SubjectCardSection(title: 'Recommended', cards: data.recommendations),
+      body: NotificationListener<ScrollEndNotification>(
+        onNotification: (notification) {
+          final page = recommendations.value;
+          final metrics = notification.metrics;
+          if (page != null &&
+              page.hasMore &&
+              !_loadingMore &&
+              metrics.pixels >= metrics.maxScrollExtent - 40) {
+            _loadMore();
+          }
+          return false;
+        },
+        child: CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(
+              child: _TrendingSection(
+                trending: trending,
+                onRetry: () => ref.invalidate(trendingProvider),
+              ),
+            ),
+            const SliverToBoxAdapter(child: _SectionTitle('为你推荐')),
+            ...recommendations.when(
+              loading: () => const [
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                ),
+              ],
+              error: (error, stack) => [
+                SliverToBoxAdapter(
+                  child: ErrorRetryView(
+                    message: 'Failed to load recommendations: $error',
+                    onRetry: () => ref.invalidate(homeRecommendationsControllerProvider),
+                  ),
+                ),
+              ],
+              data: (recPage) => [
+                SliverPadding(
+                  padding: EdgeInsets.symmetric(horizontal: padding),
+                  sliver: SliverGrid(
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: _gridColumns(width),
+                      childAspectRatio: 0.55,
+                      mainAxisSpacing: 8,
+                      crossAxisSpacing: 8,
+                    ),
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        final card = recPage.items[index];
+                        return AnimeCoverCard(
+                          imageUrl: card.imageUrl ?? '',
+                          title: card.nameCn ?? card.name,
+                          onTap: () => openSubjectDetail(context, card),
+                        );
+                      },
+                      childCount: recPage.items.length,
+                    ),
+                  ),
+                ),
+                SliverToBoxAdapter(
+                  child: _RecommendationsFooter(
+                    hasMore: recPage.hasMore,
+                    loading: _loadingMore,
+                    failed: _loadMoreFailed,
+                    onRetry: _loadMore,
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
@@ -31,46 +124,84 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-class _SubjectCardSection extends StatelessWidget {
-  const _SubjectCardSection({required this.title, required this.cards});
+/// At least 3 columns even on narrow phones; scales up on wider screens
+/// (design doc: 固定3列，宽屏自适应). Target column width ~130dp.
+int _gridColumns(double width) => (width / 130).floor().clamp(3, 8);
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle(this.title);
 
   final String title;
-  final List<SubjectCard> cards;
 
   @override
   Widget build(BuildContext context) {
-    if (cards.isEmpty) return const SizedBox.shrink();
     final padding = pagePadding(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: EdgeInsets.fromLTRB(padding, 8, padding, 8),
-          child: Text(title, style: Theme.of(context).textTheme.titleMedium),
-        ),
-        SizedBox(
-          height: 210,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding: EdgeInsets.symmetric(horizontal: padding),
-            itemCount: cards.length,
-            itemBuilder: (context, index) {
-              final card = cards[index];
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: SizedBox(
-                  width: 120,
-                  child: AnimeCoverCard(
-                    imageUrl: card.imageUrl ?? '',
-                    title: card.nameCn ?? card.name,
-                    onTap: () => openSubjectDetail(context, card),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
+    return Padding(
+      padding: EdgeInsets.fromLTRB(padding, 16, padding, 8),
+      child: Text(title, style: Theme.of(context).textTheme.titleMedium),
     );
+  }
+}
+
+class _TrendingSection extends StatelessWidget {
+  const _TrendingSection({required this.trending, required this.onRetry});
+
+  final AsyncValue<List<SubjectCard>> trending;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return trending.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.all(32),
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (error, stack) =>
+          ErrorRetryView(message: 'Failed to load trending: $error', onRetry: onRetry),
+      data: (cards) {
+        if (cards.isEmpty) return const SizedBox.shrink();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _SectionTitle('最近热门'),
+            SizedBox(
+              height: 220,
+              child: TrendingCarousel(
+                cards: cards,
+                onTap: (card) => openSubjectDetail(context, card),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _RecommendationsFooter extends StatelessWidget {
+  const _RecommendationsFooter({
+    required this.hasMore,
+    required this.loading,
+    required this.failed,
+    required this.onRetry,
+  });
+
+  final bool hasMore;
+  final bool loading;
+  final bool failed;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    if (failed) {
+      return Center(child: TextButton(onPressed: onRetry, child: const Text('加载失败，点击重试')));
+    }
+    if (loading) {
+      return const Padding(
+        padding: EdgeInsets.all(16),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    return const SizedBox.shrink();
   }
 }
