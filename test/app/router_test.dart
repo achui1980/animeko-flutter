@@ -4,6 +4,7 @@ import 'package:animeko_flutter/data/user/user_models.dart';
 import 'package:animeko_flutter/domain/auth/auth_controller.dart';
 import 'package:animeko_flutter/domain/auth/auth_state.dart';
 import 'package:animeko_flutter/domain/settings/proxy_settings_controller.dart';
+import 'package:animeko_flutter/domain/settings/theme_mode_controller.dart';
 import 'package:animeko_flutter/domain/user/self_user_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,6 +17,11 @@ import 'package:go_router/go_router.dart';
 class _FakeAuthController extends AuthController {
   @override
   AuthState build() => const AuthUnauthenticated();
+}
+
+class _FakeThemeModeController extends ThemeModeController {
+  @override
+  Future<ThemeMode> build() async => ThemeMode.system;
 }
 
 class _FakeProxySettingsController extends ProxySettingsController {
@@ -102,13 +108,52 @@ void main() {
     },
   );
 
-  testWidgets('navigating to /account renders AccountScreen with the self profile', (
+  testWidgets('navigating to /settings/proxy renders ProxySettingsScreen', (tester) async {
+    final fake = _FakeAuthController();
+    final container = ProviderContainer(
+      overrides: [
+        authControllerProvider.overrideWith(() => fake),
+        proxySettingsControllerProvider.overrideWith(() => _FakeProxySettingsController()),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    GoRouter? router;
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: Consumer(
+          builder: (context, ref, _) {
+            router = ref.watch(appRouterProvider);
+            return MaterialApp.router(routerConfig: router!);
+          },
+        ),
+      ),
+    );
+    await tester.pump();
+    fake.state = const AuthAuthenticated('user-1');
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    router!.push('/settings/proxy');
+    // Not pumpAndSettle(): same reason as above -- the previous /home
+    // route's TrendingCarousel Timer keeps the widget tree scheduling
+    // frames while it's mounted underneath.
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(find.text('代理设置'), findsWidgets);
+  });
+
+  testWidgets('the Settings tab is a 4th bottom-nav destination and renders SettingsScreen', (
     tester,
   ) async {
     final fake = _FakeAuthController();
     final container = ProviderContainer(
       overrides: [
         authControllerProvider.overrideWith(() => fake),
+        themeModeControllerProvider.overrideWith(() => _FakeThemeModeController()),
+        proxySettingsControllerProvider.overrideWith(() => _FakeProxySettingsController()),
         selfUserProvider.overrideWith(
           (ref) async => const SelfUser(
             id: 'u1',
@@ -138,53 +183,16 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
 
-    router!.push('/account');
-    // Not pumpAndSettle(): the previous /home route (with its
-    // auto-advancing TrendingCarousel Timer) stays mounted beneath the
-    // pushed route, so a new frame keeps getting scheduled every
-    // simulated 5 seconds and pumpAndSettle() never settles. A couple of
-    // bounded pumps is enough for the push transition and
-    // selfUserProvider's fake future to resolve.
+    // Navigate to the Settings tab by URL, same way the other shell
+    // branches (/home, /search, /schedule) are already reached elsewhere
+    // in this test file.
+    router!.go('/settings');
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
 
+    expect(find.byType(NavigationDestination), findsNWidgets(4));
+    final navBar = tester.widget<NavigationBar>(find.byType(NavigationBar));
+    expect(navBar.selectedIndex, 3);
     expect(find.text('Alice'), findsOneWidget);
-  });
-
-  testWidgets('navigating to /settings/proxy renders ProxySettingsScreen', (tester) async {
-    final fake = _FakeAuthController();
-    final container = ProviderContainer(
-      overrides: [
-        authControllerProvider.overrideWith(() => fake),
-        proxySettingsControllerProvider.overrideWith(() => _FakeProxySettingsController()),
-      ],
-    );
-    addTearDown(container.dispose);
-
-    GoRouter? router;
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: Consumer(
-          builder: (context, ref, _) {
-            router = ref.watch(appRouterProvider);
-            return MaterialApp.router(routerConfig: router!);
-          },
-        ),
-      ),
-    );
-    await tester.pump();
-    fake.state = const AuthAuthenticated('user-1');
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 1));
-
-    router!.push('/settings/proxy');
-    // Not pumpAndSettle(): same reason as the /account test above -- the
-    // previous /home route's TrendingCarousel Timer keeps the widget
-    // tree scheduling frames while it's mounted underneath.
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 1));
-
-    expect(find.text('代理设置'), findsWidgets);
   });
 }

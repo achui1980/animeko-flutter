@@ -21,6 +21,7 @@ class MainShell extends StatelessWidget {
           NavigationDestination(icon: Icon(Icons.home), label: 'Home'),
           NavigationDestination(icon: Icon(Icons.search), label: 'Search'),
           NavigationDestination(icon: Icon(Icons.calendar_today), label: 'Schedule'),
+          NavigationDestination(icon: Icon(Icons.settings), label: 'Settings'),
         ],
       ),
     );

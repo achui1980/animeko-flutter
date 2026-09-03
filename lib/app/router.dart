@@ -6,7 +6,6 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../domain/auth/auth_controller.dart';
 import '../domain/auth/auth_state.dart';
 import '../domain/play/subject_episodes_controller.dart';
-import '../ui/account/account_screen.dart';
 import '../ui/auth/login_screen.dart';
 import '../ui/collection/my_collection_screen.dart';
 import '../ui/home/home_screen.dart';
@@ -80,9 +79,7 @@ GoRouter appRouter(Ref ref) {
           return PlayerScreen(episode: extra);
         },
       ),
-      GoRoute(path: '/settings', builder: (context, state) => const SettingsScreen()),
       GoRoute(path: '/settings/proxy', builder: (context, state) => const ProxySettingsScreen()),
-      GoRoute(path: '/account', builder: (context, state) => const AccountScreen()),
       GoRoute(path: '/collection', builder: (context, state) => const MyCollectionScreen()),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
@@ -95,7 +92,14 @@ GoRouter appRouter(Ref ref) {
             routes: [GoRoute(path: '/search', builder: (context, state) => const SearchScreen())],
           ),
           StatefulShellBranch(
-            routes: [GoRoute(path: '/schedule', builder: (context, state) => const ScheduleScreen())],
+            routes: [
+              GoRoute(path: '/schedule', builder: (context, state) => const ScheduleScreen()),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(path: '/settings', builder: (context, state) => const SettingsScreen()),
+            ],
           ),
         ],
       ),
