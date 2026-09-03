@@ -83,14 +83,24 @@ explicitly excluded — deferred separately, see item 9).
    horizontal-drag-to-seek gesture (unconfirmed second `GestureDetector` at
    material.dart:1666) could be delivered independently/first without the
    volume/brightness plugin dependency, as a smaller first step.
-5. **片源切换UI（轻量版） (Lightweight source-switching UI)** — NOT STARTED.
-   When an episode has results from both anime1.me and Xifan, show a simple
-   source switch tab/dropdown at the top of the player screen. Do NOT
-   attempt to replicate the reference app's full MediaSelector engine
-   (auto-selection, tiering, preference memory) — this is a low-cost
-   pathfinder before deciding whether to invest in a full MediaSelector
-   later. Architecturally self-contained, no new native dependencies
-   needed — good candidate to pick up next instead of item 4.
+5. **片源切换UI（轻量版） (Lightweight source-switching UI)** — DONE
+   (commit `738d49c`). When the current episode is also available from
+   another registered `MediaSource` (matched by `MergedEpisode.title`), a
+   small pill button next to the speed control lists every source's
+   `displayName` and switches via `Navigator.pushReplacement` (same
+   pattern as auto-play-next-episode). Hidden entirely when only one
+   source has the episode. Deliberately data-driven rather than
+   hardcoded to the two current sources — per the user's explicit
+   requirement ("我希望以后我加入源的时候也是可以支持的,因为我还会加入源"),
+   it only enumerates whatever `mediaSourcesProvider`/
+   `subjectEpisodesControllerProvider` already produce, so any future
+   `MediaSource` registered in `media_registry.dart` shows up
+   automatically with zero UI changes. Does NOT replicate the reference
+   app's full MediaSelector engine (no auto-selection/tiering/preference
+   memory), as scoped. No test added, consistent with `PlayerScreen`'s
+   existing zero-coverage precedent. Final verification: `flutter test`
+   326/326 passing, `flutter analyze` 23 known issues unchanged (same 3
+   categories).
 
 ### Low priority
 6. **字幕轨道切换 (Subtitle track switching)** — Needs research first: do
