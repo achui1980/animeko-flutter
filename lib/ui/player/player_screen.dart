@@ -61,6 +61,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   Timer? _savePositionTimer;
 
+  /// Captured once, synchronously, while the widget is still safely
+  /// mounted. `_savePosition`/`_clearSavedPosition` need this from
+  /// `dispose()` (to do a final save/clear on the way out), and `ref` is
+  /// unsafe to touch by the time `dispose()` runs -- Riverpod asserts on
+  /// any `ref.read`/`ref.watch` call there ("Using ref when a widget is
+  /// about to or has been unmounted is unsafe"). Reading the future here
+  /// in `initState` instead avoids ever needing `ref` again for this.
+  late final Future<PlaybackPositionStorage> _storageFuture;
+
   /// Identifies [PlayerScreen.episode] for [PlaybackPositionStorage].
   /// Episodes have no other stable identity than `sourceId` + `title`
   /// (see `MediaEpisode`'s doc comment); combined with `subjectId`, this
@@ -71,6 +80,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   @override
   void initState() {
     super.initState();
+    _storageFuture = ref.read(playbackPositionStorageProvider.future);
     _player.stream.error.listen((message) {
       if (mounted) setState(() => _playbackError = message);
     });
@@ -116,17 +126,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   Future<void> _savePosition() async {
     final position = _player.state.position;
     if (position < _minResumePosition) return;
-    final storage = await ref.read(playbackPositionStorageProvider.future);
+    final storage = await _storageFuture;
     await storage.setPosition(_positionKey, position.inMilliseconds);
   }
 
   Future<void> _clearSavedPosition() async {
-    final storage = await ref.read(playbackPositionStorageProvider.future);
+    final storage = await _storageFuture;
     await storage.clearPosition(_positionKey);
   }
 
   Future<void> _maybeResumePosition() async {
-    final storage = await ref.read(playbackPositionStorageProvider.future);
+    final storage = await _storageFuture;
     final savedMs = storage.getPosition(_positionKey);
     if (savedMs == null) return;
     await _player.seek(Duration(milliseconds: savedMs));
