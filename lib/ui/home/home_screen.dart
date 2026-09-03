@@ -48,6 +48,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       appBar: AppBar(title: const Text('Animeko'), actions: buildStandardActions(context)),
       body: NotificationListener<ScrollEndNotification>(
         onNotification: (notification) {
+          // `notification.depth == 0` restricts this to scroll-end events
+          // from this listener's own nearest Scrollable (the
+          // CustomScrollView below). Notifications that bubbled up from a
+          // nested Scrollable further down the tree -- e.g. TrendingCarousel's
+          // own horizontal CarouselView, whether dragged by the user or
+          // auto-advanced by its internal timer -- arrive with depth >= 1
+          // and must be ignored: their metrics describe the carousel's own
+          // scroll position, not the user's position in this vertical grid.
+          if (notification.depth != 0) return false;
           final page = recommendations.value;
           final metrics = notification.metrics;
           if (page != null &&
