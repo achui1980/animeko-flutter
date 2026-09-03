@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
 
 import '../domain/auth/auth_controller.dart';
+import '../domain/settings/theme_mode_controller.dart';
 import 'router.dart';
+import 'theme/app_theme.dart';
 
 Future<void> main() async {
   // Must run before any platform-channel plugin use (e.g. the
@@ -35,6 +37,13 @@ class AnimekoFlutterApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(appRouterProvider);
-    return MaterialApp.router(title: 'Animeko', routerConfig: router);
+    final themeMode = ref.watch(themeModeControllerProvider).value ?? ThemeMode.system;
+    return MaterialApp.router(
+      title: 'Animeko',
+      theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
+      themeMode: themeMode,
+      routerConfig: router,
+    );
   }
 }
