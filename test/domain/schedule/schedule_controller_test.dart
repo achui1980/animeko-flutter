@@ -92,5 +92,27 @@ void main() {
       expect(result.single.subjects.single.nameCn, '芙莉莲');
       expect(result.single.subjects.single.id, 100);
     });
+
+    test('limits the result to at most 7 days', () async {
+      final days = List.generate(
+        10,
+        (i) => AiringScheduleForDate(
+          date: '2026-08-${(20 + i).toString().padLeft(2, '0')}',
+          list: const [],
+        ),
+      );
+      when(
+        () => api.getLatestAiringSchedule(
+          today: any(named: 'today'),
+          timeZone: any(named: 'timeZone'),
+        ),
+      ).thenAnswer((_) async => LatestAiringSchedule(list: days));
+
+      final result = await container.read(scheduleControllerProvider.future);
+
+      expect(result, hasLength(7));
+      expect(result.first.date, '2026-08-20');
+      expect(result.last.date, '2026-08-26');
+    });
   });
 }

@@ -44,7 +44,10 @@ class ScheduleController extends _$ScheduleController {
       timeZone: timeZoneOffsetString(now.timeZoneOffset),
     );
 
+    // The server can return more than a week of days; the UI only wants
+    // "this week" of data (per user feedback), so cap it client-side.
     return schedule.list
+        .take(7)
         .map(
           (day) => ScheduleDay(
             date: day.date,
