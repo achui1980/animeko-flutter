@@ -6,6 +6,8 @@ import '../../data/subject/collection_type.dart';
 import '../../data/subject/subject_models.dart';
 import '../../domain/subject/my_collections_controller.dart';
 import '../../domain/subject_card.dart';
+import '../common/anime_list_item.dart';
+import '../common/empty_view.dart';
 import '../common/error_retry_view.dart';
 import '../subject/subject_navigation.dart';
 
@@ -100,7 +102,7 @@ class _CollectionListState extends ConsumerState<_CollectionList> {
   @override
   Widget build(BuildContext context) {
     if (widget.subjects.isEmpty) {
-      return const Center(child: Text('还没有收藏任何番剧'));
+      return const EmptyView(message: '还没有收藏任何番剧');
     }
     final showFooter = widget.hasMore || _loadMoreFailed;
     return NotificationListener<ScrollEndNotification>(
@@ -129,12 +131,14 @@ class _CollectionListState extends ConsumerState<_CollectionList> {
             return const SizedBox.shrink();
           }
           final card = SubjectCard.fromMyCollectionSubject(widget.subjects[index]);
-          return ListTile(
-            leading: card.imageUrl != null
-                ? Image.network(card.imageUrl!, width: 40, fit: BoxFit.cover)
-                : const SizedBox(width: 40),
-            title: Text(card.nameCn ?? card.name),
-            onTap: () => openSubjectDetail(context, card),
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: AnimeListItem(
+              imageUrl: card.imageUrl ?? '',
+              title: card.nameCn ?? card.name,
+              subtitle: _collectionLabels[widget.type] ?? '',
+              onTap: () => openSubjectDetail(context, card),
+            ),
           );
         },
       ),
