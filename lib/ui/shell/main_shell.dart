@@ -18,10 +18,10 @@ class MainShell extends StatelessWidget {
           initialLocation: index == navigationShell.currentIndex,
         ),
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.home), label: 'Home'),
-          NavigationDestination(icon: Icon(Icons.search), label: 'Search'),
-          NavigationDestination(icon: Icon(Icons.calendar_today), label: 'Schedule'),
-          NavigationDestination(icon: Icon(Icons.settings), label: 'Settings'),
+          NavigationDestination(icon: Icon(Icons.home), label: '首页'),
+          NavigationDestination(icon: Icon(Icons.search), label: '搜索'),
+          NavigationDestination(icon: Icon(Icons.calendar_today), label: '日历'),
+          NavigationDestination(icon: Icon(Icons.settings), label: '设置'),
         ],
       ),
     );
