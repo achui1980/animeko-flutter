@@ -1,11 +1,13 @@
 // lib/ui/home/home_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
+import '../../app/theme/app_spacing.dart';
 import '../../domain/home/home_controller.dart';
 import '../../domain/subject_card.dart';
 import '../../ui/subject/subject_navigation.dart';
+import '../common/anime_cover_card.dart';
+import '../common/app_action_bar.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -14,19 +16,7 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final homeData = ref.watch(homeControllerProvider);
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Animeko'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.bookmark),
-            onPressed: () => context.push('/collection'),
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () => context.push('/settings'),
-          ),
-        ],
-      ),
+      appBar: AppBar(title: const Text('Animeko'), actions: buildStandardActions(context)),
       body: homeData.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stack) => Center(child: Text('Failed to load home: $error')),
@@ -50,40 +40,30 @@ class _SubjectCardSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (cards.isEmpty) return const SizedBox.shrink();
+    final padding = pagePadding(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.all(8),
+          padding: EdgeInsets.fromLTRB(padding, 8, padding, 8),
           child: Text(title, style: Theme.of(context).textTheme.titleMedium),
         ),
         SizedBox(
-          height: 160,
+          height: 210,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
+            padding: EdgeInsets.symmetric(horizontal: padding),
             itemCount: cards.length,
             itemBuilder: (context, index) {
               final card = cards[index];
-              return GestureDetector(
-                onTap: () => openSubjectDetail(context, card),
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: SizedBox(
                   width: 120,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Column(
-                      children: [
-                        Expanded(
-                          child: card.imageUrl != null
-                              ? Image.network(card.imageUrl!, fit: BoxFit.cover)
-                              : Container(color: Colors.grey.shade300),
-                        ),
-                        Text(
-                          card.nameCn ?? card.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
+                  child: AnimeCoverCard(
+                    imageUrl: card.imageUrl ?? '',
+                    title: card.nameCn ?? card.name,
+                    onTap: () => openSubjectDetail(context, card),
                   ),
                 ),
               );
