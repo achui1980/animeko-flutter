@@ -116,24 +116,57 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       child: Scaffold(
         backgroundColor: Colors.black,
         body: SafeArea(
-          child: playback.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (error, stack) => ErrorRetryView(
-              message: '播放失败：$error',
-              onRetry: _retry,
-            ),
-            data: (_) => _playbackError != null
-                ? ErrorRetryView(
-                    message: '播放失败：$_playbackError',
-                    onRetry: _retry,
-                  )
-                // Uses Video's default AdaptiveVideoControls (seek-bar drag,
-                // tap to show/hide controls, fullscreen button) -- see this
-                // task's "Context" note above for why no custom
-                // GestureDetector code is written here.
-                : Video(controller: _controller),
+          child: Stack(
+            children: [
+              playback.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (error, stack) => ErrorRetryView(
+                  message: '播放失败：$error',
+                  onRetry: _retry,
+                ),
+                data: (_) => _playbackError != null
+                    ? ErrorRetryView(
+                        message: '播放失败：$_playbackError',
+                        onRetry: _retry,
+                      )
+                    // Uses Video's default AdaptiveVideoControls (seek-bar drag,
+                    // tap to show/hide controls, fullscreen button) -- see this
+                    // task's "Context" note above for why no custom
+                    // GestureDetector code is written here.
+                    : Video(controller: _controller),
+              ),
+              // Floating back button -- the player has no AppBar (to stay
+              // immersive/full-bleed), so without this there was no way to
+              // leave the screen except system back gestures/shortcuts.
+              Positioned(
+                top: 8,
+                left: 8,
+                child: _BackButton(onPressed: () => Navigator.of(context).pop()),
+              ),
+            ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// A small floating circular back button, styled to sit on top of video
+/// content without a full AppBar (which would break the immersive look).
+class _BackButton extends StatelessWidget {
+  const _BackButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.black45,
+      shape: const CircleBorder(),
+      child: IconButton(
+        icon: const Icon(Icons.arrow_back, color: Colors.white),
+        tooltip: '返回',
+        onPressed: onPressed,
       ),
     );
   }
