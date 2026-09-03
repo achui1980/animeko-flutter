@@ -80,14 +80,12 @@ void main() {
     expect(find.text('Bar'), findsOneWidget);
   });
 
-  testWidgets('AppBar shows the unified account/collection/settings actions', (tester) async {
+  testWidgets('AppBar shows the collection action', (tester) async {
     await tester.pumpWidget(_wrap(const HomeScreen()));
     await tester.pump();
     await tester.pump();
 
-    expect(find.byIcon(Icons.account_circle_outlined), findsOneWidget);
     expect(find.byIcon(Icons.bookmark), findsOneWidget);
-    expect(find.byIcon(Icons.settings), findsOneWidget);
   });
 
   testWidgets(

@@ -1,26 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-/// The 3 `IconButton`s shared by Home/Search/Schedule's `AppBar.actions`:
-/// account (new in Plan 1e), collection ("我的收藏"), and settings.
-/// Wiring this into those screens (replacing their inlined, duplicated
-/// `IconButton`s) is Phase C's job -- this task only adds the helper.
+/// The shared "我的收藏" (collection) icon button used by Home/Search/
+/// Schedule's `AppBar.actions`. Account and Settings previously also
+/// lived here, but account info is now embedded inline at the top of
+/// the Settings page (see `AccountSummarySection`), and Settings itself
+/// is a bottom-nav tab rather than something reached from an AppBar
+/// icon (see the Settings/bottom-nav redesign design doc).
 List<Widget> buildStandardActions(BuildContext context) {
   return [
-    IconButton(
-      icon: const Icon(Icons.account_circle_outlined),
-      tooltip: '账户',
-      onPressed: () => context.push('/account'),
-    ),
     IconButton(
       icon: const Icon(Icons.bookmark),
       tooltip: '我的收藏',
       onPressed: () => context.push('/collection'),
-    ),
-    IconButton(
-      icon: const Icon(Icons.settings),
-      tooltip: '设置',
-      onPressed: () => context.push('/settings'),
     ),
   ];
 }

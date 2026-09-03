@@ -3,9 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('buildStandardActions returns 3 icon buttons: account, collection, settings', (
-    tester,
-  ) async {
+  testWidgets('buildStandardActions returns a single collection icon button', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Builder(
@@ -15,9 +13,7 @@ void main() {
       ),
     );
 
-    expect(find.byIcon(Icons.account_circle_outlined), findsOneWidget);
     expect(find.byIcon(Icons.bookmark), findsOneWidget);
-    expect(find.byIcon(Icons.settings), findsOneWidget);
-    expect(find.byType(IconButton), findsNWidgets(3));
+    expect(find.byType(IconButton), findsOneWidget);
   });
 }

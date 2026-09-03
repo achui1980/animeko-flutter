@@ -39,12 +39,10 @@ void main() {
     expect(find.text('Foo'), findsOneWidget);
   });
 
-  testWidgets('AppBar shows the unified account/collection/settings actions', (tester) async {
+  testWidgets('AppBar shows the collection action', (tester) async {
     await tester.pumpWidget(_wrap(const ScheduleScreen()));
     await tester.pumpAndSettle();
 
-    expect(find.byIcon(Icons.account_circle_outlined), findsOneWidget);
     expect(find.byIcon(Icons.bookmark), findsOneWidget);
-    expect(find.byIcon(Icons.settings), findsOneWidget);
   });
 }
