@@ -1,7 +1,10 @@
 // test/app/router_test.dart
 import 'package:animeko_flutter/app/router.dart';
+import 'package:animeko_flutter/data/user/user_models.dart';
 import 'package:animeko_flutter/domain/auth/auth_controller.dart';
 import 'package:animeko_flutter/domain/auth/auth_state.dart';
+import 'package:animeko_flutter/domain/settings/proxy_settings_controller.dart';
+import 'package:animeko_flutter/domain/user/self_user_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -13,6 +16,11 @@ import 'package:go_router/go_router.dart';
 class _FakeAuthController extends AuthController {
   @override
   AuthState build() => const AuthUnauthenticated();
+}
+
+class _FakeProxySettingsController extends ProxySettingsController {
+  @override
+  Future<String?> build() async => null;
 }
 
 void main() {
@@ -91,4 +99,79 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('navigating to /account renders AccountScreen with the self profile', (
+    tester,
+  ) async {
+    final fake = _FakeAuthController();
+    final container = ProviderContainer(
+      overrides: [
+        authControllerProvider.overrideWith(() => fake),
+        selfUserProvider.overrideWith(
+          (ref) async => const SelfUser(
+            id: 'u1',
+            nickname: 'Alice',
+            hasPassword: true,
+            isBangumiSessionValid: true,
+          ),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    GoRouter? router;
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: Consumer(
+          builder: (context, ref, _) {
+            router = ref.watch(appRouterProvider);
+            return MaterialApp.router(routerConfig: router!);
+          },
+        ),
+      ),
+    );
+    await tester.pump();
+    fake.state = const AuthAuthenticated('user-1');
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    router!.push('/account');
+    await tester.pumpAndSettle();
+
+    expect(find.text('Alice'), findsOneWidget);
+  });
+
+  testWidgets('navigating to /settings/proxy renders ProxySettingsScreen', (tester) async {
+    final fake = _FakeAuthController();
+    final container = ProviderContainer(
+      overrides: [
+        authControllerProvider.overrideWith(() => fake),
+        proxySettingsControllerProvider.overrideWith(() => _FakeProxySettingsController()),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    GoRouter? router;
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: Consumer(
+          builder: (context, ref, _) {
+            router = ref.watch(appRouterProvider);
+            return MaterialApp.router(routerConfig: router!);
+          },
+        ),
+      ),
+    );
+    await tester.pump();
+    fake.state = const AuthAuthenticated('user-1');
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    router!.push('/settings/proxy');
+    await tester.pumpAndSettle();
+
+    expect(find.text('代理设置'), findsWidgets);
+  });
 }
