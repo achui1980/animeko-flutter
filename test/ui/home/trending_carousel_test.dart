@@ -1,5 +1,6 @@
 import 'package:animeko_flutter/domain/subject_card.dart';
 import 'package:animeko_flutter/ui/home/trending_carousel.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -71,6 +72,57 @@ void main() {
     await tester.pump(const Duration(milliseconds: 350));
 
     expect(controller.offset, greaterThan(0.0));
+  });
+
+  testWidgets('shows arrow buttons on desktop platforms', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+
+    await tester.pumpWidget(_wrap(const TrendingCarousel(cards: _cards, onTap: _noop)));
+    await tester.pump();
+
+    expect(find.byIcon(Icons.chevron_left), findsOneWidget);
+    expect(find.byIcon(Icons.chevron_right), findsOneWidget);
+
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('does not show arrow buttons on mobile platforms', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+
+    await tester.pumpWidget(_wrap(const TrendingCarousel(cards: _cards, onTap: _noop)));
+    await tester.pump();
+
+    expect(find.byIcon(Icons.chevron_left), findsNothing);
+    expect(find.byIcon(Icons.chevron_right), findsNothing);
+
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('tapping the next arrow advances the carousel', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    final controller = CarouselController();
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      _wrap(TrendingCarousel(cards: _cards, onTap: _noop, controller: controller)),
+    );
+    await tester.pump();
+
+    expect(controller.offset, 0.0);
+
+    await tester.tap(find.byIcon(Icons.chevron_right));
+    // Two pumps are needed here (unlike the auto-advance test above, which
+    // triggers `animateToItem` from within a `Timer.periodic` callback that
+    // fires *during* a `pump(duration)` call): a tap-triggered call starts
+    // the animation ticker but its baseline timestamp isn't set until the
+    // *next* frame, so a zero-duration pump is needed first to establish
+    // it before a second pump can actually advance the animation.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
+
+    expect(controller.offset, greaterThan(0.0));
+
+    debugDefaultTargetPlatformOverride = null;
   });
 }
 

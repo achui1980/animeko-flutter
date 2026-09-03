@@ -1,9 +1,26 @@
 // lib/ui/home/trending_carousel.dart
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../domain/subject_card.dart';
+
+/// Whether the current platform should show desktop-style left/right
+/// arrow buttons on the carousel, matching the reference Animeko app's
+/// convention (desktop gets arrows; mobile/web stays pure gesture-swipe).
+bool isDesktopPlatform() {
+  switch (defaultTargetPlatform) {
+    case TargetPlatform.macOS:
+    case TargetPlatform.windows:
+    case TargetPlatform.linux:
+      return true;
+    case TargetPlatform.android:
+    case TargetPlatform.iOS:
+    case TargetPlatform.fuchsia:
+      return false;
+  }
+}
 
 /// An auto-advancing hero carousel for the home page's "trending"
 /// section, built on Flutter's Material 3 `CarouselView.weighted`
@@ -51,6 +68,16 @@ class _TrendingCarouselState extends State<TrendingCarousel> {
 
   void _pauseTimer() => _timer?.cancel();
 
+  void _goToRelativeIndex(int delta) {
+    final count = widget.cards.length;
+    _currentIndex = (_currentIndex + delta) % count;
+    if (_currentIndex < 0) _currentIndex += count;
+    _controller.animateToItem(_currentIndex);
+    // Treat an arrow tap like a manual scroll: reset the auto-advance
+    // countdown instead of letting it fire again immediately after.
+    _startTimer();
+  }
+
   @override
   void dispose() {
     _timer?.cancel();
@@ -62,7 +89,7 @@ class _TrendingCarouselState extends State<TrendingCarousel> {
   Widget build(BuildContext context) {
     if (widget.cards.isEmpty) return const SizedBox.shrink();
 
-    return NotificationListener<ScrollNotification>(
+    final carousel = NotificationListener<ScrollNotification>(
       onNotification: (notification) {
         if (notification is ScrollStartNotification) {
           _pauseTimer();
@@ -78,6 +105,31 @@ class _TrendingCarouselState extends State<TrendingCarousel> {
         onTap: (index) => widget.onTap(widget.cards[index]),
         children: widget.cards.map(_buildItem).toList(),
       ),
+    );
+
+    if (!isDesktopPlatform() || widget.cards.length <= 1) return carousel;
+
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        carousel,
+        Positioned(
+          left: 4,
+          child: _ArrowButton(
+            icon: Icons.chevron_left,
+            tooltip: '上一个',
+            onPressed: () => _goToRelativeIndex(-1),
+          ),
+        ),
+        Positioned(
+          right: 4,
+          child: _ArrowButton(
+            icon: Icons.chevron_right,
+            tooltip: '下一个',
+            onPressed: () => _goToRelativeIndex(1),
+          ),
+        ),
+      ],
     );
   }
 
@@ -114,6 +166,32 @@ class _TrendingCarouselState extends State<TrendingCarousel> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// A semi-transparent circular arrow button overlaid on the carousel,
+/// shown only on desktop platforms (see [isDesktopPlatform]) since
+/// desktop users have no touch-drag affordance hint the way mobile users
+/// do -- matching the reference Animeko app's own desktop-only arrows on
+/// its horizontal lists.
+class _ArrowButton extends StatelessWidget {
+  const _ArrowButton({required this.icon, required this.tooltip, required this.onPressed});
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.black45,
+      shape: const CircleBorder(),
+      child: IconButton(
+        icon: Icon(icon, color: Colors.white),
+        tooltip: tooltip,
+        onPressed: onPressed,
       ),
     );
   }
