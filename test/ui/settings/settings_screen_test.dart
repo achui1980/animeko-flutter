@@ -1,7 +1,9 @@
+import 'package:animeko_flutter/data/user/user_models.dart';
 import 'package:animeko_flutter/domain/auth/auth_controller.dart';
 import 'package:animeko_flutter/domain/auth/auth_state.dart';
 import 'package:animeko_flutter/domain/settings/proxy_settings_controller.dart';
 import 'package:animeko_flutter/domain/settings/theme_mode_controller.dart';
+import 'package:animeko_flutter/domain/user/self_user_controller.dart';
 import 'package:animeko_flutter/ui/settings/settings_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -23,6 +25,13 @@ class _FakeProxySettingsController extends ProxySettingsController {
   Future<String?> build() async => 'http://127.0.0.1:2222';
 }
 
+const _user = SelfUser(
+  id: 'u1',
+  nickname: 'Alice',
+  hasPassword: true,
+  isBangumiSessionValid: true,
+);
+
 Widget _wrap() {
   final router = GoRouter(
     initialLocation: '/settings',
@@ -32,10 +41,6 @@ Widget _wrap() {
         path: '/settings/proxy',
         builder: (context, state) => const Scaffold(body: Text('PROXY PAGE')),
       ),
-      GoRoute(
-        path: '/account',
-        builder: (context, state) => const Scaffold(body: Text('ACCOUNT PAGE')),
-      ),
     ],
   );
   return ProviderScope(
@@ -43,13 +48,16 @@ Widget _wrap() {
       authControllerProvider.overrideWith(() => _FakeAuthController()),
       themeModeControllerProvider.overrideWith(() => _FakeThemeModeController()),
       proxySettingsControllerProvider.overrideWith(() => _FakeProxySettingsController()),
+      selfUserProvider.overrideWith((ref) async => _user),
     ],
     child: MaterialApp.router(routerConfig: router),
   );
 }
 
 void main() {
-  testWidgets('shows the persisted theme mode, proxy address, and auth summary', (tester) async {
+  testWidgets('shows the persisted theme mode, proxy address, and account summary', (
+    tester,
+  ) async {
     await tester.pumpWidget(_wrap());
     await tester.pumpAndSettle();
 
@@ -60,26 +68,20 @@ void main() {
     );
     expect(radioGroup.groupValue, ThemeMode.dark);
     expect(find.text('http://127.0.0.1:2222'), findsOneWidget);
-    expect(find.text('已登录'), findsOneWidget);
+    expect(find.text('Alice'), findsOneWidget);
   });
 
   testWidgets('tapping the proxy entry navigates to /settings/proxy', (tester) async {
     await tester.pumpWidget(_wrap());
     await tester.pumpAndSettle();
 
+    // The account summary now sits above this entry, pushing it below the
+    // default test viewport fold -- scroll it into view before tapping.
+    await tester.ensureVisible(find.text('代理设置'));
+    await tester.pump();
     await tester.tap(find.text('代理设置'));
     await tester.pumpAndSettle();
 
     expect(find.text('PROXY PAGE'), findsOneWidget);
-  });
-
-  testWidgets('tapping the account entry navigates to /account', (tester) async {
-    await tester.pumpWidget(_wrap());
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.text('账户设置'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('ACCOUNT PAGE'), findsOneWidget);
   });
 }

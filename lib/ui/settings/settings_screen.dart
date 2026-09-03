@@ -3,16 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../domain/auth/auth_controller.dart';
-import '../../domain/auth/auth_state.dart';
 import '../../domain/settings/proxy_settings_controller.dart';
 import '../../domain/settings/theme_mode_controller.dart';
+import 'account_summary_section.dart';
 
-/// Grouped-list settings page (Plan 1e phase B), aligned with the
-/// reference Animeko app's grouped-settings layout. Unlike the
-/// reference app's fully transparent `SettingsScope` container, this
-/// keeps Flutter's default M3 `Card` per group -- it already gives the
-/// same grouping affordance without a custom container widget.
+/// Grouped-list settings page. The account summary (avatar, nickname,
+/// sign-out) lives at the top, followed by the 通用/网络 groups -- see
+/// the Settings/bottom-nav redesign design doc for why account info
+/// moved here instead of staying on a separate `/account` page.
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
@@ -20,14 +18,14 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeModeControllerProvider);
     final proxy = ref.watch(proxySettingsControllerProvider);
-    final authState = ref.watch(authControllerProvider);
-    final isAuthenticated = authState is AuthAuthenticated;
 
     return Scaffold(
       appBar: AppBar(title: const Text('设置')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          const AccountSummarySection(),
+          const SizedBox(height: 16),
           _SettingsGroup(
             title: '通用',
             children: [
@@ -63,18 +61,6 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          _SettingsGroup(
-            title: '账户',
-            children: [
-              ListTile(
-                title: const Text('账户设置'),
-                subtitle: Text(isAuthenticated ? '已登录' : '未登录'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => context.push('/account'),
-              ),
-            ],
-          ),
         ],
       ),
     );
@@ -102,9 +88,9 @@ class _SettingsGroup extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
             child: Text(
               title,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: Theme.of(context).colorScheme.primary,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(color: Theme.of(context).colorScheme.primary),
             ),
           ),
           ...children,
