@@ -9,6 +9,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import '../../app/theme/app_theme.dart';
 import '../../domain/play/episode_play_controller.dart';
 import '../../domain/play/subject_episodes_controller.dart';
+import '../../domain/settings/proxy_settings_controller.dart';
 import '../common/error_retry_view.dart';
 
 class PlayerScreen extends ConsumerStatefulWidget {
@@ -38,6 +39,28 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     _player.stream.error.listen((message) {
       if (mounted) setState(() => _playbackError = message);
     });
+    // media_kit's native backend (libmpv/ffmpeg) makes its own network
+    // connections and does NOT pick up the app's Dio-configured proxy
+    // (see `dioProvider`/`proxy_dio_config.dart`) -- that proxy is wired
+    // only into the Dio HTTP client used for metadata API calls, never
+    // into the video player. On networks where a playback source's CDN
+    // (e.g. 稀饭动漫's `moedot.net`) is only reachable through the
+    // configured proxy, this caused every playback attempt to fail with
+    // "Failed to open ..." or "tcp: ffurl_read returned ..." even though
+    // the app-level proxy setting was already correctly configured and
+    // working for all other network calls. Fix: forward the same proxy
+    // URL to libmpv via its `http-proxy` property, which ffmpeg's HTTP
+    // protocol layer honors for all subsequent network I/O.
+    unawaited(_configureProxy());
+  }
+
+  Future<void> _configureProxy() async {
+    final proxyUrl = await ref.read(proxySettingsControllerProvider.future);
+    if (proxyUrl == null || proxyUrl.isEmpty) return;
+    final platform = _player.platform;
+    if (platform is NativePlayer) {
+      await platform.setProperty('http-proxy', proxyUrl);
+    }
   }
 
   @override
