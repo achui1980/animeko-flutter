@@ -8,6 +8,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 
 import '../../app/theme/app_theme.dart';
 import '../../data/play/playback_position_storage.dart';
+import '../../domain/media/media_registry.dart';
 import '../../domain/play/episode_play_controller.dart';
 import '../../domain/play/subject_episodes_controller.dart';
 import '../../domain/settings/playback_speed_controller.dart';
@@ -262,13 +263,36 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
               Positioned(
                 top: 8,
                 right: 8,
-                child: _SpeedButton(
-                  onSelected: (speed) async {
-                    await _player.setRate(speed);
-                    await ref
-                        .read(playbackSpeedControllerProvider.notifier)
-                        .setPlaybackSpeed(speed);
-                  },
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _SourceButton(
+                      subjectId: widget.subjectId,
+                      subjectName: widget.subjectName,
+                      currentEpisode: widget.episode,
+                      onSelected: (target) {
+                        if (target.sourceId == widget.episode.sourceId) return;
+                        Navigator.of(context).pushReplacement(
+                          MaterialPageRoute(
+                            builder: (context) => PlayerScreen(
+                              episode: target,
+                              subjectId: widget.subjectId,
+                              subjectName: widget.subjectName,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    _SpeedButton(
+                      onSelected: (speed) async {
+                        await _player.setRate(speed);
+                        await ref
+                            .read(playbackSpeedControllerProvider.notifier)
+                            .setPlaybackSpeed(speed);
+                      },
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -330,6 +354,88 @@ class _SpeedButton extends ConsumerWidget {
           child: Text(
             '${speed}x',
             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A small floating pill button for switching the currently-playing
+/// episode to the same episode (matched by [MergedEpisode.title]) from a
+/// different [MediaSource]. Renders nothing when fewer than two sources
+/// have this episode -- there is nothing to switch to. New sources need
+/// no changes here: this only ever lists whatever [mediaSourcesProvider]
+/// and [subjectEpisodesControllerProvider] already produce, keyed by
+/// [MediaSource.displayName].
+class _SourceButton extends ConsumerWidget {
+  const _SourceButton({
+    required this.subjectId,
+    required this.subjectName,
+    required this.currentEpisode,
+    required this.onSelected,
+  });
+
+  final int subjectId;
+  final String subjectName;
+  final MergedEpisode currentEpisode;
+  final void Function(MergedEpisode target) onSelected;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final episodes = ref
+            .watch(
+              subjectEpisodesControllerProvider(
+                subjectId: subjectId,
+                subjectName: subjectName,
+              ),
+            )
+            .value ??
+        const <MergedEpisode>[];
+    final sameEpisode = episodes
+        .where((e) => e.title == currentEpisode.title)
+        .toList();
+    if (sameEpisode.length <= 1) return const SizedBox.shrink();
+
+    final displayNames = {
+      for (final source in ref.watch(mediaSourcesProvider))
+        source.id: source.displayName,
+    };
+
+    return Material(
+      color: Colors.black45,
+      shape: const StadiumBorder(),
+      child: PopupMenuButton<MergedEpisode>(
+        tooltip: '切换播放源',
+        onSelected: onSelected,
+        itemBuilder: (context) => sameEpisode
+            .map(
+              (e) => PopupMenuItem<MergedEpisode>(
+                value: e,
+                child: Row(
+                  children: [
+                    if (e.sourceId == currentEpisode.sourceId)
+                      const Padding(
+                        padding: EdgeInsets.only(right: 8),
+                        child: Icon(Icons.check, size: 16),
+                      ),
+                    Text(displayNames[e.sourceId] ?? e.sourceId),
+                  ],
+                ),
+              ),
+            )
+            .toList(),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                displayNames[currentEpisode.sourceId] ?? currentEpisode.sourceId,
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+              const Icon(Icons.expand_more, color: Colors.white, size: 16),
+            ],
           ),
         ),
       ),
