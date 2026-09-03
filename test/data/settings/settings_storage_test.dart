@@ -58,5 +58,20 @@ void main() {
         expect(storage.getThemeMode(), ThemeMode.system);
       });
     });
+
+    group('playback speed', () {
+      test('getPlaybackSpeed returns 1.0 when nothing is stored', () async {
+        final prefs = await SharedPreferences.getInstance();
+        final storage = SettingsStorage(prefs);
+        expect(storage.getPlaybackSpeed(), 1.0);
+      });
+
+      test('setPlaybackSpeed persists and getPlaybackSpeed reads it back', () async {
+        final prefs = await SharedPreferences.getInstance();
+        final storage = SettingsStorage(prefs);
+        await storage.setPlaybackSpeed(1.5);
+        expect(storage.getPlaybackSpeed(), 1.5);
+      });
+    });
   });
 }

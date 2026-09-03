@@ -7,6 +7,7 @@ part 'settings_storage.g.dart';
 
 const _proxyUrlKey = 'proxy_url';
 const _themeModeKey = 'theme_mode';
+const _playbackSpeedKey = 'playback_speed';
 
 /// Thin wrapper around [SharedPreferences] for simple app settings that
 /// don't need [SecureTokenStorage]'s encryption -- a proxy URL is not
@@ -48,6 +49,15 @@ class SettingsStorage {
   /// Persists [mode] as the selected theme mode.
   Future<void> setThemeMode(ThemeMode mode) async {
     await _prefs.setString(_themeModeKey, mode.name);
+  }
+
+  /// Returns the persisted playback speed multiplier, or `1.0` if none is
+  /// set (normal speed).
+  double getPlaybackSpeed() => _prefs.getDouble(_playbackSpeedKey) ?? 1.0;
+
+  /// Persists [speed] as the selected playback speed multiplier.
+  Future<void> setPlaybackSpeed(double speed) async {
+    await _prefs.setDouble(_playbackSpeedKey, speed);
   }
 }
 
