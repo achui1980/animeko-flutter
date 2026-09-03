@@ -10,6 +10,7 @@ import '../../domain/play/subject_episodes_controller.dart';
 import '../../domain/subject/subject_collection_controller.dart';
 import '../../domain/subject/subject_detail_controller.dart';
 import '../common/error_retry_view.dart';
+import 'subject_blurred_header.dart';
 
 class SubjectDetailScreen extends ConsumerWidget {
   const SubjectDetailScreen({
@@ -36,12 +37,7 @@ class SubjectDetailScreen extends ConsumerWidget {
       appBar: AppBar(title: Text(subjectName)),
       body: ListView(
         children: [
-          if (imageUrl != null)
-            SizedBox(
-              height: 160,
-              width: double.infinity,
-              child: Image.network(imageUrl!, fit: BoxFit.cover),
-            ),
+          if (imageUrl != null) SubjectBlurredHeader(imageUrl: imageUrl!),
           _SubjectInfoSection(subjectId: subjectId),
           _CastStaffSection(subjectId: subjectId),
           const Divider(),
