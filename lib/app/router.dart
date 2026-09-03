@@ -76,7 +76,13 @@ GoRouter appRouter(Ref ref) {
               body: Center(child: Text('Invalid navigation')),
             );
           }
-          return PlayerScreen(episode: extra);
+          final subjectId = int.parse(state.pathParameters['subjectId']!);
+          final subjectName = state.uri.queryParameters['name'] ?? '';
+          return PlayerScreen(
+            episode: extra,
+            subjectId: subjectId,
+            subjectName: subjectName,
+          );
         },
       ),
       GoRoute(path: '/settings/proxy', builder: (context, state) => const ProxySettingsScreen()),

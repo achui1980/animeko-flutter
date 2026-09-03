@@ -17,9 +17,21 @@ import '../common/error_retry_view.dart';
 const _playbackSpeeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
 
 class PlayerScreen extends ConsumerStatefulWidget {
-  const PlayerScreen({super.key, required this.episode});
+  const PlayerScreen({
+    super.key,
+    required this.episode,
+    required this.subjectId,
+    required this.subjectName,
+  });
 
   final MergedEpisode episode;
+
+  /// Together with [subjectName], used to look up the full episode list
+  /// (via [subjectEpisodesControllerProvider]) so playback can
+  /// auto-advance to the next episode from the same source when the
+  /// current one finishes -- see `_maybePlayNextEpisode`.
+  final int subjectId;
+  final String subjectName;
 
   @override
   ConsumerState<PlayerScreen> createState() => _PlayerScreenState();
@@ -37,11 +49,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   /// failure.
   String? _playbackError;
 
+  StreamSubscription<bool>? _completedSubscription;
+  bool _hasAdvancedToNextEpisode = false;
+
   @override
   void initState() {
     super.initState();
     _player.stream.error.listen((message) {
       if (mounted) setState(() => _playbackError = message);
+    });
+    _completedSubscription = _player.stream.completed.listen((completed) {
+      if (completed) _maybePlayNextEpisode();
     });
     // media_kit's native backend (libmpv/ffmpeg) makes its own network
     // connections and does NOT pick up the app's Dio-configured proxy
@@ -67,8 +85,49 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     }
   }
 
+  /// Called when media_kit reports playback has run to completion. Looks
+  /// up the same-source episode list (via
+  /// [subjectEpisodesControllerProvider]) to find the episode right after
+  /// [PlayerScreen.episode]; if one exists, replaces this screen with a
+  /// fresh [PlayerScreen] for it. Matches episodes by `title` within the
+  /// same [MergedEpisode.sourceId] (episodes have no other stable
+  /// identity -- see `MediaEpisode`'s doc comment). Guarded by
+  /// [_hasAdvancedToNextEpisode] so this only ever fires once per screen
+  /// instance, even if media_kit emits `completed: true` more than once.
+  void _maybePlayNextEpisode() {
+    if (_hasAdvancedToNextEpisode || !mounted) return;
+    final episodes = ref
+        .read(
+          subjectEpisodesControllerProvider(
+            subjectId: widget.subjectId,
+            subjectName: widget.subjectName,
+          ),
+        )
+        .value;
+    if (episodes == null) return;
+    final sameSource = episodes
+        .where((e) => e.sourceId == widget.episode.sourceId)
+        .toList();
+    final currentIndex = sameSource.indexWhere(
+      (e) => e.title == widget.episode.title,
+    );
+    if (currentIndex == -1 || currentIndex + 1 >= sameSource.length) return;
+    _hasAdvancedToNextEpisode = true;
+    final next = sameSource[currentIndex + 1];
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (context) => PlayerScreen(
+          episode: next,
+          subjectId: widget.subjectId,
+          subjectName: widget.subjectName,
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
+    unawaited(_completedSubscription?.cancel());
     // media_kit has a known crash where disposing a Player while it is
     // still playing (i.e. without calling `stop()` first) can invoke a
     // native FFI callback after it has already been freed, causing a

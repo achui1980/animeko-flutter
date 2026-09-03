@@ -71,7 +71,8 @@ class SubjectDetailScreen extends ConsumerWidget {
                     title: Text(episode.title),
                     trailing: Chip(label: Text(_sourceLabel(sources, episode.sourceId))),
                     onTap: () => context.push(
-                      '/subject/$subjectId/play',
+                      '/subject/$subjectId/play'
+                      '?name=${Uri.encodeComponent(subjectName)}',
                       extra: episode,
                     ),
                   ),
