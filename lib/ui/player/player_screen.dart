@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
+import '../../app/theme/app_theme.dart';
 import '../../domain/play/episode_play_controller.dart';
 import '../../domain/play/subject_episodes_controller.dart';
 import '../common/error_retry_view.dart';
@@ -87,25 +88,28 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     });
     final playback = ref.watch(provider);
 
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: SafeArea(
-        child: playback.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, stack) => ErrorRetryView(
-            message: '播放失败：$error',
-            onRetry: _retry,
+    return Theme(
+      data: AppTheme.dark(),
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: SafeArea(
+          child: playback.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (error, stack) => ErrorRetryView(
+              message: '播放失败：$error',
+              onRetry: _retry,
+            ),
+            data: (_) => _playbackError != null
+                ? ErrorRetryView(
+                    message: '播放失败：$_playbackError',
+                    onRetry: _retry,
+                  )
+                // Uses Video's default AdaptiveVideoControls (seek-bar drag,
+                // tap to show/hide controls, fullscreen button) -- see this
+                // task's "Context" note above for why no custom
+                // GestureDetector code is written here.
+                : Video(controller: _controller),
           ),
-          data: (_) => _playbackError != null
-              ? ErrorRetryView(
-                  message: '播放失败：$_playbackError',
-                  onRetry: _retry,
-                )
-              // Uses Video's default AdaptiveVideoControls (seek-bar drag,
-              // tap to show/hide controls, fullscreen button) -- see this
-              // task's "Context" note above for why no custom
-              // GestureDetector code is written here.
-              : Video(controller: _controller),
         ),
       ),
     );
