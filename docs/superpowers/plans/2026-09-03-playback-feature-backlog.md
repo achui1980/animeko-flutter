@@ -31,31 +31,66 @@ explicitly excluded — deferred separately, see item 9).
 
 ## Recommended priority order (from cost/benefit analysis)
 
-### High priority
-1. **倍速播放 (Playback speed control)** — Add a speed-selection UI to the
-   player screen using media_kit's `Player.setRate()` (common presets
-   0.5x–2x), remember the last-selected speed. Lowest cost, near-universal
-   expected feature.
-2. **自动连播下一集 (Auto-play next episode)** — After playback completes,
-   automatically navigate to the next episode (based on the existing
-   `SubjectEpisodesController` episode list). Listen on
-   `_player.stream.completed`; change localized to the player screen.
-3. **记住播放位置 / 简易播放历史 (Remember playback position / simple local
-   history, no cloud sync)** — Record playback position on exit, auto-jump
-   to it next time. Local storage only (SQLite/local DB), skip the complex
-   Bangumi cloud-sync subset for now.
+### High priority — ALL DONE
+1. **倍速播放 (Playback speed control)** — DONE. Commits `bca2ef0` (data
+   layer: `SettingsStorage.getPlaybackSpeed()/setPlaybackSpeed()` +
+   `PlaybackSpeedController`) and `743994c` (UI: `_SpeedButton` popup menu
+   on `PlayerScreen`, applies persisted speed via `Player.setRate()` on
+   every new source open).
+2. **自动连播下一集 (Auto-play next episode)** — DONE. Commit `92a8551`.
+   `PlayerScreen` now takes `subjectId`/`subjectName`, listens on
+   `_player.stream.completed`, matches the current episode within
+   `SubjectEpisodesController`'s list via a `sourceId+title` composite key
+   (no other stable identity exists on `MediaEpisode`), and
+   `Navigator.pushReplacement`s to the next same-source episode.
+3. **记住播放位置 / 简易播放历史 (Remember playback position, local-only)**
+   — DONE. Commit `9e9f117`. New `PlaybackPositionStorage`
+   (`lib/data/play/playback_position_storage.dart`, SharedPreferences-backed,
+   keyed by the same `subjectId::sourceId::title` composite key), wired into
+   `PlayerScreen` via a 5s periodic save timer + resume-on-open + clear-on-
+   completion. Minimum resume thresholds at 5s to avoid saving/resuming
+   trivial positions.
+
+   Final verification after items 1-3: `flutter test` 326/326 passing,
+   `flutter analyze` 23 known issues (same 3 established categories, +1
+   `depend_on_referenced_packages` from `playback_speed_controller_test.dart`'s
+   plain-riverpod import).
 
 ### Medium priority
-4. **手势控制 (Gesture controls)** — Swipe to adjust volume/brightness/seek
-   position. media_kit's `MaterialVideoControlsThemeData` already reserves
-   `onVolumeChanged`/`onBrightnessChanged`-style callback slots, so wiring
-   cost is much lower than building from scratch.
-5. **片源切换UI（轻量版） (Lightweight source-switching UI)** — When an
-   episode has results from both anime1.me and Xifan, show a simple source
-   switch tab/dropdown at the top of the player screen. Do NOT attempt to
-   replicate the reference app's full MediaSelector engine (auto-selection,
-   tiering, preference memory) — this is a low-cost pathfinder before
-   deciding whether to invest in a full MediaSelector later.
+4. **手势控制 (Gesture controls)** — **INVESTIGATED, DEFERRED (not a simple
+   wiring task as originally assumed).** Read `media_kit_video-2.0.1`'s
+   actual source (`material.dart`): `MaterialVideoControlsThemeData` does
+   have `onVolumeChanged`/`onBrightnessChanged`/`initialVolume`/
+   `initialBrightness` fields, and the mobile-style controls widget already
+   implements the swipe gesture internally (`GestureDetector.onVerticalDragUpdate`
+   at material.dart:933, on-screen percentage indicators). **But** this only
+   tracks a local 0.0–1.0 UI value — it does NOT call any real OS volume/
+   brightness API. Making it actually work requires: (a) adding new
+   third-party native plugin dependencies (e.g. volume-controller-style and
+   screen-brightness-style packages — zero such deps currently in
+   `pubspec.yaml`, confirmed via grep), (b) verifying those plugins support
+   macOS specifically (the only platform used for visual verification all
+   session — desktop volume/brightness plugins are less commonly
+   maintained for macOS than mobile), (c) possible platform
+   permission/entitlement config, and (d) separately confirming whether
+   `MaterialDesktopVideoControlsThemeData` (the desktop-style controls
+   actually used by `AdaptiveVideoControls` on this app's tested platform)
+   even has an equivalent gesture at all — NOT yet confirmed either way.
+   **User's decision: "先跳过,但是要记录下来.等日后在做" (skip for now, but
+   record it — revisit later).** Deferred, not started. When picked up
+   again: first confirm desktop gesture support before deciding whether to
+   take on the new native-plugin dependency, and consider whether a
+   horizontal-drag-to-seek gesture (unconfirmed second `GestureDetector` at
+   material.dart:1666) could be delivered independently/first without the
+   volume/brightness plugin dependency, as a smaller first step.
+5. **片源切换UI（轻量版） (Lightweight source-switching UI)** — NOT STARTED.
+   When an episode has results from both anime1.me and Xifan, show a simple
+   source switch tab/dropdown at the top of the player screen. Do NOT
+   attempt to replicate the reference app's full MediaSelector engine
+   (auto-selection, tiering, preference memory) — this is a low-cost
+   pathfinder before deciding whether to invest in a full MediaSelector
+   later. Architecturally self-contained, no new native dependencies
+   needed — good candidate to pick up next instead of item 4.
 
 ### Low priority
 6. **字幕轨道切换 (Subtitle track switching)** — Needs research first: do
