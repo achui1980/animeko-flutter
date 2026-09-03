@@ -7,6 +7,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 import '../../app/theme/app_theme.dart';
+import '../../data/play/playback_position_storage.dart';
 import '../../domain/play/episode_play_controller.dart';
 import '../../domain/play/subject_episodes_controller.dart';
 import '../../domain/settings/playback_speed_controller.dart';
@@ -15,6 +16,11 @@ import '../common/error_retry_view.dart';
 
 /// Playback speed presets offered in the speed-selection menu.
 const _playbackSpeeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
+
+/// Below this, resuming would be indistinguishable from starting over, so
+/// don't bother seeking (and don't bother persisting positions this
+/// small either -- see `_savePosition`).
+const _minResumePosition = Duration(seconds: 5);
 
 class PlayerScreen extends ConsumerStatefulWidget {
   const PlayerScreen({
@@ -52,6 +58,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   StreamSubscription<bool>? _completedSubscription;
   bool _hasAdvancedToNextEpisode = false;
 
+  Timer? _savePositionTimer;
+
+  /// Identifies [PlayerScreen.episode] for [PlaybackPositionStorage].
+  /// Episodes have no other stable identity than `sourceId` + `title`
+  /// (see `MediaEpisode`'s doc comment); combined with `subjectId`, this
+  /// is unique enough in practice.
+  String get _positionKey =>
+      '${widget.subjectId}::${widget.episode.sourceId}::${widget.episode.title}';
+
   @override
   void initState() {
     super.initState();
@@ -59,8 +74,20 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       if (mounted) setState(() => _playbackError = message);
     });
     _completedSubscription = _player.stream.completed.listen((completed) {
-      if (completed) _maybePlayNextEpisode();
+      if (completed) {
+        unawaited(_clearSavedPosition());
+        _maybePlayNextEpisode();
+      }
     });
+    // Periodically persist the current position so playback can resume
+    // from roughly the same spot after leaving and reopening this
+    // episode. A period, rather than saving on every position update, is
+    // enough resolution for "resume where I left off" and avoids writing
+    // to SharedPreferences several times a second.
+    _savePositionTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => unawaited(_savePosition()),
+    );
     // media_kit's native backend (libmpv/ffmpeg) makes its own network
     // connections and does NOT pick up the app's Dio-configured proxy
     // (see `dioProvider`/`proxy_dio_config.dart`) -- that proxy is wired
@@ -83,6 +110,25 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     if (platform is NativePlayer) {
       await platform.setProperty('http-proxy', proxyUrl);
     }
+  }
+
+  Future<void> _savePosition() async {
+    final position = _player.state.position;
+    if (position < _minResumePosition) return;
+    final storage = await ref.read(playbackPositionStorageProvider.future);
+    await storage.setPosition(_positionKey, position.inMilliseconds);
+  }
+
+  Future<void> _clearSavedPosition() async {
+    final storage = await ref.read(playbackPositionStorageProvider.future);
+    await storage.clearPosition(_positionKey);
+  }
+
+  Future<void> _maybeResumePosition() async {
+    final storage = await ref.read(playbackPositionStorageProvider.future);
+    final savedMs = storage.getPosition(_positionKey);
+    if (savedMs == null) return;
+    await _player.seek(Duration(milliseconds: savedMs));
   }
 
   /// Called when media_kit reports playback has run to completion. Looks
@@ -128,6 +174,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   @override
   void dispose() {
     unawaited(_completedSubscription?.cancel());
+    _savePositionTimer?.cancel();
+    unawaited(_savePosition());
     // media_kit has a known crash where disposing a Player while it is
     // still playing (i.e. without calling `stop()` first) can invoke a
     // native FFI callback after it has already been freed, causing a
@@ -173,6 +221,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           );
           final speed = await ref.read(playbackSpeedControllerProvider.future);
           await _player.setRate(speed);
+          await _maybeResumePosition();
         },
       );
     });
