@@ -9,8 +9,12 @@ import 'package:media_kit_video/media_kit_video.dart';
 import '../../app/theme/app_theme.dart';
 import '../../domain/play/episode_play_controller.dart';
 import '../../domain/play/subject_episodes_controller.dart';
+import '../../domain/settings/playback_speed_controller.dart';
 import '../../domain/settings/proxy_settings_controller.dart';
 import '../common/error_retry_view.dart';
+
+/// Playback speed presets offered in the speed-selection menu.
+const _playbackSpeeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
 
 class PlayerScreen extends ConsumerStatefulWidget {
   const PlayerScreen({super.key, required this.episode});
@@ -97,16 +101,20 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     // every `build()` (see design doc "数据流" step 3).
     ref.listen(provider, (previous, next) {
       next.whenData(
-        (source) => _player.open(
-          Media(
-            source.url,
-            // Some sources' video CDNs (e.g. anime1.me) reject direct
-            // requests without specific headers -- see each concrete
-            // MediaPlaybackSource's own `headers` doc comment. Others
-            // (e.g. 稀饭动漫) need none, in which case this is empty.
-            httpHeaders: source.headers,
-          ),
-        ),
+        (source) async {
+          await _player.open(
+            Media(
+              source.url,
+              // Some sources' video CDNs (e.g. anime1.me) reject direct
+              // requests without specific headers -- see each concrete
+              // MediaPlaybackSource's own `headers` doc comment. Others
+              // (e.g. 稀饭动漫) need none, in which case this is empty.
+              httpHeaders: source.headers,
+            ),
+          );
+          final speed = await ref.read(playbackSpeedControllerProvider.future);
+          await _player.setRate(speed);
+        },
       );
     });
     final playback = ref.watch(provider);
@@ -143,6 +151,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                 left: 8,
                 child: _BackButton(onPressed: () => Navigator.of(context).pop()),
               ),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: _SpeedButton(
+                  onSelected: (speed) async {
+                    await _player.setRate(speed);
+                    await ref
+                        .read(playbackSpeedControllerProvider.notifier)
+                        .setPlaybackSpeed(speed);
+                  },
+                ),
+              ),
             ],
           ),
         ),
@@ -171,3 +191,41 @@ class _BackButton extends StatelessWidget {
     );
   }
 }
+
+/// A small floating pill button showing the current playback speed. Tapping
+/// it opens a menu of common speed presets; selecting one applies it to the
+/// player and persists it via [PlaybackSpeedController].
+class _SpeedButton extends ConsumerWidget {
+  const _SpeedButton({required this.onSelected});
+
+  final void Function(double speed) onSelected;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final speed = ref.watch(playbackSpeedControllerProvider).value ?? 1.0;
+    return Material(
+      color: Colors.black45,
+      shape: const StadiumBorder(),
+      child: PopupMenuButton<double>(
+        tooltip: '播放速度',
+        onSelected: onSelected,
+        itemBuilder: (context) => _playbackSpeeds
+            .map(
+              (value) => PopupMenuItem<double>(
+                value: value,
+                child: Text('${value}x'),
+              ),
+            )
+            .toList(),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Text(
+            '${speed}x',
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
