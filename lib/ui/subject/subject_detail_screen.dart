@@ -11,6 +11,7 @@ import '../../domain/subject/subject_collection_controller.dart';
 import '../../domain/subject/subject_detail_controller.dart';
 import '../common/error_retry_view.dart';
 import 'subject_blurred_header.dart';
+import 'subject_tags_row.dart';
 
 class SubjectDetailScreen extends ConsumerWidget {
   const SubjectDetailScreen({
@@ -112,13 +113,7 @@ class _SubjectInfoSection extends ConsumerWidget {
           children: [
             Text(subject.summary),
             const SizedBox(height: 8),
-            if (subject.tags.isNotEmpty)
-              Wrap(
-                spacing: 4,
-                children: subject.tags
-                    .map((tag) => Chip(label: Text('${tag.name} ${tag.count}')))
-                    .toList(),
-              ),
+            SubjectTagsRow(tags: subject.tags),
             const SizedBox(height: 8),
             Row(
               children: [
