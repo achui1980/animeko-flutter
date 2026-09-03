@@ -1,10 +1,13 @@
 // lib/ui/search/search_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../domain/search/search_controller.dart';
-import '../../ui/subject/subject_navigation.dart';
+import '../common/anime_list_item.dart';
+import '../common/app_action_bar.dart';
+import '../common/empty_view.dart';
+import '../common/error_retry_view.dart';
+import '../subject/subject_navigation.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
@@ -34,36 +37,36 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               .read(searchControllerProvider.notifier)
               .search(keywords: value),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.bookmark),
-            onPressed: () => context.push('/collection'),
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () => context.push('/settings'),
-          ),
-        ],
+        actions: buildStandardActions(context),
       ),
       body: results.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stack) => Center(child: Text('Search failed: $error')),
-        data: (cards) => ListView.builder(
-          itemCount: cards.length,
-          itemBuilder: (context, index) {
-            final card = cards[index];
-            return ListTile(
-              leading: card.imageUrl != null
-                  ? Image.network(card.imageUrl!, width: 48, fit: BoxFit.cover)
-                  : const SizedBox(width: 48),
-              title: Text(card.nameCn ?? card.name),
-              subtitle: card.tags != null && card.tags!.isNotEmpty
-                  ? Text(card.tags!.join(', '))
-                  : null,
-              onTap: () => openSubjectDetail(context, card),
-            );
-          },
+        error: (error, stack) => ErrorRetryView(
+          message: 'Search failed: $error',
+          onRetry: () => ref.invalidate(searchControllerProvider),
         ),
+        data: (cards) {
+          if (cards.isEmpty) {
+            return const EmptyView(
+              icon: Icons.search_off,
+              message: '没有找到相关番剧，换个关键词试试',
+            );
+          }
+          return ListView.separated(
+            padding: const EdgeInsets.all(8),
+            itemCount: cards.length,
+            separatorBuilder: (_, _) => const SizedBox(height: 8),
+            itemBuilder: (context, index) {
+              final card = cards[index];
+              return AnimeListItem(
+                imageUrl: card.imageUrl ?? '',
+                title: card.nameCn ?? card.name,
+                subtitle: card.tags?.join(', ') ?? '',
+                onTap: () => openSubjectDetail(context, card),
+              );
+            },
+          );
+        },
       ),
     );
   }
