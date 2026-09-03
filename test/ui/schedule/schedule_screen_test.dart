@@ -1,6 +1,6 @@
 import 'package:animeko_flutter/domain/schedule/schedule_controller.dart';
 import 'package:animeko_flutter/domain/subject_card.dart';
-import 'package:animeko_flutter/ui/common/anime_list_item.dart';
+import 'package:animeko_flutter/ui/common/anime_cover_card.dart';
 import 'package:animeko_flutter/ui/common/tag_chip.dart';
 import 'package:animeko_flutter/ui/schedule/schedule_screen.dart';
 import 'package:flutter/material.dart';
@@ -24,7 +24,7 @@ Widget _wrap(List<ScheduleDay> days) {
 }
 
 void main() {
-  testWidgets('shows each day\'s subjects directly, with no expand/collapse interaction', (
+  testWidgets('shows each day\'s subjects directly in a horizontal row, with no expand/collapse interaction', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -39,9 +39,13 @@ void main() {
 
     // The item is already visible -- no tap/expand needed, and there must
     // be no ExpansionTile left in the tree at all.
-    expect(find.byType(AnimeListItem), findsOneWidget);
+    expect(find.byType(AnimeCoverCard), findsOneWidget);
     expect(find.text('Foo'), findsOneWidget);
     expect(find.byType(ExpansionTile), findsNothing);
+    expect(
+      tester.widget<ListView>(find.byType(ListView).last).scrollDirection,
+      Axis.horizontal,
+    );
   });
 
   testWidgets('formats the date header in a readable Chinese format', (tester) async {

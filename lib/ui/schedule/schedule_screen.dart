@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/theme/app_spacing.dart';
 import '../../domain/schedule/schedule_controller.dart';
-import '../common/anime_list_item.dart';
+import '../common/anime_cover_card.dart';
 import '../common/app_action_bar.dart';
 import '../common/error_retry_view.dart';
 import '../common/tag_chip.dart';
@@ -43,7 +43,7 @@ class ScheduleScreen extends ConsumerWidget {
           final padding = pagePadding(context);
           final today = todayDateString(DateTime.now());
           return ListView.builder(
-            padding: EdgeInsets.symmetric(horizontal: padding, vertical: 8),
+            padding: const EdgeInsets.symmetric(vertical: 8),
             itemCount: days.length,
             itemBuilder: (context, index) {
               final day = days[index];
@@ -52,7 +52,7 @@ class ScheduleScreen extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    padding: EdgeInsets.fromLTRB(padding, 12, padding, 12),
                     child: Row(
                       children: [
                         Text(
@@ -66,15 +66,26 @@ class ScheduleScreen extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  ...day.subjects.map(
-                    (card) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: AnimeListItem(
-                        imageUrl: card.imageUrl ?? '',
-                        title: card.nameCn ?? card.name,
-                        subtitle: day.date,
-                        onTap: () => openSubjectDetail(context, card),
-                      ),
+                  SizedBox(
+                    height: 210,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: EdgeInsets.symmetric(horizontal: padding),
+                      itemCount: day.subjects.length,
+                      itemBuilder: (context, subjectIndex) {
+                        final card = day.subjects[subjectIndex];
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: SizedBox(
+                            width: 120,
+                            child: AnimeCoverCard(
+                              imageUrl: card.imageUrl ?? '',
+                              title: card.nameCn ?? card.name,
+                              onTap: () => openSubjectDetail(context, card),
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ],
