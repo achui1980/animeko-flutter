@@ -24,7 +24,17 @@ class SubjectBlurredHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final blurSigma = MediaQuery.of(context).size.width < 600 ? 16.0 : 32.0;
+    final mediaQuery = MediaQuery.of(context);
+    final blurSigma = mediaQuery.size.width < 600 ? 16.0 : 32.0;
+
+    // Decode the blurred background at half resolution (Kazumi's
+    // `_InfoHeaderBackground` pattern: `downsample=0.5`) -- a Gaussian
+    // blur's cost scales with pixel count, and blurring away detail at
+    // sigma 16-32 makes decoding at full resolution first pure waste.
+    // `cacheWidth`/`cacheHeight` tell Flutter's image codec to decode at
+    // this smaller size directly, rather than decode-full-then-downscale.
+    final cacheWidth = (mediaQuery.size.width * mediaQuery.devicePixelRatio * 0.5).round();
+    final cacheHeight = (height * mediaQuery.devicePixelRatio * 0.5).round();
 
     return SizedBox(
       height: height,
@@ -37,6 +47,8 @@ class SubjectBlurredHeader extends StatelessWidget {
             child: Image.network(
               imageUrl,
               fit: BoxFit.cover,
+              cacheWidth: cacheWidth,
+              cacheHeight: cacheHeight,
               errorBuilder: (context, error, stackTrace) =>
                   Container(color: colorScheme.surfaceContainerHighest),
             ),
