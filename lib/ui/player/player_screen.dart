@@ -3,8 +3,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_volume_controller/flutter_volume_controller.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
+import 'package:screen_brightness/screen_brightness.dart';
 
 import '../../app/theme/app_theme.dart';
 import '../../data/play/playback_position_storage.dart';
@@ -14,6 +16,7 @@ import '../../domain/play/subject_episodes_controller.dart';
 import '../../domain/settings/playback_speed_controller.dart';
 import '../../domain/settings/proxy_settings_controller.dart';
 import '../common/error_retry_view.dart';
+import '../home/trending_carousel.dart' show isDesktopPlatform;
 
 /// Playback speed presets offered in the speed-selection menu.
 const _playbackSpeeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
@@ -60,6 +63,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   bool _hasAdvancedToNextEpisode = false;
 
   Timer? _savePositionTimer;
+
+  // --- Volume/brightness swipe gesture state ---
+  // (see `_handleVerticalDragUpdate`/`_adjustVolume`/`_adjustBrightness`).
+  // Values are 0.0-1.0 fractions, matching both plugins' own scale.
+  double _volume = 1;
+  double _brightness = 1;
+  bool _showVolumeHud = false;
+  bool _showBrightnessHud = false;
+  double? _dragStartX;
+  Timer? _hudHideTimer;
 
   /// Captured once, synchronously, while the widget is still safely
   /// mounted. `_savePosition`/`_clearSavedPosition` need this from
@@ -112,6 +125,29 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     // URL to libmpv via its `http-proxy` property, which ffmpeg's HTTP
     // protocol layer honors for all subsequent network I/O.
     unawaited(_configureProxy());
+    // We show our own HUD for volume/brightness swipes (see
+    // `_AdjustmentHud`), so suppress each platform's native
+    // volume-changed overlay to avoid a duplicate indicator.
+    unawaited(FlutterVolumeController.updateShowSystemUI(false));
+    unawaited(_initVolumeAndBrightness());
+  }
+
+  Future<void> _initVolumeAndBrightness() async {
+    try {
+      final volume = await FlutterVolumeController.getVolume();
+      if (volume != null && mounted) setState(() => _volume = volume);
+    } on Object {
+      // Best-effort only -- if the platform can't report the current
+      // volume, the gesture still works from whatever `_volume` already
+      // is, just possibly out of sync with the system value initially.
+    }
+    if (isDesktopPlatform()) return;
+    try {
+      final brightness = await ScreenBrightness().application;
+      if (mounted) setState(() => _brightness = brightness);
+    } on Object {
+      // Same rationale as above.
+    }
   }
 
   Future<void> _configureProxy() async {
@@ -140,6 +176,66 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final savedMs = storage.getPosition(_positionKey);
     if (savedMs == null) return;
     await _player.seek(Duration(milliseconds: savedMs));
+  }
+
+  /// Records which half of the screen a vertical drag started in --
+  /// [_handleVerticalDragUpdate] uses this to decide whether the drag
+  /// adjusts brightness (left half) or volume (right half), matching the
+  /// convention used by most video apps.
+  void _handleVerticalDragStart(DragStartDetails details) {
+    _dragStartX = details.globalPosition.dx;
+  }
+
+  /// Left half of the screen adjusts brightness, right half adjusts
+  /// volume -- both by the same fraction of screen height the finger has
+  /// moved, so a full-height drag goes from 0% to 100%. Brightness is
+  /// skipped entirely on desktop (no touch screen to swipe on, and
+  /// mouse-drag-to-dim would be surprising); volume works everywhere.
+  void _handleVerticalDragUpdate(DragUpdateDetails details) {
+    final startX = _dragStartX;
+    if (startX == null) return;
+    final size = MediaQuery.sizeOf(context);
+    final delta = -details.delta.dy / size.height;
+    if (startX < size.width / 2) {
+      if (isDesktopPlatform()) return;
+      unawaited(_adjustBrightness(delta));
+    } else {
+      unawaited(_adjustVolume(delta));
+    }
+  }
+
+  Future<void> _adjustVolume(double delta) async {
+    final volume = (_volume + delta).clamp(0.0, 1.0);
+    setState(() {
+      _volume = volume;
+      _showVolumeHud = true;
+      _showBrightnessHud = false;
+    });
+    _scheduleHideHud();
+    await FlutterVolumeController.setVolume(volume);
+  }
+
+  Future<void> _adjustBrightness(double delta) async {
+    final brightness = (_brightness + delta).clamp(0.0, 1.0);
+    setState(() {
+      _brightness = brightness;
+      _showBrightnessHud = true;
+      _showVolumeHud = false;
+    });
+    _scheduleHideHud();
+    await ScreenBrightness().setApplicationScreenBrightness(brightness);
+  }
+
+  void _scheduleHideHud() {
+    _hudHideTimer?.cancel();
+    _hudHideTimer = Timer(const Duration(milliseconds: 800), () {
+      if (mounted) {
+        setState(() {
+          _showVolumeHud = false;
+          _showBrightnessHud = false;
+        });
+      }
+    });
   }
 
   /// Called when media_kit reports playback has run to completion. Looks
@@ -187,6 +283,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     unawaited(_completedSubscription?.cancel());
     _savePositionTimer?.cancel();
     unawaited(_savePosition());
+    _hudHideTimer?.cancel();
+    // Restore each platform's own volume-changed overlay and, on mobile,
+    // hand screen brightness back to whatever the system had it at
+    // before this screen changed it (neither of these `ref`/context, so
+    // -- unlike `_savePosition` -- they're safe to fire from `dispose()`
+    // directly, no `_storageFuture`-style caching needed).
+    unawaited(FlutterVolumeController.updateShowSystemUI(true));
+    if (!isDesktopPlatform()) {
+      unawaited(ScreenBrightness().resetApplicationScreenBrightness());
+    }
     // media_kit has a known crash where disposing a Player while it is
     // still playing (i.e. without calling `stop()` first) can invoke a
     // native FFI callback after it has already been freed, causing a
@@ -243,69 +349,93 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       child: Scaffold(
         backgroundColor: Colors.black,
         body: SafeArea(
-          child: Stack(
-            children: [
-              playback.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (error, stack) => ErrorRetryView(
-                  message: '播放失败：$error',
-                  onRetry: _retry,
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onVerticalDragStart: _handleVerticalDragStart,
+            onVerticalDragUpdate: _handleVerticalDragUpdate,
+            child: Stack(
+              children: [
+                playback.when(
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (error, stack) => ErrorRetryView(
+                    message: '播放失败：$error',
+                    onRetry: _retry,
+                  ),
+                  data: (_) => _playbackError != null
+                      ? ErrorRetryView(
+                          message: '播放失败：$_playbackError',
+                          onRetry: _retry,
+                        )
+                      // Uses Video's default AdaptiveVideoControls (seek-bar drag,
+                      // tap to show/hide controls, fullscreen button) -- see this
+                      // task's "Context" note above for why no custom
+                      // GestureDetector code is written here.
+                      : Video(controller: _controller),
                 ),
-                data: (_) => _playbackError != null
-                    ? ErrorRetryView(
-                        message: '播放失败：$_playbackError',
-                        onRetry: _retry,
-                      )
-                    // Uses Video's default AdaptiveVideoControls (seek-bar drag,
-                    // tap to show/hide controls, fullscreen button) -- see this
-                    // task's "Context" note above for why no custom
-                    // GestureDetector code is written here.
-                    : Video(controller: _controller),
-              ),
-              // Floating back button -- the player has no AppBar (to stay
-              // immersive/full-bleed), so without this there was no way to
-              // leave the screen except system back gestures/shortcuts.
-              Positioned(
-                top: 8,
-                left: 8,
-                child: _BackButton(onPressed: () => Navigator.of(context).pop()),
-              ),
-              Positioned(
-                top: 8,
-                right: 8,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _SourceButton(
-                      subjectId: widget.subjectId,
-                      subjectName: widget.subjectName,
-                      currentEpisode: widget.episode,
-                      onSelected: (target) {
-                        if (target.sourceId == widget.episode.sourceId) return;
-                        Navigator.of(context).pushReplacement(
-                          MaterialPageRoute(
-                            builder: (context) => PlayerScreen(
-                              episode: target,
-                              subjectId: widget.subjectId,
-                              subjectName: widget.subjectName,
+                if (_showVolumeHud)
+                  Center(
+                    child: _AdjustmentHud(
+                      icon: _volumeIcon(_volume),
+                      value: _volume,
+                    ),
+                  ),
+                if (_showBrightnessHud)
+                  Center(
+                    child: _AdjustmentHud(
+                      icon: _brightnessIcon(_brightness),
+                      value: _brightness,
+                    ),
+                  ),
+                // Floating back button -- the player has no AppBar (to stay
+                // immersive/full-bleed), so without this there was no way to
+                // leave the screen except system back gestures/shortcuts.
+                Positioned(
+                  top: 8,
+                  left: 8,
+                  child: _BackButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _SourceButton(
+                        subjectId: widget.subjectId,
+                        subjectName: widget.subjectName,
+                        currentEpisode: widget.episode,
+                        onSelected: (target) {
+                          if (target.sourceId == widget.episode.sourceId) {
+                            return;
+                          }
+                          Navigator.of(context).pushReplacement(
+                            MaterialPageRoute(
+                              builder: (context) => PlayerScreen(
+                                episode: target,
+                                subjectId: widget.subjectId,
+                                subjectName: widget.subjectName,
+                              ),
                             ),
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(width: 8),
-                    _SpeedButton(
-                      onSelected: (speed) async {
-                        await _player.setRate(speed);
-                        await ref
-                            .read(playbackSpeedControllerProvider.notifier)
-                            .setPlaybackSpeed(speed);
-                      },
-                    ),
-                  ],
+                          );
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      _SpeedButton(
+                        onSelected: (speed) async {
+                          await _player.setRate(speed);
+                          await ref
+                              .read(playbackSpeedControllerProvider.notifier)
+                              .setPlaybackSpeed(speed);
+                        },
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -447,6 +577,68 @@ class _SourceButton extends ConsumerWidget {
               const Icon(Icons.expand_more, color: Colors.white, size: 16),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Icon for the volume HUD, chosen from [volume] (0.0-1.0).
+IconData _volumeIcon(double volume) {
+  if (volume <= 0) return Icons.volume_off;
+  if (volume < 0.5) return Icons.volume_down;
+  return Icons.volume_up;
+}
+
+/// Icon for the brightness HUD, chosen from [brightness] (0.0-1.0).
+IconData _brightnessIcon(double brightness) {
+  if (brightness < 0.34) return Icons.brightness_low;
+  if (brightness < 0.67) return Icons.brightness_medium;
+  return Icons.brightness_high;
+}
+
+/// Floating feedback shown while a vertical swipe is adjusting volume or
+/// brightness (see `_handleVerticalDragUpdate`). Deliberately does not use
+/// `BackdropFilter`/`ImageFilter.blur` -- layering either over the video
+/// surface is a known source of a native Impeller crash (see
+/// flutter/flutter#185506); a plain semi-transparent `Material` avoids it
+/// entirely while still reading clearly over video content.
+class _AdjustmentHud extends StatelessWidget {
+  const _AdjustmentHud({required this.icon, required this.value});
+
+  final IconData icon;
+  final double value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.black54,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: Colors.white, size: 28),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: 120,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: value,
+                  minHeight: 6,
+                  backgroundColor: Colors.white24,
+                  valueColor: const AlwaysStoppedAnimation(Colors.white),
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${(value * 100).round()}%',
+              style: const TextStyle(color: Colors.white, fontSize: 12),
+            ),
+          ],
         ),
       ),
     );
