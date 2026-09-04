@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_volume_controller/flutter_volume_controller.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
+import 'package:saver_gallery/saver_gallery.dart';
 import 'package:screen_brightness/screen_brightness.dart';
 
 import '../../app/theme/app_theme.dart';
@@ -73,6 +74,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   bool _showBrightnessHud = false;
   double? _dragStartX;
   Timer? _hudHideTimer;
+
+  // --- Screenshot feedback ---
+  bool _screenshotFlash = false;
+  Timer? _screenshotFlashTimer;
 
   /// Captured once, synchronously, while the widget is still safely
   /// mounted. `_savePosition`/`_clearSavedPosition` need this from
@@ -238,6 +243,45 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     });
   }
 
+  /// Saves a screenshot of the current video frame to the device gallery.
+  /// `saver_gallery` (unlike media_kit's own `Player.screenshot()`, which
+  /// is cross-platform) only ships native implementations for
+  /// Android/iOS/OHOS, so desktop gets a plain "not supported" message
+  /// instead of a broken attempt.
+  Future<void> _takeScreenshot() async {
+    if (isDesktopPlatform()) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('暂未支持保存截图')),
+        );
+      }
+      return;
+    }
+    final bytes = await _player.screenshot();
+    if (bytes == null || !mounted) return;
+    final result = await SaverGallery.saveImage(
+      bytes,
+      fileName: 'animeko_${DateTime.now().millisecondsSinceEpoch}.jpg',
+      skipIfExists: false,
+    );
+    if (!mounted) return;
+    if (result.isSuccess) {
+      _triggerScreenshotFlash();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('截图保存失败：${result.errorMessage}')),
+      );
+    }
+  }
+
+  void _triggerScreenshotFlash() {
+    _screenshotFlashTimer?.cancel();
+    setState(() => _screenshotFlash = true);
+    _screenshotFlashTimer = Timer(const Duration(milliseconds: 150), () {
+      if (mounted) setState(() => _screenshotFlash = false);
+    });
+  }
+
   /// Called when media_kit reports playback has run to completion. Looks
   /// up the same-source episode list (via
   /// [subjectEpisodesControllerProvider]) to find the episode right after
@@ -284,6 +328,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     _savePositionTimer?.cancel();
     unawaited(_savePosition());
     _hudHideTimer?.cancel();
+    _screenshotFlashTimer?.cancel();
     // Restore each platform's own volume-changed overlay and, on mobile,
     // hand screen brightness back to whatever the system had it at
     // before this screen changed it (neither of these `ref`/context, so
@@ -387,6 +432,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                       value: _brightness,
                     ),
                   ),
+                // Screenshot flash feedback -- plain white flash, not a
+                // BackdropFilter/blur (see `_AdjustmentHud`'s doc comment
+                // for why), ignoring pointer events so it never blocks
+                // taps while fading.
+                IgnorePointer(
+                  child: AnimatedOpacity(
+                    opacity: _screenshotFlash ? 0.6 : 0.0,
+                    duration: const Duration(milliseconds: 150),
+                    child: Container(color: Colors.white),
+                  ),
+                ),
                 // Floating back button -- the player has no AppBar (to stay
                 // immersive/full-bleed), so without this there was no way to
                 // leave the screen except system back gestures/shortcuts.
@@ -431,6 +487,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                               .setPlaybackSpeed(speed);
                         },
                       ),
+                      const SizedBox(width: 8),
+                      _ScreenshotButton(onPressed: _takeScreenshot),
                     ],
                   ),
                 ),
@@ -458,6 +516,28 @@ class _BackButton extends StatelessWidget {
       child: IconButton(
         icon: const Icon(Icons.arrow_back, color: Colors.white),
         tooltip: '返回',
+        onPressed: onPressed,
+      ),
+    );
+  }
+}
+
+/// A small floating circular button that saves a screenshot of the
+/// current video frame to the device gallery (see
+/// `_PlayerScreenState._takeScreenshot`).
+class _ScreenshotButton extends StatelessWidget {
+  const _ScreenshotButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.black45,
+      shape: const CircleBorder(),
+      child: IconButton(
+        icon: const Icon(Icons.camera_alt, color: Colors.white),
+        tooltip: '截图',
         onPressed: onPressed,
       ),
     );
