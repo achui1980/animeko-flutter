@@ -4,12 +4,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/subject/collection_type.dart';
+import '../../data/subject/subject_models.dart';
 import '../../domain/media/media_registry.dart';
 import '../../domain/media/media_source.dart';
 import '../../domain/play/subject_episodes_controller.dart';
 import '../../domain/subject/subject_collection_controller.dart';
 import '../../domain/subject/subject_detail_controller.dart';
 import '../common/error_retry_view.dart';
+import '../common/rating_stars.dart';
+import 'expandable_summary.dart';
 import 'subject_blurred_header.dart';
 import 'subject_tags_row.dart';
 
@@ -38,7 +41,7 @@ class SubjectDetailScreen extends ConsumerWidget {
       appBar: AppBar(title: Text(subjectName)),
       body: ListView(
         children: [
-          if (imageUrl != null) SubjectBlurredHeader(imageUrl: imageUrl!),
+          if (imageUrl != null) _ImmersiveHeader(subjectId: subjectId, imageUrl: imageUrl!),
           _SubjectInfoSection(subjectId: subjectId),
           _CastStaffSection(subjectId: subjectId),
           const Divider(),
@@ -112,27 +115,84 @@ class _SubjectInfoSection extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(subject.summary),
+            ExpandableSummary(text: subject.summary),
             const SizedBox(height: 8),
             SubjectTagsRow(tags: subject.tags),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                if (subject.score != null) Text('评分：${subject.score}'),
-                if (subject.rank != null)
-                  Padding(
-                    padding: const EdgeInsets.only(left: 16),
-                    child: Text('排名：#${subject.rank}'),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _CollectionButtons(subjectId: subjectId),
             const SizedBox(height: 16),
             _RatingSection(subjectId: subjectId),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// The subject's title/rating stars/collection buttons, overlaid inside
+/// [SubjectBlurredHeader]'s bottom area next to the sharp foreground
+/// thumbnail -- mirroring Kazumi's `bangumi_info_card.dart`, which
+/// bundles this same information inside its header card rather than
+/// leaving it to a separate section below. Renders just the plain
+/// header (no info overlay) while the subject is still loading or
+/// failed to load, since there's nothing meaningful to show yet.
+class _ImmersiveHeader extends ConsumerWidget {
+  const _ImmersiveHeader({required this.subjectId, required this.imageUrl});
+
+  final int subjectId;
+  final String imageUrl;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final provider = subjectDetailControllerProvider(subjectId: subjectId);
+    final detail = ref.watch(provider);
+    return SubjectBlurredHeader(
+      imageUrl: imageUrl,
+      info: detail.maybeWhen(
+        data: (subject) => _HeaderInfo(subjectId: subjectId, subject: subject),
+        orElse: () => null,
+      ),
+    );
+  }
+}
+
+class _HeaderInfo extends StatelessWidget {
+  const _HeaderInfo({required this.subjectId, required this.subject});
+
+  final int subjectId;
+  final SubjectDetail subject;
+
+  @override
+  Widget build(BuildContext context) {
+    final score = subject.score != null ? double.tryParse(subject.score!) : null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          subject.nameCn.isNotEmpty ? subject.nameCn : subject.name,
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 4),
+        if (score != null || subject.rank != null)
+          Row(
+            children: [
+              if (score != null) RatingStars(score: score),
+              if (subject.rank != null)
+                Padding(
+                  padding: const EdgeInsets.only(left: 12),
+                  child: Text(
+                    '排名：#${subject.rank}',
+                    style: const TextStyle(color: Colors.white70, fontSize: 12),
+                  ),
+                ),
+            ],
+          ),
+        const SizedBox(height: 8),
+        _CollectionButtons(subjectId: subjectId),
+      ],
     );
   }
 }
@@ -314,7 +374,7 @@ class _RatingSectionState extends ConsumerState<_RatingSection> {
   }
 }
 
-/// Two horizontal avatar rows (cast, then staff). Either row fails
+/// Two vertical [ListTile] lists (cast, then staff). Either list fails
 /// silently (hides itself entirely) without affecting the other or
 /// `_SubjectInfoSection` -- the design doc's "per-source silent
 /// failure" pattern.
@@ -336,9 +396,17 @@ class _CastStaffSection extends ConsumerWidget {
           error: (error, stack) => const SizedBox.shrink(),
           data: (list) => list.isEmpty
               ? const SizedBox.shrink()
-              : _AvatarRow(
+              : _PersonList(
                   title: '角色',
-                  items: list.map((c) => (c.character.name, c.character.imageUrl)).toList(),
+                  items: list
+                      .map(
+                        (c) => (
+                          c.character.name,
+                          c.character.imageUrl,
+                          _characterRoleLabel(c.role),
+                        ),
+                      )
+                      .toList(),
                 ),
         ),
         staff.when(
@@ -346,9 +414,9 @@ class _CastStaffSection extends ConsumerWidget {
           error: (error, stack) => const SizedBox.shrink(),
           data: (list) => list.isEmpty
               ? const SizedBox.shrink()
-              : _AvatarRow(
+              : _PersonList(
                   title: '制作人员',
-                  items: list.map((s) => (s.name, s.imageUrl)).toList(),
+                  items: list.map((s) => (s.name, s.imageUrl, s.role ?? '')).toList(),
                 ),
         ),
       ],
@@ -356,14 +424,21 @@ class _CastStaffSection extends ConsumerWidget {
   }
 }
 
-/// A titled horizontal-scroll row of circular avatars + names. No
-/// tap-through to a person detail page (explicitly excluded, see the
-/// design doc).
-class _AvatarRow extends StatelessWidget {
-  const _AvatarRow({required this.title, required this.items});
+/// A titled vertical list of people ([ListTile]s: avatar, name, and an
+/// optional relation/role subtitle) -- e.g. "主角"/"配角"/"客串" for
+/// cast, or a staff role like "导演". Replaces the previous horizontal
+/// avatar-only carousel (Kazumi's `character_card.dart`/`staff_card.dart`
+/// use this same vertical-`ListTile` layout, which surfaces the
+/// relation/role that a bare avatar row can't). No tap-through to a
+/// person detail page (explicitly excluded, see the design doc).
+class _PersonList extends StatelessWidget {
+  const _PersonList({required this.title, required this.items});
 
   final String title;
-  final List<(String, String?)> items;
+
+  /// (name, imageUrl, subtitle) -- subtitle is '' when there's nothing
+  /// to show (no `ListTile.subtitle` is rendered in that case).
+  final List<(String, String?, String)> items;
 
   @override
   Widget build(BuildContext context) {
@@ -374,40 +449,35 @@ class _AvatarRow extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
           child: Text(title, style: Theme.of(context).textTheme.titleSmall),
         ),
-        SizedBox(
-          height: 96,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            itemCount: items.length,
-            itemBuilder: (context, index) {
-              final (name, imageUrl) = items[index];
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Column(
-                  children: [
-                    CircleAvatar(
-                      radius: 28,
-                      backgroundImage: imageUrl != null ? NetworkImage(imageUrl) : null,
-                      child: imageUrl == null ? const Icon(Icons.person) : null,
-                    ),
-                    SizedBox(
-                      width: 64,
-                      child: Text(
-                        name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
+        for (final (name, imageUrl, subtitle) in items)
+          ListTile(
+            leading: CircleAvatar(
+              backgroundImage: imageUrl != null ? NetworkImage(imageUrl) : null,
+              child: imageUrl == null ? const Icon(Icons.person) : null,
+            ),
+            title: Text(name),
+            subtitle: subtitle.isEmpty ? null : Text(subtitle),
           ),
-        ),
       ],
     );
+  }
+}
+
+/// Maps a [RelatedCharacter.role] to Bangumi's confirmed convention
+/// (verified against the real Kotlin client's `AniCharacterSubject.kt`
+/// doc comment: `1 = 主角, 2 = 配角, 3 = 客串`). Any other value
+/// (including future additions) falls back to an empty string rather
+/// than guessing.
+String _characterRoleLabel(int role) {
+  switch (role) {
+    case 1:
+      return '主角';
+    case 2:
+      return '配角';
+    case 3:
+      return '客串';
+    default:
+      return '';
   }
 }
 

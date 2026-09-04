@@ -14,12 +14,19 @@ import 'package:flutter/material.dart';
 /// deliberately does NOT extract a dynamic color theme from the cover
 /// image (excluded scope, see the design doc's "明确排除范围").
 class SubjectBlurredHeader extends StatelessWidget {
-  const SubjectBlurredHeader({super.key, required this.imageUrl});
+  const SubjectBlurredHeader({super.key, required this.imageUrl, this.info});
 
   static const height = 240.0;
   static const coverAspectRatio = 849 / 1200;
 
   final String imageUrl;
+
+  /// Optional content (title/rating/collection buttons) rendered next
+  /// to the sharp foreground thumbnail, so the header itself carries
+  /// the subject's identity instead of leaving that entirely to a
+  /// separate section below (Kazumi's `bangumi_info_card.dart` overlays
+  /// this same information inside its header area).
+  final Widget? info;
 
   @override
   Widget build(BuildContext context) {
@@ -66,22 +73,29 @@ class SubjectBlurredHeader extends StatelessWidget {
             alignment: Alignment.bottomLeft,
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: AspectRatio(
-                  aspectRatio: coverAspectRatio,
-                  child: SizedBox(
-                    width: 120,
-                    child: Image.network(
-                      imageUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        color: colorScheme.surfaceContainerHighest,
-                        child: const Icon(Icons.image_not_supported_outlined),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: AspectRatio(
+                      aspectRatio: coverAspectRatio,
+                      child: SizedBox(
+                        width: 120,
+                        child: Image.network(
+                          imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => Container(
+                            color: colorScheme.surfaceContainerHighest,
+                            child: const Icon(Icons.image_not_supported_outlined),
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
+                  if (info != null)
+                    Expanded(child: Padding(padding: const EdgeInsets.only(left: 12), child: info!)),
+                ],
               ),
             ),
           ),

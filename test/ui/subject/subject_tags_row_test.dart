@@ -32,5 +32,31 @@ void main() {
 
       expect(find.byType(TagChip), findsNothing);
     });
+
+    testWidgets('caps visible tags at maxVisible and shows a 更多 chip', (tester) async {
+      final tags = List.generate(5, (i) => SubjectTag(name: 'tag$i', count: i));
+      await tester.pumpWidget(
+        MaterialApp(home: Scaffold(body: SubjectTagsRow(tags: tags, maxVisible: 3))),
+      );
+
+      expect(find.byType(TagChip), findsNWidgets(4)); // 3 visible + 1 "更多"
+      expect(find.text('更多 +2'), findsOneWidget);
+      expect(find.text('tag3 3'), findsNothing);
+    });
+
+    testWidgets('tapping 更多 reveals the remaining tags', (tester) async {
+      final tags = List.generate(5, (i) => SubjectTag(name: 'tag$i', count: i));
+      await tester.pumpWidget(
+        MaterialApp(home: Scaffold(body: SubjectTagsRow(tags: tags, maxVisible: 3))),
+      );
+
+      await tester.tap(find.text('更多 +2'));
+      await tester.pump();
+
+      expect(find.byType(TagChip), findsNWidgets(5));
+      expect(find.text('更多 +2'), findsNothing);
+      expect(find.text('tag3 3'), findsOneWidget);
+      expect(find.text('tag4 4'), findsOneWidget);
+    });
   });
 }

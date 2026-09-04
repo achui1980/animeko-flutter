@@ -32,5 +32,20 @@ void main() {
       final size = tester.getSize(find.byType(SubjectBlurredHeader));
       expect(size.height, SubjectBlurredHeader.height);
     });
+
+    testWidgets('renders the optional info slot next to the thumbnail', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SubjectBlurredHeader(
+              imageUrl: 'https://example.com/cover.png',
+              info: const Text('Some Title'),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Some Title'), findsOneWidget);
+    });
   });
 }
