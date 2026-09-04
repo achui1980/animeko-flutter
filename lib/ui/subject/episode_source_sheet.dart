@@ -63,16 +63,48 @@ class EpisodeSourceSheet extends StatelessWidget {
                 title: Text(sourceLabel(sources, entry.key)),
                 initiallyExpanded: true,
                 children: [
-                  for (final episode in entry.value)
-                    ListTile(
-                      title: Text(episode.title),
-                      onTap: () => onEpisodeSelected(episode),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final episode in entry.value)
+                          _EpisodeButton(
+                            episode: episode,
+                            onTap: () => onEpisodeSelected(episode),
+                          ),
+                      ],
                     ),
+                  ),
                 ],
               ),
           ],
         );
       },
+    );
+  }
+}
+
+/// One episode's grid button inside [EpisodeSourceSheet] -- a compact
+/// tappable pill rather than a full-width [ListTile], so many episodes
+/// (a whole season) can be scanned at a glance in a wrapping grid
+/// instead of one long vertical list.
+class _EpisodeButton extends StatelessWidget {
+  const _EpisodeButton({required this.episode, required this.onTap});
+
+  final MergedEpisode episode;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton(
+      onPressed: onTap,
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(64, 40),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+      ),
+      child: Text(episode.title, maxLines: 1, overflow: TextOverflow.ellipsis),
     );
   }
 }
