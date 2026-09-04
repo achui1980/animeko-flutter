@@ -1,4 +1,7 @@
 import 'package:animeko_flutter/app/main.dart';
+import 'package:animeko_flutter/app/theme/app_theme.dart';
+import 'package:animeko_flutter/domain/settings/dynamic_color_controller.dart';
+import 'package:animeko_flutter/domain/settings/seed_color_controller.dart';
 import 'package:animeko_flutter/domain/settings/theme_mode_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,11 +12,23 @@ class _FakeThemeModeController extends ThemeModeController {
   Future<ThemeMode> build() async => ThemeMode.dark;
 }
 
+class _FakeDynamicColorController extends DynamicColorController {
+  @override
+  Future<bool> build() async => false;
+}
+
+class _FakeSeedColorController extends SeedColorController {
+  @override
+  Future<Color> build() async => kSeedColor;
+}
+
 void main() {
   testWidgets('applies AppTheme.light()/dark() and the persisted ThemeMode', (tester) async {
     final container = ProviderContainer(
       overrides: [
         themeModeControllerProvider.overrideWith(() => _FakeThemeModeController()),
+        dynamicColorControllerProvider.overrideWith(() => _FakeDynamicColorController()),
+        seedColorControllerProvider.overrideWith(() => _FakeSeedColorController()),
       ],
     );
     addTearDown(container.dispose);

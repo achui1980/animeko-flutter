@@ -13,21 +13,29 @@ const kSeedColor = Color(0xFF4F378B);
 class AppTheme {
   AppTheme._();
 
-  static ThemeData light() => ThemeData(
+  static ThemeData light({Color seedColor = kSeedColor}) => ThemeData(
     useMaterial3: true,
     brightness: Brightness.light,
     colorScheme: ColorScheme.fromSeed(
-      seedColor: kSeedColor,
+      seedColor: seedColor,
       brightness: Brightness.light,
     ),
   );
 
-  static ThemeData dark() => ThemeData(
+  static ThemeData dark({Color seedColor = kSeedColor}) => ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
     colorScheme: ColorScheme.fromSeed(
-      seedColor: kSeedColor,
+      seedColor: seedColor,
       brightness: Brightness.dark,
     ),
+  );
+
+  /// Builds a theme directly from a platform-provided dynamic
+  /// [ColorScheme] (see `DynamicColorBuilder` in `main.dart`), bypassing
+  /// [kSeedColor]/[light]/[dark] entirely.
+  static ThemeData fromDynamicColorScheme(ColorScheme colorScheme) => ThemeData(
+    useMaterial3: true,
+    colorScheme: colorScheme,
   );
 }

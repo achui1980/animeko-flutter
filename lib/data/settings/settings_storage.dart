@@ -8,6 +8,8 @@ part 'settings_storage.g.dart';
 const _proxyUrlKey = 'proxy_url';
 const _themeModeKey = 'theme_mode';
 const _playbackSpeedKey = 'playback_speed';
+const _useDynamicColorKey = 'use_dynamic_color';
+const _seedColorKey = 'seed_color';
 
 /// Thin wrapper around [SharedPreferences] for simple app settings that
 /// don't need [SecureTokenStorage]'s encryption -- a proxy URL is not
@@ -58,6 +60,28 @@ class SettingsStorage {
   /// Persists [speed] as the selected playback speed multiplier.
   Future<void> setPlaybackSpeed(double speed) async {
     await _prefs.setDouble(_playbackSpeedKey, speed);
+  }
+
+  /// Whether the app should follow the platform's dynamic (Material You)
+  /// color scheme instead of the seed-color-derived one. Defaults to
+  /// `false`, matching the reference Kotlin app's own default.
+  bool getUseDynamicColor() => _prefs.getBool(_useDynamicColorKey) ?? false;
+
+  /// Persists [enabled] as whether to use the platform's dynamic color
+  /// scheme.
+  Future<void> setUseDynamicColor(bool enabled) async {
+    await _prefs.setBool(_useDynamicColorKey, enabled);
+  }
+
+  /// Returns the persisted seed color, or `null` if none is set (the
+  /// caller should fall back to [kSeedColor] -- this file intentionally
+  /// doesn't import `app_theme.dart` to avoid a `lib/data` -> `lib/app`
+  /// dependency).
+  int? getSeedColorValue() => _prefs.getInt(_seedColorKey);
+
+  /// Persists [value] (a `Color.value`) as the selected seed color.
+  Future<void> setSeedColorValue(int value) async {
+    await _prefs.setInt(_seedColorKey, value);
   }
 }
 

@@ -25,4 +25,17 @@ void main() {
     expect(AppTheme.light().colorScheme.primary, isNotNull);
     expect(AppTheme.dark().colorScheme.primary, isNotNull);
   });
+
+  test('AppTheme.light()/dark() accept a custom seed color', () {
+    const customSeed = Color(0xFF006A6A);
+    final expected = ColorScheme.fromSeed(seedColor: customSeed).primary;
+    expect(AppTheme.light(seedColor: customSeed).colorScheme.primary, expected);
+  });
+
+  test('AppTheme.fromDynamicColorScheme uses the given ColorScheme as-is', () {
+    final colorScheme = ColorScheme.fromSeed(seedColor: const Color(0xFFFF0000));
+    final theme = AppTheme.fromDynamicColorScheme(colorScheme);
+    expect(theme.useMaterial3, isTrue);
+    expect(theme.colorScheme, colorScheme);
+  });
 }

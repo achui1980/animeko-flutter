@@ -73,5 +73,35 @@ void main() {
         expect(storage.getPlaybackSpeed(), 1.5);
       });
     });
+
+    group('dynamic color', () {
+      test('getUseDynamicColor returns false when nothing is stored', () async {
+        final prefs = await SharedPreferences.getInstance();
+        final storage = SettingsStorage(prefs);
+        expect(storage.getUseDynamicColor(), false);
+      });
+
+      test('setUseDynamicColor persists and getUseDynamicColor reads it back', () async {
+        final prefs = await SharedPreferences.getInstance();
+        final storage = SettingsStorage(prefs);
+        await storage.setUseDynamicColor(true);
+        expect(storage.getUseDynamicColor(), true);
+      });
+    });
+
+    group('seed color', () {
+      test('getSeedColorValue returns null when nothing is stored', () async {
+        final prefs = await SharedPreferences.getInstance();
+        final storage = SettingsStorage(prefs);
+        expect(storage.getSeedColorValue(), isNull);
+      });
+
+      test('setSeedColorValue persists and getSeedColorValue reads it back', () async {
+        final prefs = await SharedPreferences.getInstance();
+        final storage = SettingsStorage(prefs);
+        await storage.setSeedColorValue(0xFF00FF00);
+        expect(storage.getSeedColorValue(), 0xFF00FF00);
+      });
+    });
   });
 }

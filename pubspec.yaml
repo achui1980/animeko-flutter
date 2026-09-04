@@ -53,6 +53,7 @@ dependencies:
   flutter_volume_controller: ^2.0.2
   screen_brightness: ^2.1.11
   saver_gallery: ^4.1.2
+  dynamic_color: ^1.9.0
 
 dev_dependencies:
   flutter_test:
