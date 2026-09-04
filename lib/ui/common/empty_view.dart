@@ -19,7 +19,19 @@ class EmptyView extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 48, color: colorScheme.onSurfaceVariant),
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: colorScheme.secondaryContainer,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              icon,
+              size: 32,
+              color: colorScheme.onSecondaryContainer,
+            ),
+          ),
           const SizedBox(height: 12),
           Text(
             message,

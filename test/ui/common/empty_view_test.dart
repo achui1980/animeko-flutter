@@ -25,4 +25,21 @@ void main() {
 
     expect(find.byIcon(Icons.inbox_outlined), findsOneWidget);
   });
+
+  testWidgets('EmptyView wraps the icon in a circular tonal badge', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(home: Scaffold(body: EmptyView(message: '没有数据'))),
+    );
+
+    final badge = tester.widget<Container>(
+      find.ancestor(
+        of: find.byIcon(Icons.inbox_outlined),
+        matching: find.byType(Container),
+      ),
+    );
+    final decoration = badge.decoration as BoxDecoration;
+    expect(decoration.shape, BoxShape.circle);
+  });
 }
