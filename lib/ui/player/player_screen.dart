@@ -2,6 +2,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'
+    show KeyDownEvent, KeyEvent, LogicalKeyboardKey;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_volume_controller/flutter_volume_controller.dart';
 import 'package:media_kit/media_kit.dart';
@@ -243,6 +245,50 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     });
   }
 
+  /// Fixed (non-remappable, for now) keyboard shortcuts: space play/pause,
+  /// left/right seek ±10s, up/down adjust volume ±5%, F toggle fullscreen.
+  /// Only handles [KeyDownEvent]s -- key-up/repeat events are ignored so
+  /// each press only fires the action once.
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    switch (event.logicalKey) {
+      case LogicalKeyboardKey.space:
+        _player.playOrPause();
+        return KeyEventResult.handled;
+      case LogicalKeyboardKey.arrowLeft:
+        unawaited(_seekBy(const Duration(seconds: -10)));
+        return KeyEventResult.handled;
+      case LogicalKeyboardKey.arrowRight:
+        unawaited(_seekBy(const Duration(seconds: 10)));
+        return KeyEventResult.handled;
+      case LogicalKeyboardKey.arrowUp:
+        unawaited(_adjustVolume(0.05));
+        return KeyEventResult.handled;
+      case LogicalKeyboardKey.arrowDown:
+        unawaited(_adjustVolume(-0.05));
+        return KeyEventResult.handled;
+      case LogicalKeyboardKey.keyF:
+        unawaited(_toggleFullscreen());
+        return KeyEventResult.handled;
+      default:
+        return KeyEventResult.ignored;
+    }
+  }
+
+  Future<void> _seekBy(Duration delta) async {
+    final target = _player.state.position + delta;
+    await _player.seek(target.isNegative ? Duration.zero : target);
+  }
+
+  Future<void> _toggleFullscreen() async {
+    if (!mounted) return;
+    if (isFullscreen(context)) {
+      await exitFullscreen(context);
+    } else {
+      await enterFullscreen(context);
+    }
+  }
+
   /// Saves a screenshot of the current video frame to the device gallery.
   /// `saver_gallery` (unlike media_kit's own `Player.screenshot()`, which
   /// is cross-platform) only ships native implementations for
@@ -251,9 +297,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   Future<void> _takeScreenshot() async {
     if (isDesktopPlatform()) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('暂未支持保存截图')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('暂未支持保存截图')));
       }
       return;
     }
@@ -268,9 +314,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     if (result.isSuccess) {
       _triggerScreenshotFlash();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('截图保存失败：${result.errorMessage}')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('截图保存失败：${result.errorMessage}')));
     }
   }
 
@@ -369,23 +415,21 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     // as a side effect exactly once per successful resolution, not on
     // every `build()` (see design doc "数据流" step 3).
     ref.listen(provider, (previous, next) {
-      next.whenData(
-        (source) async {
-          await _player.open(
-            Media(
-              source.url,
-              // Some sources' video CDNs (e.g. anime1.me) reject direct
-              // requests without specific headers -- see each concrete
-              // MediaPlaybackSource's own `headers` doc comment. Others
-              // (e.g. 稀饭动漫) need none, in which case this is empty.
-              httpHeaders: source.headers,
-            ),
-          );
-          final speed = await ref.read(playbackSpeedControllerProvider.future);
-          await _player.setRate(speed);
-          await _maybeResumePosition();
-        },
-      );
+      next.whenData((source) async {
+        await _player.open(
+          Media(
+            source.url,
+            // Some sources' video CDNs (e.g. anime1.me) reject direct
+            // requests without specific headers -- see each concrete
+            // MediaPlaybackSource's own `headers` doc comment. Others
+            // (e.g. 稀饭动漫) need none, in which case this is empty.
+            httpHeaders: source.headers,
+          ),
+        );
+        final speed = await ref.read(playbackSpeedControllerProvider.future);
+        await _player.setRate(speed);
+        await _maybeResumePosition();
+      });
     });
     final playback = ref.watch(provider);
 
@@ -394,105 +438,107 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       child: Scaffold(
         backgroundColor: Colors.black,
         body: SafeArea(
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onVerticalDragStart: _handleVerticalDragStart,
-            onVerticalDragUpdate: _handleVerticalDragUpdate,
-            child: Stack(
-              children: [
-                playback.when(
-                  loading: () =>
-                      const Center(child: CircularProgressIndicator()),
-                  error: (error, stack) => ErrorRetryView(
-                    message: '播放失败：$error',
-                    onRetry: _retry,
+          child: Focus(
+            autofocus: true,
+            onKeyEvent: _handleKeyEvent,
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onVerticalDragStart: _handleVerticalDragStart,
+              onVerticalDragUpdate: _handleVerticalDragUpdate,
+              child: Stack(
+                children: [
+                  playback.when(
+                    loading: () =>
+                        const Center(child: CircularProgressIndicator()),
+                    error: (error, stack) =>
+                        ErrorRetryView(message: '播放失败：$error', onRetry: _retry),
+                    data: (_) => _playbackError != null
+                        ? ErrorRetryView(
+                            message: '播放失败：$_playbackError',
+                            onRetry: _retry,
+                          )
+                        // Uses Video's default AdaptiveVideoControls (seek-bar drag,
+                        // tap to show/hide controls, fullscreen button) -- see this
+                        // task's "Context" note above for why no custom
+                        // GestureDetector code is written here.
+                        : Video(controller: _controller),
                   ),
-                  data: (_) => _playbackError != null
-                      ? ErrorRetryView(
-                          message: '播放失败：$_playbackError',
-                          onRetry: _retry,
-                        )
-                      // Uses Video's default AdaptiveVideoControls (seek-bar drag,
-                      // tap to show/hide controls, fullscreen button) -- see this
-                      // task's "Context" note above for why no custom
-                      // GestureDetector code is written here.
-                      : Video(controller: _controller),
-                ),
-                if (_showVolumeHud)
-                  Center(
-                    child: _AdjustmentHud(
-                      icon: _volumeIcon(_volume),
-                      value: _volume,
+                  if (_showVolumeHud)
+                    Center(
+                      child: _AdjustmentHud(
+                        icon: _volumeIcon(_volume),
+                        value: _volume,
+                      ),
+                    ),
+                  if (_showBrightnessHud)
+                    Center(
+                      child: _AdjustmentHud(
+                        icon: _brightnessIcon(_brightness),
+                        value: _brightness,
+                      ),
+                    ),
+                  // Screenshot flash feedback -- plain white flash, not a
+                  // BackdropFilter/blur (see `_AdjustmentHud`'s doc comment
+                  // for why), ignoring pointer events so it never blocks
+                  // taps while fading.
+                  IgnorePointer(
+                    child: AnimatedOpacity(
+                      opacity: _screenshotFlash ? 0.6 : 0.0,
+                      duration: const Duration(milliseconds: 150),
+                      child: Container(color: Colors.white),
                     ),
                   ),
-                if (_showBrightnessHud)
-                  Center(
-                    child: _AdjustmentHud(
-                      icon: _brightnessIcon(_brightness),
-                      value: _brightness,
+                  // Floating back button -- the player has no AppBar (to stay
+                  // immersive/full-bleed), so without this there was no way to
+                  // leave the screen except system back gestures/shortcuts.
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    child: _BackButton(
+                      onPressed: () => Navigator.of(context).pop(),
                     ),
                   ),
-                // Screenshot flash feedback -- plain white flash, not a
-                // BackdropFilter/blur (see `_AdjustmentHud`'s doc comment
-                // for why), ignoring pointer events so it never blocks
-                // taps while fading.
-                IgnorePointer(
-                  child: AnimatedOpacity(
-                    opacity: _screenshotFlash ? 0.6 : 0.0,
-                    duration: const Duration(milliseconds: 150),
-                    child: Container(color: Colors.white),
-                  ),
-                ),
-                // Floating back button -- the player has no AppBar (to stay
-                // immersive/full-bleed), so without this there was no way to
-                // leave the screen except system back gestures/shortcuts.
-                Positioned(
-                  top: 8,
-                  left: 8,
-                  child: _BackButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ),
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _SourceButton(
-                        subjectId: widget.subjectId,
-                        subjectName: widget.subjectName,
-                        currentEpisode: widget.episode,
-                        onSelected: (target) {
-                          if (target.sourceId == widget.episode.sourceId) {
-                            return;
-                          }
-                          Navigator.of(context).pushReplacement(
-                            MaterialPageRoute(
-                              builder: (context) => PlayerScreen(
-                                episode: target,
-                                subjectId: widget.subjectId,
-                                subjectName: widget.subjectName,
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _SourceButton(
+                          subjectId: widget.subjectId,
+                          subjectName: widget.subjectName,
+                          currentEpisode: widget.episode,
+                          onSelected: (target) {
+                            if (target.sourceId == widget.episode.sourceId) {
+                              return;
+                            }
+                            Navigator.of(context).pushReplacement(
+                              MaterialPageRoute(
+                                builder: (context) => PlayerScreen(
+                                  episode: target,
+                                  subjectId: widget.subjectId,
+                                  subjectName: widget.subjectName,
+                                ),
                               ),
-                            ),
-                          );
-                        },
-                      ),
-                      const SizedBox(width: 8),
-                      _SpeedButton(
-                        onSelected: (speed) async {
-                          await _player.setRate(speed);
-                          await ref
-                              .read(playbackSpeedControllerProvider.notifier)
-                              .setPlaybackSpeed(speed);
-                        },
-                      ),
-                      const SizedBox(width: 8),
-                      _ScreenshotButton(onPressed: _takeScreenshot),
-                    ],
+                            );
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                        _SpeedButton(
+                          onSelected: (speed) async {
+                            await _player.setRate(speed);
+                            await ref
+                                .read(playbackSpeedControllerProvider.notifier)
+                                .setPlaybackSpeed(speed);
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                        _ScreenshotButton(onPressed: _takeScreenshot),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -563,17 +609,18 @@ class _SpeedButton extends ConsumerWidget {
         onSelected: onSelected,
         itemBuilder: (context) => _playbackSpeeds
             .map(
-              (value) => PopupMenuItem<double>(
-                value: value,
-                child: Text('${value}x'),
-              ),
+              (value) =>
+                  PopupMenuItem<double>(value: value, child: Text('${value}x')),
             )
             .toList(),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Text(
             '${speed}x',
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       ),
@@ -603,7 +650,8 @@ class _SourceButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final episodes = ref
+    final episodes =
+        ref
             .watch(
               subjectEpisodesControllerProvider(
                 subjectId: subjectId,
@@ -651,8 +699,12 @@ class _SourceButton extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                displayNames[currentEpisode.sourceId] ?? currentEpisode.sourceId,
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                displayNames[currentEpisode.sourceId] ??
+                    currentEpisode.sourceId,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const Icon(Icons.expand_more, color: Colors.white, size: 16),
             ],
@@ -724,4 +776,3 @@ class _AdjustmentHud extends StatelessWidget {
     );
   }
 }
-
