@@ -8,6 +8,7 @@ import '../../domain/settings/proxy_settings_controller.dart';
 import '../../domain/settings/seed_color_controller.dart';
 import '../../domain/settings/theme_mode_controller.dart';
 import 'account_summary_section.dart';
+import 'settings_split_group.dart';
 
 /// Grouped-list settings page. The account summary (avatar, nickname,
 /// sign-out) lives at the top, followed by the 通用/网络 groups -- see
@@ -31,7 +32,7 @@ class SettingsScreen extends ConsumerWidget {
         children: [
           const AccountSummarySection(),
           const SizedBox(height: 16),
-          _SettingsGroup(
+          SettingsSplitGroup(
             title: '通用',
             children: [
               themeMode.when(
@@ -62,7 +63,6 @@ class SettingsScreen extends ConsumerWidget {
                   ),
                 ),
               ),
-              const Divider(height: 1),
               SwitchListTile(
                 title: const Text('跟随系统取色'),
                 subtitle: const Text('Material You 动态配色（如平台支持）'),
@@ -102,7 +102,7 @@ class SettingsScreen extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 16),
-          _SettingsGroup(
+          SettingsSplitGroup(
             title: '网络',
             children: [
               ListTile(
@@ -121,34 +121,6 @@ class SettingsScreen extends ConsumerWidget {
   void _setThemeMode(WidgetRef ref, ThemeMode? mode) {
     if (mode == null) return;
     ref.read(themeModeControllerProvider.notifier).setThemeMode(mode);
-  }
-}
-
-class _SettingsGroup extends StatelessWidget {
-  const _SettingsGroup({required this.title, required this.children});
-
-  final String title;
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-            child: Text(
-              title,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: Theme.of(context).colorScheme.primary,
-              ),
-            ),
-          ),
-          ...children,
-        ],
-      ),
-    );
   }
 }
 
