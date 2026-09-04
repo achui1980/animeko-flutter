@@ -45,7 +45,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final width = MediaQuery.of(context).size.width;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Animeko'), actions: buildStandardActions(context)),
       body: NotificationListener<ScrollEndNotification>(
         onNotification: (notification) {
           // `notification.depth == 0` restricts this to scroll-end events
@@ -69,6 +68,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         },
         child: CustomScrollView(
           slivers: [
+            _CollapsingHomeAppBar(actions: buildStandardActions(context)),
             SliverToBoxAdapter(
               child: _TrendingSection(
                 trending: trending,
@@ -136,6 +136,43 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 /// At least 3 columns even on narrow phones; scales up on wider screens
 /// (design doc: 固定3列，宽屏自适应). Target column width ~130dp.
 int _gridColumns(double width) => (width / 130).floor().clamp(3, 8);
+
+/// A [SliverAppBar] whose title shrinks/lightens as the page scrolls,
+/// collapsing from a large "hero" title down to a normal toolbar title.
+/// Borrowed from Kazumi's `popular_page.dart` (pure Flutter animation, no
+/// new dependencies).
+class _CollapsingHomeAppBar extends StatelessWidget {
+  const _CollapsingHomeAppBar({required this.actions});
+
+  final List<Widget> actions;
+
+  static const _expandedHeight = 120.0;
+  static const _expandedFontSize = 28.0;
+  static const _collapsedFontSize = 20.0;
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverAppBar(
+      expandedHeight: _expandedHeight,
+      stretch: true,
+      pinned: true,
+      actions: actions,
+      flexibleSpace: LayoutBuilder(
+        builder: (context, constraints) {
+          final t = ((constraints.maxHeight - kToolbarHeight) /
+                  (_expandedHeight - kToolbarHeight))
+              .clamp(0.0, 1.0);
+          final fontSize = _collapsedFontSize + (_expandedFontSize - _collapsedFontSize) * t;
+          final fontWeight = FontWeight.lerp(FontWeight.w500, FontWeight.w700, t);
+          return FlexibleSpaceBar(
+            titlePadding: const EdgeInsetsDirectional.only(start: 16, bottom: 16),
+            title: Text('Animeko', style: TextStyle(fontSize: fontSize, fontWeight: fontWeight)),
+          );
+        },
+      ),
+    );
+  }
+}
 
 class _SectionTitle extends StatelessWidget {
   const _SectionTitle(this.title);
