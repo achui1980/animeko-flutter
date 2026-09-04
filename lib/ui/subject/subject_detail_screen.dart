@@ -12,6 +12,7 @@ import '../../domain/subject/subject_collection_controller.dart';
 import '../../domain/subject/subject_detail_controller.dart';
 import '../common/error_retry_view.dart';
 import '../common/rating_stars.dart';
+import 'episode_source_sheet.dart';
 import 'expandable_summary.dart';
 import 'subject_blurred_header.dart';
 import 'subject_tags_row.dart';
@@ -45,47 +46,64 @@ class SubjectDetailScreen extends ConsumerWidget {
           _SubjectInfoSection(subjectId: subjectId),
           _CastStaffSection(subjectId: subjectId),
           const Divider(),
-          ...episodes.when(
-            loading: () => const [
-              Padding(
-                padding: EdgeInsets.all(24),
-                child: Center(child: CircularProgressIndicator()),
-              ),
-            ],
+          episodes.when(
+            loading: () => const Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(child: CircularProgressIndicator()),
+            ),
             error: (error, stack) {
               if (error is MediaNotFoundException) {
-                return const [
-                  Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Center(child: Text('未找到该番剧的播放资源')),
-                  ),
-                ];
+                return const Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Center(child: Text('未找到该番剧的播放资源')),
+                );
               }
-              return [
-                ErrorRetryView(
-                  message: '加载失败：$error',
-                  onRetry: () => ref.invalidate(provider),
-                ),
-              ];
+              return ErrorRetryView(
+                message: '加载失败：$error',
+                onRetry: () => ref.invalidate(provider),
+              );
             },
-            data: (episodeList) => episodeList
-                .map(
-                  (episode) => ListTile(
-                    title: Text(episode.title),
-                    trailing: Chip(label: Text(_sourceLabel(sources, episode.sourceId))),
-                    onTap: () => context.push(
-                      '/subject/$subjectId/play'
-                      '?name=${Uri.encodeComponent(subjectName)}',
-                      extra: episode,
-                    ),
-                  ),
-                )
-                .toList(),
+            data: (episodeList) => Padding(
+              padding: const EdgeInsets.all(16),
+              child: FilledButton.icon(
+                icon: const Icon(Icons.play_arrow),
+                label: Text('开始观看 (${episodeList.length}集)'),
+                onPressed: () =>
+                    _openEpisodeSheet(context, episodeList, sources, subjectId, subjectName),
+              ),
+            ),
           ),
         ],
       ),
     );
   }
+}
+
+/// Opens [EpisodeSourceSheet] as a modal bottom sheet, closing it and
+/// navigating to the player when an episode is picked.
+void _openEpisodeSheet(
+  BuildContext context,
+  List<MergedEpisode> episodeList,
+  List<MediaSource> sources,
+  int subjectId,
+  String subjectName,
+) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    builder: (sheetContext) => EpisodeSourceSheet(
+      episodes: episodeList,
+      sources: sources,
+      onEpisodeSelected: (episode) {
+        Navigator.of(sheetContext).pop();
+        context.push(
+          '/subject/$subjectId/play'
+          '?name=${Uri.encodeComponent(subjectName)}',
+          extra: episode,
+        );
+      },
+    ),
+  );
 }
 
 /// Summary/tags/score/rank + the collection-status buttons + the rating
@@ -479,17 +497,4 @@ String _characterRoleLabel(int role) {
     default:
       return '';
   }
-}
-
-/// Human-readable label for the merged-episode-list source badge
-/// (Decision 6). Looks up the owning [MediaSource]'s [MediaSource.displayName]
-/// so this stays in sync with the single source of truth instead of
-/// re-deriving it from a hardcoded switch on `sourceId`. Falls back to the
-/// raw `sourceId` for any `sourceId` with no matching registered source --
-/// never crashes, just looks slightly less polished.
-String _sourceLabel(List<MediaSource> sources, String sourceId) {
-  for (final source in sources) {
-    if (source.id == sourceId) return source.displayName;
-  }
-  return sourceId;
 }
