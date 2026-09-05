@@ -150,6 +150,8 @@ class _CollapsingHomeAppBar extends StatelessWidget {
   static const _expandedFontSize = 28.0;
   static const _collapsedFontSize = 20.0;
   static const _subtitleFontSize = 13.0;
+  static const _expandedIconSize = 44.0;
+  static const _collapsedIconSize = 24.0;
 
   @override
   Widget build(BuildContext context) {
@@ -165,30 +167,42 @@ class _CollapsingHomeAppBar extends StatelessWidget {
               .clamp(0.0, 1.0);
           final fontSize = _collapsedFontSize + (_expandedFontSize - _collapsedFontSize) * t;
           final fontWeight = FontWeight.lerp(FontWeight.w500, FontWeight.w700, t);
+          final iconSize = _collapsedIconSize + (_expandedIconSize - _collapsedIconSize) * t;
           return FlexibleSpaceBar(
-            titlePadding: const EdgeInsetsDirectional.only(start: 16, bottom: 16),
-            // "AniMeow" is the app's English brand name; "喵番" is its Chinese
-            // counterpart, shown as a small subtitle beneath it. The subtitle
-            // fades out as the bar collapses (t -> 0) so the collapsed
-            // toolbar keeps showing a single line, matching the pre-existing
+            centerTitle: true,
+            titlePadding: const EdgeInsetsDirectional.only(bottom: 16),
+            // The header shows the app icon next to the "AniMeow" / "喵番"
+            // wordmark, centered as a whole. "AniMeow" is the app's English
+            // brand name; "喵番" is its Chinese counterpart, shown as a small
+            // subtitle beneath it. Both the icon and the subtitle shrink/fade
+            // as the bar collapses (t -> 0) so the collapsed toolbar keeps
+            // showing a single compact row, matching the pre-existing
             // collapsed layout.
-            title: Column(
+            title: Row(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Text('AniMeow', style: TextStyle(fontSize: fontSize, fontWeight: fontWeight)),
-                if (t > 0.01)
-                  Opacity(
-                    opacity: t,
-                    child: Text(
-                      '喵番',
-                      style: TextStyle(
-                        fontSize: _subtitleFontSize,
-                        fontWeight: FontWeight.w400,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                Image.asset('assets/icon/app_icon.png', width: iconSize, height: iconSize),
+                const SizedBox(width: 10),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('AniMeow', style: TextStyle(fontSize: fontSize, fontWeight: fontWeight)),
+                    if (t > 0.01)
+                      Opacity(
+                        opacity: t,
+                        child: Text(
+                          '喵番',
+                          style: TextStyle(
+                            fontSize: _subtitleFontSize,
+                            fontWeight: FontWeight.w400,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
+                  ],
+                ),
               ],
             ),
           );
