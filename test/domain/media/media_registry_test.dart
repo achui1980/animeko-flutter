@@ -1,8 +1,12 @@
 // test/domain/media/media_registry_test.dart
 import 'package:animeko_flutter/data/anime1/anime1_api.dart';
 import 'package:animeko_flutter/data/anime1/anime1_models.dart';
+import 'package:animeko_flutter/data/dilidili/dilidili_api.dart';
+import 'package:animeko_flutter/data/dilidili/dilidili_models.dart';
 import 'package:animeko_flutter/data/xifan/xifan_api.dart';
 import 'package:animeko_flutter/data/xifan/xifan_models.dart';
+import 'package:animeko_flutter/data/yinghua/yinghua_api.dart';
+import 'package:animeko_flutter/data/yinghua/yinghua_models.dart';
 import 'package:animeko_flutter/domain/media/media_registry.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -11,6 +15,10 @@ import 'package:riverpod/riverpod.dart';
 class MockAnime1Api extends Mock implements Anime1Api {}
 
 class MockXifanApi extends Mock implements XifanApi {}
+
+class MockYinghuaApi extends Mock implements YinghuaApi {}
+
+class MockDilidiliApi extends Mock implements DilidiliApi {}
 
 void main() {
   group('Anime1MediaSource', () {
@@ -104,10 +112,112 @@ void main() {
     });
   });
 
-  test('mediaSourcesProvider returns both the anime1 and xifan sources', () {
+  group('YinghuaMediaSource', () {
+    late MockYinghuaApi api;
+    late YinghuaMediaSource source;
+
+    setUp(() {
+      api = MockYinghuaApi();
+      source = YinghuaMediaSource(api);
+    });
+
+    test('id and displayName', () {
+      expect(source.id, 'yinghua');
+      expect(source.displayName, '樱花动漫');
+    });
+
+    test('search delegates to YinghuaApi.search', () async {
+      when(() => api.search('鬼灭之刃')).thenAnswer(
+        (_) async => [const YinghuaBangumi(id: 58802, title: '鬼灭之刃')],
+      );
+      final result = await source.search('鬼灭之刃');
+      expect(result, hasLength(1));
+    });
+
+    test("listEpisodes delegates to listEpisodes using the candidate's id", () async {
+      when(() => api.listEpisodes(58802)).thenAnswer(
+        (_) async => [
+          const YinghuaEpisode(
+            title: '第01集',
+            playPageUrl: 'https://www.yinghua2.com/index.php/vod/play/id/58802/sid/1/nid/1.html',
+          ),
+        ],
+      );
+      final result = await source.listEpisodes(const YinghuaBangumi(id: 58802, title: 'x'));
+      expect(result, hasLength(1));
+    });
+
+    test("resolvePlayback delegates to resolvePlaybackUrl using the episode's playPageUrl", () async {
+      when(
+        () => api.resolvePlaybackUrl('https://www.yinghua2.com/index.php/vod/play/id/58802/sid/1/nid/1.html'),
+      ).thenAnswer(
+        (_) async => const YinghuaPlaybackSource(url: 'https://play.example.com/a.m3u8'),
+      );
+      final result = await source.resolvePlayback(
+        const YinghuaEpisode(
+          title: '第01集',
+          playPageUrl: 'https://www.yinghua2.com/index.php/vod/play/id/58802/sid/1/nid/1.html',
+        ),
+      );
+      expect(result.url, 'https://play.example.com/a.m3u8');
+    });
+  });
+
+  group('DilidiliMediaSource', () {
+    late MockDilidiliApi api;
+    late DilidiliMediaSource source;
+
+    setUp(() {
+      api = MockDilidiliApi();
+      source = DilidiliMediaSource(api);
+    });
+
+    test('id and displayName', () {
+      expect(source.id, 'dilidili');
+      expect(source.displayName, '嘀哩嘀哩');
+    });
+
+    test('search delegates to DilidiliApi.search', () async {
+      when(() => api.search('海贼王')).thenAnswer(
+        (_) async => [const DilidiliAnime(slug: 'one-piece', title: '海贼王')],
+      );
+      final result = await source.search('海贼王');
+      expect(result, hasLength(1));
+    });
+
+    test("listEpisodes delegates to listEpisodes using the candidate's slug", () async {
+      when(() => api.listEpisodes('one-piece')).thenAnswer(
+        (_) async => [
+          const DilidiliEpisode(
+            title: '第1176集',
+            watchPageUrl: 'https://dilidili.io/watch/one-piece-ep1176/',
+          ),
+        ],
+      );
+      final result = await source.listEpisodes(const DilidiliAnime(slug: 'one-piece', title: 'x'));
+      expect(result, hasLength(1));
+    });
+
+    test("resolvePlayback delegates to resolvePlaybackUrl using the episode's watchPageUrl", () async {
+      when(
+        () => api.resolvePlaybackUrl('https://dilidili.io/watch/one-piece-ep1176/'),
+      ).thenAnswer(
+        (_) async => const DilidiliPlaybackSource(url: 'https://v.lzcdn31.com/index.m3u8'),
+      );
+      final result = await source.resolvePlayback(
+        const DilidiliEpisode(
+          title: '第1176集',
+          watchPageUrl: 'https://dilidili.io/watch/one-piece-ep1176/',
+        ),
+      );
+      expect(result.url, 'https://v.lzcdn31.com/index.m3u8');
+    });
+  });
+
+  test('mediaSourcesProvider returns all four registered sources', () {
     final container = ProviderContainer();
     addTearDown(container.dispose);
     final sources = container.read(mediaSourcesProvider);
-    expect(sources.map((s) => s.id), ['anime1', 'xifan']);
+    expect(sources.map((s) => s.id), ['anime1', 'xifan', 'yinghua', 'dilidili']);
   });
 }

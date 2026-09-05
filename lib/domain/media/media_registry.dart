@@ -3,8 +3,12 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../data/anime1/anime1_api.dart';
 import '../../data/anime1/anime1_models.dart';
+import '../../data/dilidili/dilidili_api.dart';
+import '../../data/dilidili/dilidili_models.dart';
 import '../../data/xifan/xifan_api.dart';
 import '../../data/xifan/xifan_models.dart';
+import '../../data/yinghua/yinghua_api.dart';
+import '../../data/yinghua/yinghua_models.dart';
 import 'media_source.dart';
 
 part 'media_registry.g.dart';
@@ -61,6 +65,54 @@ class XifanMediaSource implements MediaSource {
       _api.resolvePlaybackUrl((episode as XifanEpisode).watchPageUrl);
 }
 
+/// Adapts [YinghuaApi] to the shared [MediaSource] interface. See
+/// [Anime1MediaSource]'s doc comment for the downcast-safety rationale.
+class YinghuaMediaSource implements MediaSource {
+  YinghuaMediaSource(this._api);
+  final YinghuaApi _api;
+
+  @override
+  String get id => 'yinghua';
+
+  @override
+  String get displayName => '樱花动漫';
+
+  @override
+  Future<List<MediaCandidate>> search(String title) => _api.search(title);
+
+  @override
+  Future<List<MediaEpisode>> listEpisodes(MediaCandidate candidate) =>
+      _api.listEpisodes((candidate as YinghuaBangumi).id);
+
+  @override
+  Future<MediaPlaybackSource> resolvePlayback(MediaEpisode episode) =>
+      _api.resolvePlaybackUrl((episode as YinghuaEpisode).playPageUrl);
+}
+
+/// Adapts [DilidiliApi] to the shared [MediaSource] interface. See
+/// [Anime1MediaSource]'s doc comment for the downcast-safety rationale.
+class DilidiliMediaSource implements MediaSource {
+  DilidiliMediaSource(this._api);
+  final DilidiliApi _api;
+
+  @override
+  String get id => 'dilidili';
+
+  @override
+  String get displayName => '嘀哩嘀哩';
+
+  @override
+  Future<List<MediaCandidate>> search(String title) => _api.search(title);
+
+  @override
+  Future<List<MediaEpisode>> listEpisodes(MediaCandidate candidate) =>
+      _api.listEpisodes((candidate as DilidiliAnime).slug);
+
+  @override
+  Future<MediaPlaybackSource> resolvePlayback(MediaEpisode episode) =>
+      _api.resolvePlaybackUrl((episode as DilidiliEpisode).watchPageUrl);
+}
+
 /// Every registered [MediaSource], queried concurrently by
 /// `SubjectEpisodesController`. Add a new source here (and nowhere else)
 /// to make it participate in the merged search/episode-list flow.
@@ -68,4 +120,6 @@ class XifanMediaSource implements MediaSource {
 List<MediaSource> mediaSources(Ref ref) => [
       Anime1MediaSource(ref.watch(anime1ApiProvider)),
       XifanMediaSource(ref.watch(xifanApiProvider)),
+      YinghuaMediaSource(ref.watch(yinghuaApiProvider)),
+      DilidiliMediaSource(ref.watch(dilidiliApiProvider)),
     ];
