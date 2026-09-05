@@ -51,7 +51,7 @@ DMG_PATH="${DMG_DIR}/${DMG_NAME}"
 STAGING_DIR="${DMG_DIR}/staging"
 
 echo "==> [1/3] Building release .app via scripts/build_macos.sh"
-"${SCRIPT_DIR}/build_macos.sh"
+"${REPO_ROOT}/scripts/build_macos.sh"
 
 if [ ! -d "${APP_PATH}" ]; then
   echo "ERROR: expected app bundle not found at ${APP_PATH} after build" >&2
