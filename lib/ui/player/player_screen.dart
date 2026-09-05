@@ -53,6 +53,7 @@ class PlayerScreen extends ConsumerStatefulWidget {
 class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   final _player = Player();
   late final _controller = VideoController(_player);
+  late MergedEpisode _currentEpisode;
 
   /// Set when media_kit reports a playback error *after* a source was
   /// already opened successfully (i.e. after `AsyncData` -- see the
@@ -90,16 +91,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   /// in `initState` instead avoids ever needing `ref` again for this.
   late final Future<PlaybackPositionStorage> _storageFuture;
 
-  /// Identifies [PlayerScreen.episode] for [PlaybackPositionStorage].
-  /// Episodes have no other stable identity than `sourceId` + `title`
-  /// (see `MediaEpisode`'s doc comment); combined with `subjectId`, this
-  /// is unique enough in practice.
+  /// Identifies `_currentEpisode` (the actually-playing episode, which
+  /// may have advanced past [PlayerScreen.episode]) for
+  /// [PlaybackPositionStorage]. Episodes have no other stable identity
+  /// than `sourceId` + `title` (see `MediaEpisode`'s doc comment);
+  /// combined with `subjectId`, this is unique enough in practice.
   String get _positionKey =>
-      '${widget.subjectId}::${widget.episode.sourceId}::${widget.episode.title}';
+      '${widget.subjectId}::${_currentEpisode.sourceId}::${_currentEpisode.title}';
 
   @override
   void initState() {
     super.initState();
+    _currentEpisode = widget.episode;
     _storageFuture = ref.read(playbackPositionStorageProvider.future);
     _player.stream.error.listen((message) {
       if (mounted) setState(() => _playbackError = message);
@@ -331,12 +334,27 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   /// Called when media_kit reports playback has run to completion. Looks
   /// up the same-source episode list (via
   /// [subjectEpisodesControllerProvider]) to find the episode right after
-  /// [PlayerScreen.episode]; if one exists, replaces this screen with a
-  /// fresh [PlayerScreen] for it. Matches episodes by `title` within the
-  /// same [MergedEpisode.sourceId] (episodes have no other stable
-  /// identity -- see `MediaEpisode`'s doc comment). Guarded by
-  /// [_hasAdvancedToNextEpisode] so this only ever fires once per screen
-  /// instance, even if media_kit emits `completed: true` more than once.
+  /// `_currentEpisode` (the actually-playing episode, not the immutable
+  /// [PlayerScreen.episode] this screen was constructed with); if one
+  /// exists, advances playback in place by updating `_currentEpisode` via
+  /// `setState` -- no navigation, no new screen. Matches episodes by
+  /// `title` within the same [MergedEpisode.sourceId] (episodes have no
+  /// other stable identity -- see `MediaEpisode`'s doc comment).
+  ///
+  /// Guarded by [_hasAdvancedToNextEpisode], which stays armed (`true`)
+  /// from the moment an advance is decided here until the
+  /// newly-selected episode's media has actually finished opening --
+  /// disarmed only inside the `ref.listen(provider, ...)` side effect in
+  /// `build()`, after `_player.open`/`setRate`/`_maybeResumePosition`
+  /// have all completed for the new episode. `setState` itself runs
+  /// synchronously and returns long before that point, so disarming the
+  /// guard right after it (as an earlier version of this method did)
+  /// would leave a window during which a duplicate/rapid-fire
+  /// `completed: true` event -- e.g. a second event for the episode
+  /// that just finished, arriving slightly later as its own async
+  /// stream event -- could trigger another, unwanted advance and skip
+  /// two episodes instead of one. Keeping the guard armed for this
+  /// whole window closes that gap.
   void _maybePlayNextEpisode() {
     if (_hasAdvancedToNextEpisode || !mounted) return;
     final episodes = ref
@@ -349,23 +367,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         .value;
     if (episodes == null) return;
     final sameSource = episodes
-        .where((e) => e.sourceId == widget.episode.sourceId)
+        .where((e) => e.sourceId == _currentEpisode.sourceId)
         .toList();
     final currentIndex = sameSource.indexWhere(
-      (e) => e.title == widget.episode.title,
+      (e) => e.title == _currentEpisode.title,
     );
     if (currentIndex == -1 || currentIndex + 1 >= sameSource.length) return;
-    _hasAdvancedToNextEpisode = true;
     final next = sameSource[currentIndex + 1];
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (context) => PlayerScreen(
-          episode: next,
-          subjectId: widget.subjectId,
-          subjectName: widget.subjectName,
-        ),
-      ),
-    );
+    _hasAdvancedToNextEpisode = true;
+    setState(() {
+      _currentEpisode = next;
+    });
   }
 
   @override
@@ -405,12 +417,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   void _retry() {
     setState(() => _playbackError = null);
-    ref.invalidate(episodePlayControllerProvider(episode: widget.episode));
+    ref.invalidate(episodePlayControllerProvider(episode: _currentEpisode));
   }
 
   @override
   Widget build(BuildContext context) {
-    final provider = episodePlayControllerProvider(episode: widget.episode);
+    final provider = episodePlayControllerProvider(episode: _currentEpisode);
     // `player.open` is a command, not a declarative value -- it must run
     // as a side effect exactly once per successful resolution, not on
     // every `build()` (see design doc "数据流" step 3).
@@ -429,6 +441,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         final speed = await ref.read(playbackSpeedControllerProvider.future);
         await _player.setRate(speed);
         await _maybeResumePosition();
+        // The newly-selected episode's media has now actually finished
+        // opening (and any saved position restored) -- only now is it
+        // safe to disarm the guard set in `_maybePlayNextEpisode`. See
+        // that method's doc comment for why this can't be disarmed any
+        // earlier (e.g. right after the `setState` that swaps
+        // `_currentEpisode`).
+        if (mounted) _hasAdvancedToNextEpisode = false;
       });
     });
     final playback = ref.watch(provider);
@@ -507,9 +526,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                         _SourceButton(
                           subjectId: widget.subjectId,
                           subjectName: widget.subjectName,
-                          currentEpisode: widget.episode,
+                          currentEpisode: _currentEpisode,
                           onSelected: (target) {
-                            if (target.sourceId == widget.episode.sourceId) {
+                            if (target.sourceId == _currentEpisode.sourceId) {
                               return;
                             }
                             Navigator.of(context).pushReplacement(
