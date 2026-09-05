@@ -457,11 +457,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                             message: '播放失败：$_playbackError',
                             onRetry: _retry,
                           )
-                        // Uses Video's default AdaptiveVideoControls (seek-bar drag,
-                        // tap to show/hide controls, fullscreen button) -- see this
-                        // task's "Context" note above for why no custom
-                        // GestureDetector code is written here.
-                        : Video(controller: _controller),
+                        // media_kit_video's default AdaptiveVideoControls is
+                        // disabled (controls: NoVideoControls) -- this app
+                        // renders its own custom top/bottom control bars
+                        // instead (see PlayerTopBar/PlayerBottomBar).
+                        : Video(controller: _controller, controls: NoVideoControls),
                   ),
                   if (_showVolumeHud)
                     Center(
