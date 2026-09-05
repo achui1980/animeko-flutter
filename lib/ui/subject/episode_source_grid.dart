@@ -2,17 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../domain/media/media_source.dart';
 import '../../domain/play/subject_episodes_controller.dart';
+import 'episode_source_sheet.dart' show sourceLabel;
 
-/// Returns the display name for [sourceId] looked up in [sources], falling
-/// back to the raw [sourceId] if no source matches.
-String sourceLabel(List<MediaSource> sources, String sourceId) {
-  for (final source in sources) {
-    if (source.id == sourceId) {
-      return source.displayName;
-    }
-  }
-  return sourceId;
-}
+export 'episode_source_sheet.dart' show sourceLabel;
 
 /// Flat, chip-filterable grid of [MergedEpisode]s.
 ///
