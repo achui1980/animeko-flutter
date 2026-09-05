@@ -53,13 +53,13 @@ class AnimeCoverCard extends StatelessWidget {
                 title,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                // Shrunk to 85% of the default titleMedium size per user
+                // Shrunk to 90% of the default titleMedium size per user
                 // feedback -- the default felt too large for a 2-line title.
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontSize:
                       (Theme.of(context).textTheme.titleMedium?.fontSize ??
                           16) *
-                      0.85,
+                      0.9,
                 ),
               ),
             ),
