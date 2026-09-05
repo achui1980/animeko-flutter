@@ -21,6 +21,8 @@ import '../../domain/settings/proxy_settings_controller.dart';
 import '../common/error_retry_view.dart';
 import '../home/trending_carousel.dart' show isDesktopPlatform;
 import '../subject/episode_source_grid.dart';
+import 'player_bottom_bar.dart';
+import 'player_top_bar.dart';
 
 /// Playback speed presets offered in the speed-selection menu.
 const _playbackSpeeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
@@ -67,6 +69,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   StreamSubscription<bool>? _completedSubscription;
   bool _hasAdvancedToNextEpisode = false;
   bool _drawerOpen = false;
+  bool _controlsVisible = true;
+  Timer? _hideControlsTimer;
 
   Timer? _savePositionTimer;
 
@@ -142,6 +146,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     // volume-changed overlay to avoid a duplicate indicator.
     unawaited(FlutterVolumeController.updateShowSystemUI(false));
     unawaited(_initVolumeAndBrightness());
+    _scheduleHideControls();
   }
 
   Future<void> _initVolumeAndBrightness() async {
@@ -307,6 +312,26 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     setState(() => _drawerOpen = !_drawerOpen);
   }
 
+  void _scheduleHideControls() {
+    _hideControlsTimer?.cancel();
+    _hideControlsTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) setState(() => _controlsVisible = false);
+    });
+  }
+
+  void _toggleControls() {
+    if (_drawerOpen) {
+      setState(() => _drawerOpen = false);
+      return;
+    }
+    setState(() => _controlsVisible = !_controlsVisible);
+    if (_controlsVisible) {
+      _scheduleHideControls();
+    } else {
+      _hideControlsTimer?.cancel();
+    }
+  }
+
   /// Saves a screenshot of the current video frame to the device gallery.
   /// `saver_gallery` (unlike media_kit's own `Player.screenshot()`, which
   /// is cross-platform) only ships native implementations for
@@ -399,6 +424,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   void dispose() {
     unawaited(_completedSubscription?.cancel());
     _savePositionTimer?.cancel();
+    _hideControlsTimer?.cancel();
     unawaited(_savePosition());
     _hudHideTimer?.cancel();
     _screenshotFlashTimer?.cancel();
@@ -553,6 +579,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
             onKeyEvent: _handleKeyEvent,
             child: GestureDetector(
               behavior: HitTestBehavior.translucent,
+              onTap: _toggleControls,
               onVerticalDragStart: _handleVerticalDragStart,
               onVerticalDragUpdate: _handleVerticalDragUpdate,
               child: Stack(
@@ -599,226 +626,76 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                     ),
                   ),
                   _buildDrawer(),
-                  // Floating back button -- the player has no AppBar (to stay
-                  // immersive/full-bleed), so without this there was no way to
-                  // leave the screen except system back gestures/shortcuts.
-                  Positioned(
-                    top: 8,
-                    left: 8,
-                    child: _BackButton(
-                      onPressed: () => Navigator.of(context).pop(),
+                  if (_controlsVisible)
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      child: PlayerTopBar(
+                        title: '${widget.subjectName} · ${_currentEpisode.title}',
+                        onBack: () => Navigator.of(context).pop(),
+                        onScreenshot: _takeScreenshot,
+                      ),
                     ),
-                  ),
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _SourceButton(
-                          subjectId: widget.subjectId,
-                          subjectName: widget.subjectName,
-                          currentEpisode: _currentEpisode,
-                          onSelected: (target) {
-                            if (target.sourceId == _currentEpisode.sourceId) {
-                              return;
-                            }
-                            Navigator.of(context).pushReplacement(
-                              MaterialPageRoute(
-                                builder: (context) => PlayerScreen(
-                                  episode: target,
-                                  subjectId: widget.subjectId,
-                                  subjectName: widget.subjectName,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                        const SizedBox(width: 8),
-                        _SpeedButton(
-                          onSelected: (speed) async {
-                            await _player.setRate(speed);
-                            await ref
-                                .read(playbackSpeedControllerProvider.notifier)
-                                .setPlaybackSpeed(speed);
-                          },
-                        ),
-                        const SizedBox(width: 8),
-                        _ScreenshotButton(onPressed: _takeScreenshot),
-                      ],
+                  if (_controlsVisible)
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: Consumer(
+                        builder: (context, ref, _) {
+                          final speed =
+                              ref.watch(playbackSpeedControllerProvider).value ??
+                              1.0;
+                          return StreamBuilder<bool>(
+                            stream: _player.stream.playing,
+                            initialData: _player.state.playing,
+                            builder: (context, playingSnapshot) {
+                              return StreamBuilder<Duration>(
+                                stream: _player.stream.position,
+                                initialData: _player.state.position,
+                                builder: (context, positionSnapshot) {
+                                  return StreamBuilder<Duration>(
+                                    stream: _player.stream.duration,
+                                    initialData: _player.state.duration,
+                                    builder: (context, durationSnapshot) {
+                                      return PlayerBottomBar(
+                                        isPlaying: playingSnapshot.data ?? false,
+                                        position:
+                                            positionSnapshot.data ??
+                                            Duration.zero,
+                                        duration:
+                                            durationSnapshot.data ??
+                                            Duration.zero,
+                                        onPlayPause: _player.playOrPause,
+                                        onSeek: _player.seek,
+                                        currentSpeed: speed,
+                                        speedOptions: _playbackSpeeds,
+                                        onSpeedSelected: (value) async {
+                                          await _player.setRate(value);
+                                          await ref
+                                              .read(
+                                                playbackSpeedControllerProvider
+                                                    .notifier,
+                                              )
+                                              .setPlaybackSpeed(value);
+                                        },
+                                        onDrawerToggle: _toggleDrawer,
+                                        onFullscreenToggle: _toggleFullscreen,
+                                        isFullscreen: isFullscreen(context),
+                                      );
+                                    },
+                                  );
+                                },
+                              );
+                            },
+                          );
+                        },
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// A small floating circular back button, styled to sit on top of video
-/// content without a full AppBar (which would break the immersive look).
-class _BackButton extends StatelessWidget {
-  const _BackButton({required this.onPressed});
-
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.black45,
-      shape: const CircleBorder(),
-      child: IconButton(
-        icon: const Icon(Icons.arrow_back, color: Colors.white),
-        tooltip: '返回',
-        onPressed: onPressed,
-      ),
-    );
-  }
-}
-
-/// A small floating circular button that saves a screenshot of the
-/// current video frame to the device gallery (see
-/// `_PlayerScreenState._takeScreenshot`).
-class _ScreenshotButton extends StatelessWidget {
-  const _ScreenshotButton({required this.onPressed});
-
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.black45,
-      shape: const CircleBorder(),
-      child: IconButton(
-        icon: const Icon(Icons.camera_alt, color: Colors.white),
-        tooltip: '截图',
-        onPressed: onPressed,
-      ),
-    );
-  }
-}
-
-/// A small floating pill button showing the current playback speed. Tapping
-/// it opens a menu of common speed presets; selecting one applies it to the
-/// player and persists it via [PlaybackSpeedController].
-class _SpeedButton extends ConsumerWidget {
-  const _SpeedButton({required this.onSelected});
-
-  final void Function(double speed) onSelected;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final speed = ref.watch(playbackSpeedControllerProvider).value ?? 1.0;
-    return Material(
-      color: Colors.black45,
-      shape: const StadiumBorder(),
-      child: PopupMenuButton<double>(
-        tooltip: '播放速度',
-        onSelected: onSelected,
-        itemBuilder: (context) => _playbackSpeeds
-            .map(
-              (value) =>
-                  PopupMenuItem<double>(value: value, child: Text('${value}x')),
-            )
-            .toList(),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Text(
-            '${speed}x',
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// A small floating pill button for switching the currently-playing
-/// episode to the same episode (matched by [MergedEpisode.title]) from a
-/// different [MediaSource]. Renders nothing when fewer than two sources
-/// have this episode -- there is nothing to switch to. New sources need
-/// no changes here: this only ever lists whatever [mediaSourcesProvider]
-/// and [subjectEpisodesControllerProvider] already produce, keyed by
-/// [MediaSource.displayName].
-class _SourceButton extends ConsumerWidget {
-  const _SourceButton({
-    required this.subjectId,
-    required this.subjectName,
-    required this.currentEpisode,
-    required this.onSelected,
-  });
-
-  final int subjectId;
-  final String subjectName;
-  final MergedEpisode currentEpisode;
-  final void Function(MergedEpisode target) onSelected;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final episodes =
-        ref
-            .watch(
-              subjectEpisodesControllerProvider(
-                subjectId: subjectId,
-                subjectName: subjectName,
-              ),
-            )
-            .value ??
-        const <MergedEpisode>[];
-    final sameEpisode = episodes
-        .where((e) => e.title == currentEpisode.title)
-        .toList();
-    if (sameEpisode.length <= 1) return const SizedBox.shrink();
-
-    final displayNames = {
-      for (final source in ref.watch(mediaSourcesProvider))
-        source.id: source.displayName,
-    };
-
-    return Material(
-      color: Colors.black45,
-      shape: const StadiumBorder(),
-      child: PopupMenuButton<MergedEpisode>(
-        tooltip: '切换播放源',
-        onSelected: onSelected,
-        itemBuilder: (context) => sameEpisode
-            .map(
-              (e) => PopupMenuItem<MergedEpisode>(
-                value: e,
-                child: Row(
-                  children: [
-                    if (e.sourceId == currentEpisode.sourceId)
-                      const Padding(
-                        padding: EdgeInsets.only(right: 8),
-                        child: Icon(Icons.check, size: 16),
-                      ),
-                    Text(displayNames[e.sourceId] ?? e.sourceId),
-                  ],
-                ),
-              ),
-            )
-            .toList(),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                displayNames[currentEpisode.sourceId] ??
-                    currentEpisode.sourceId,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const Icon(Icons.expand_more, color: Colors.white, size: 16),
-            ],
           ),
         ),
       ),
