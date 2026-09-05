@@ -20,6 +20,7 @@ import '../../domain/settings/playback_speed_controller.dart';
 import '../../domain/settings/proxy_settings_controller.dart';
 import '../common/error_retry_view.dart';
 import '../home/trending_carousel.dart' show isDesktopPlatform;
+import '../subject/episode_source_grid.dart';
 
 /// Playback speed presets offered in the speed-selection menu.
 const _playbackSpeeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
@@ -65,6 +66,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   StreamSubscription<bool>? _completedSubscription;
   bool _hasAdvancedToNextEpisode = false;
+  bool _drawerOpen = false;
 
   Timer? _savePositionTimer;
 
@@ -273,6 +275,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       case LogicalKeyboardKey.keyF:
         unawaited(_toggleFullscreen());
         return KeyEventResult.handled;
+      case LogicalKeyboardKey.keyE:
+        _toggleDrawer();
+        return KeyEventResult.handled;
+      case LogicalKeyboardKey.escape:
+        if (_drawerOpen) {
+          setState(() => _drawerOpen = false);
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
       default:
         return KeyEventResult.ignored;
     }
@@ -290,6 +301,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     } else {
       await enterFullscreen(context);
     }
+  }
+
+  void _toggleDrawer() {
+    setState(() => _drawerOpen = !_drawerOpen);
   }
 
   /// Saves a screenshot of the current video frame to the device gallery.
@@ -420,6 +435,82 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     ref.invalidate(episodePlayControllerProvider(episode: _currentEpisode));
   }
 
+  /// Renders the collapsible episode/source drawer. `child` is `null`
+  /// (rather than an always-mounted widget sized to zero width) whenever
+  /// the drawer is closed, so its content subtree -- in particular
+  /// [EpisodeSourceGrid] -- fully unmounts instead of merely shrinking.
+  /// This is intentional: [EpisodeSourceGrid] keeps its own filter-chip
+  /// selection as internal state, and unmounting is what makes that
+  /// state reset fresh every time the drawer reopens, rather than
+  /// carrying over whatever filter was selected the last time it was
+  /// open.
+  ///
+  /// `onEpisodeSelected` arms [_hasAdvancedToNextEpisode] (`true`) the
+  /// same way [_maybePlayNextEpisode] arms it before its own
+  /// `_currentEpisode`-changing `setState` -- this is not specific to
+  /// auto-advance. The guard's disarm, in `build()`'s
+  /// `ref.listen(provider, ...)` callback, is generic: it resets to
+  /// `false` once whatever episode is *currently* `_currentEpisode` has
+  /// actually finished opening, regardless of whether that episode
+  /// became current via auto-advance or manual selection here. Arming on
+  /// every switch trigger is what closes the race where the user picks a
+  /// new episode from the drawer while the old one is still loaded and
+  /// media_kit fires a stale/duplicate `completed: true` event for it:
+  /// without the guard armed, `_maybePlayNextEpisode` would run
+  /// unguarded during that window, read the already-updated
+  /// `_currentEpisode`, and silently advance past the episode the user
+  /// just selected.
+  Widget _buildDrawer() {
+    return Positioned(
+      top: 0,
+      right: 0,
+      bottom: 0,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: _drawerOpen ? 320 : 0,
+        color: Colors.black87,
+        child: _drawerOpen
+            ? SafeArea(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Builder(
+                    builder: (context) {
+                      final episodesAsync = ref.watch(
+                        subjectEpisodesControllerProvider(
+                          subjectId: widget.subjectId,
+                          subjectName: widget.subjectName,
+                        ),
+                      );
+                      final sources = ref.watch(mediaSourcesProvider);
+                      return episodesAsync.when(
+                        data: (episodes) => EpisodeSourceGrid(
+                          episodes: episodes,
+                          sources: sources,
+                          currentEpisode: _currentEpisode,
+                          onEpisodeSelected: (episode) {
+                            setState(() {
+                              _currentEpisode = episode;
+                              _hasAdvancedToNextEpisode = true;
+                              _drawerOpen = false;
+                            });
+                          },
+                        ),
+                        loading: () =>
+                            const Center(child: CircularProgressIndicator()),
+                        error: (error, stack) => Text(
+                          '加载失败：$error',
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              )
+            : null,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = episodePlayControllerProvider(episode: _currentEpisode);
@@ -507,6 +598,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                       child: Container(color: Colors.white),
                     ),
                   ),
+                  _buildDrawer(),
                   // Floating back button -- the player has no AppBar (to stay
                   // immersive/full-bleed), so without this there was no way to
                   // leave the screen except system back gestures/shortcuts.
