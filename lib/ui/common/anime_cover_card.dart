@@ -51,7 +51,7 @@ class AnimeCoverCard extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
               child: Text(
                 title,
-                maxLines: 1,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.titleMedium,
               ),

@@ -67,7 +67,10 @@ class ScheduleScreen extends ConsumerWidget {
                     ),
                   ),
                   SizedBox(
-                    height: 210,
+                    // Raised from 210 to reserve extra vertical space for
+                    // AnimeCoverCard's title, which now wraps to 2 lines
+                    // instead of 1 (see anime_cover_card.dart).
+                    height: 240,
                     child: ListView.builder(
                       scrollDirection: Axis.horizontal,
                       padding: EdgeInsets.symmetric(horizontal: padding),

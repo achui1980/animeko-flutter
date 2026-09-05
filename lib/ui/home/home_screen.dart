@@ -100,7 +100,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   sliver: SliverGrid(
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: _gridColumns(width),
-                      childAspectRatio: 0.55,
+                      // Lowered from 0.55 to reserve extra vertical space for
+                      // AnimeCoverCard's title, which now wraps to 2 lines
+                      // instead of 1 (see anime_cover_card.dart).
+                      childAspectRatio: 0.5,
                       mainAxisSpacing: 8,
                       crossAxisSpacing: 8,
                     ),
