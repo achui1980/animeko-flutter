@@ -1,6 +1,7 @@
 // lib/ui/home/home_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../app/theme/app_spacing.dart';
 import '../../domain/home/home_recommendations_controller.dart';
@@ -188,7 +189,10 @@ class _CollapsingHomeAppBar extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('AniMeow', style: TextStyle(fontSize: fontSize, fontWeight: fontWeight)),
+                    Text(
+                      'AniMeow',
+                      style: GoogleFonts.fredoka(fontSize: fontSize, fontWeight: fontWeight),
+                    ),
                     if (t > 0.01)
                       Opacity(
                         opacity: t,
