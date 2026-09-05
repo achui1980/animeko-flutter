@@ -57,7 +57,7 @@ final class SubjectCollectionControllerProvider
 }
 
 String _$subjectCollectionControllerHash() =>
-    r'0661068394b2f48371d791622ec73c6dd70d80c7';
+    r'8c20774060bad1331653fadfe38860c492a009e8';
 
 final class SubjectCollectionControllerFamily extends $Family
     with

@@ -166,7 +166,7 @@ class _CollapsingHomeAppBar extends StatelessWidget {
           final fontWeight = FontWeight.lerp(FontWeight.w500, FontWeight.w700, t);
           return FlexibleSpaceBar(
             titlePadding: const EdgeInsetsDirectional.only(start: 16, bottom: 16),
-            title: Text('Animeko', style: TextStyle(fontSize: fontSize, fontWeight: fontWeight)),
+            title: Text('AniMeow', style: TextStyle(fontSize: fontSize, fontWeight: fontWeight)),
           );
         },
       ),

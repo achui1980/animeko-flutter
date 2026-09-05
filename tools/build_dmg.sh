@@ -14,7 +14,7 @@
 #      (e.g. leftover .dSYM bundles from a previous build) ends up
 #      inside the dmg.
 #   3. Runs create-dmg against that staging folder to produce a
-#      volume named "Animeko" with the app icon on the left and an
+#      volume named "AniMeow" with the app icon on the left and an
 #      Applications drop-link on the right.
 #
 # Requirements:
@@ -24,7 +24,7 @@
 #   ./tools/build_dmg.sh
 #
 # The resulting .dmg is left at:
-#   build/dmg/Animeko.dmg
+#   build/dmg/AniMeow.dmg
 #
 # Run this script from anywhere; it always operates relative to the repo
 # root (determined from this script's own location), not the caller's cwd.
@@ -43,10 +43,10 @@ if ! command -v create-dmg >/dev/null 2>&1; then
   exit 1
 fi
 
-APP_NAME="animeko_flutter.app"
+APP_NAME="AniMeow.app"
 APP_PATH="build/macos/Build/Products/Release/${APP_NAME}"
 DMG_DIR="build/dmg"
-DMG_NAME="Animeko.dmg"
+DMG_NAME="AniMeow.dmg"
 DMG_PATH="${DMG_DIR}/${DMG_NAME}"
 STAGING_DIR="${DMG_DIR}/staging"
 
@@ -67,7 +67,7 @@ echo "==> [3/3] Packaging into ${DMG_NAME} with create-dmg"
 rm -f "${DMG_PATH}"
 
 create-dmg \
-  --volname "Animeko" \
+  --volname "AniMeow" \
   --window-pos 200 120 \
   --window-size 600 400 \
   --icon-size 100 \

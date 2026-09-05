@@ -59,7 +59,7 @@ class AnimekoFlutterApp extends ConsumerWidget {
             ? AppTheme.fromDynamicColorScheme(darkDynamic)
             : AppTheme.dark(seedColor: seedColor);
         return MaterialApp.router(
-          title: 'Animeko',
+          title: 'AniMeow',
           theme: light,
           darkTheme: dark,
           themeMode: themeMode,

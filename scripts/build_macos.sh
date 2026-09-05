@@ -2,7 +2,7 @@
 #
 # scripts/build_macos.sh
 #
-# Builds a release macOS .app bundle for animeko_flutter.
+# Builds a release macOS .app bundle for AniMeow (animeko_flutter).
 #
 # What it does:
 #   1. flutter pub get                                   (ensure deps match pubspec.lock)
@@ -16,7 +16,7 @@
 #   ./scripts/build_macos.sh
 #
 # The resulting .app is left at:
-#   build/macos/Build/Products/Release/animeko_flutter.app
+#   build/macos/Build/Products/Release/AniMeow.app
 #
 # Run this script from anywhere; it always operates relative to the repo root
 # (determined from this script's own location), not the caller's cwd.
@@ -29,7 +29,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${REPO_ROOT}"
 
-APP_NAME="animeko_flutter.app"
+APP_NAME="AniMeow.app"
 APP_PATH="build/macos/Build/Products/Release/${APP_NAME}"
 
 echo "==> [1/3] flutter pub get"

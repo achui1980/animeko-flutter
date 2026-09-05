@@ -64,7 +64,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
 
-    expect(find.text('Animeko'), findsOneWidget);
+    expect(find.text('AniMeow'), findsOneWidget);
     expect(find.text('Log in with Bangumi'), findsNothing);
   });
 
