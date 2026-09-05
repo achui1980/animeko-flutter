@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../domain/media/media_source.dart';
 import '../../domain/play/subject_episodes_controller.dart';
+import 'episode_source_grid.dart';
 
 /// Human-readable label for a merged episode's source badge. Looks up
 /// the owning [MediaSource]'s [MediaSource.displayName] so this stays
@@ -17,15 +18,9 @@ String sourceLabel(List<MediaSource> sources, String sourceId) {
   return sourceId;
 }
 
-/// A bottom sheet listing every [MergedEpisode] grouped by which
-/// [MediaSource] it came from. Kazumi's detail page has a similar
-/// "开始观看" bottom sheet, but its groups are per-plugin search
-/// results, not pre-merged episodes -- this app already has a merged
-/// episode list per subject (see [SubjectEpisodesController]), so this
-/// sheet only needs to group that existing list by source, not run any
-/// new search. Each source's group starts expanded (there are usually
-/// only 1-2 registered sources); tapping any episode calls
-/// [onEpisodeSelected].
+/// Modal bottom sheet for picking an episode (and, implicitly, its
+/// source) from the subject-detail page. Wraps [EpisodeSourceGrid] with
+/// a [DraggableScrollableSheet] and a header.
 class EpisodeSourceSheet extends StatelessWidget {
   const EpisodeSourceSheet({
     super.key,
@@ -36,15 +31,10 @@ class EpisodeSourceSheet extends StatelessWidget {
 
   final List<MergedEpisode> episodes;
   final List<MediaSource> sources;
-  final void Function(MergedEpisode episode) onEpisodeSelected;
+  final ValueChanged<MergedEpisode> onEpisodeSelected;
 
   @override
   Widget build(BuildContext context) {
-    final grouped = <String, List<MergedEpisode>>{};
-    for (final episode in episodes) {
-      grouped.putIfAbsent(episode.sourceId, () => []).add(episode);
-    }
-
     return DraggableScrollableSheet(
       initialChildSize: 0.6,
       minChildSize: 0.3,
@@ -56,55 +46,22 @@ class EpisodeSourceSheet extends StatelessWidget {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Text('选集', style: Theme.of(context).textTheme.titleMedium),
-            ),
-            for (final entry in grouped.entries)
-              ExpansionTile(
-                title: Text(sourceLabel(sources, entry.key)),
-                initiallyExpanded: true,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        for (final episode in entry.value)
-                          _EpisodeButton(
-                            episode: episode,
-                            onTap: () => onEpisodeSelected(episode),
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
+              child: Text(
+                '选择集数',
+                style: Theme.of(context).textTheme.titleMedium,
               ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: EpisodeSourceGrid(
+                episodes: episodes,
+                sources: sources,
+                onEpisodeSelected: onEpisodeSelected,
+              ),
+            ),
           ],
         );
       },
-    );
-  }
-}
-
-/// One episode's grid button inside [EpisodeSourceSheet] -- a compact
-/// tappable pill rather than a full-width [ListTile], so many episodes
-/// (a whole season) can be scanned at a glance in a wrapping grid
-/// instead of one long vertical list.
-class _EpisodeButton extends StatelessWidget {
-  const _EpisodeButton({required this.episode, required this.onTap});
-
-  final MergedEpisode episode;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return OutlinedButton(
-      onPressed: onTap,
-      style: OutlinedButton.styleFrom(
-        minimumSize: const Size(64, 40),
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-      ),
-      child: Text(episode.title, maxLines: 1, overflow: TextOverflow.ellipsis),
     );
   }
 }
