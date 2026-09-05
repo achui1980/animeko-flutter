@@ -149,6 +149,7 @@ class _CollapsingHomeAppBar extends StatelessWidget {
   static const _expandedHeight = 120.0;
   static const _expandedFontSize = 28.0;
   static const _collapsedFontSize = 20.0;
+  static const _subtitleFontSize = 13.0;
 
   @override
   Widget build(BuildContext context) {
@@ -166,7 +167,30 @@ class _CollapsingHomeAppBar extends StatelessWidget {
           final fontWeight = FontWeight.lerp(FontWeight.w500, FontWeight.w700, t);
           return FlexibleSpaceBar(
             titlePadding: const EdgeInsetsDirectional.only(start: 16, bottom: 16),
-            title: Text('AniMeow', style: TextStyle(fontSize: fontSize, fontWeight: fontWeight)),
+            // "AniMeow" is the app's English brand name; "喵番" is its Chinese
+            // counterpart, shown as a small subtitle beneath it. The subtitle
+            // fades out as the bar collapses (t -> 0) so the collapsed
+            // toolbar keeps showing a single line, matching the pre-existing
+            // collapsed layout.
+            title: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('AniMeow', style: TextStyle(fontSize: fontSize, fontWeight: fontWeight)),
+                if (t > 0.01)
+                  Opacity(
+                    opacity: t,
+                    child: Text(
+                      '喵番',
+                      style: TextStyle(
+                        fontSize: _subtitleFontSize,
+                        fontWeight: FontWeight.w400,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           );
         },
       ),
