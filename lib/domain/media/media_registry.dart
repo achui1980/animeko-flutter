@@ -64,11 +64,8 @@ class XifanMediaSource implements MediaSource {
       _api.listEpisodes((candidate as XifanBangumi).id);
 
   @override
-  Future<List<MediaPlaybackSource>> resolvePlayback(
-    MediaEpisode episode,
-  ) async => [
-    await _api.resolvePlaybackUrl((episode as XifanEpisode).watchPageUrl),
-  ];
+  Future<List<MediaPlaybackSource>> resolvePlayback(MediaEpisode episode) =>
+      _api.resolvePlaybackUrl((episode as XifanEpisode).watchPageUrls);
 }
 
 /// Adapts [YinghuaApi] to the shared [MediaSource] interface. See

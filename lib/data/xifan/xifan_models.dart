@@ -13,18 +13,22 @@ class XifanBangumi implements MediaCandidate {
   String get sourceId => 'xifan';
 }
 
-/// A single episode: one entry in a bangumi's episode list.
+/// One logical episode, merged across all "线路" (line) lists that
+/// expose it under the same title. [watchPageUrls] is ordered by line
+/// appearance on the bangumi page; index 0 is the default/primary line,
+/// the rest are fallback candidates.
 class XifanEpisode implements MediaEpisode {
-  const XifanEpisode({required this.title, required this.watchPageUrl});
+  const XifanEpisode({required this.title, required this.watchPageUrls});
 
   /// Episode label, e.g. `第01集`.
   @override
   final String title;
 
-  /// Absolute URL of the watch page
-  /// (`/watch/<bangumiId>/<line>/<episode>.html`), passed to
+  /// Absolute URLs of the watch page
+  /// (`/watch/<bangumiId>/<line>/<episode>.html`), one per line, ordered
+  /// by line appearance on the bangumi page, passed to
   /// [XifanApi.resolvePlaybackUrl].
-  final String watchPageUrl;
+  final List<String> watchPageUrls;
 
   @override
   String get sourceId => 'xifan';

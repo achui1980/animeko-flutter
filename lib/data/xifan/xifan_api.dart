@@ -72,10 +72,14 @@ class XifanApi {
 
   /// GET https://dm1.xfdm.pro/bangumi/`<bangumiId>`.html
   ///
-  /// NOTE (unverified, v1 simplification): only the *first*
-  /// `.anthology-list-play` list on the page is read, even when the
-  /// bangumi offers multiple lines. See this method's test-file doc
-  /// comment for why.
+  /// Lists episodes merged across ALL "线路" (line) lists on the bangumi
+  /// page. Each line is its own `<ul class="anthology-list-play">`
+  /// sibling under `.anthology-list-box`; the same logical episode
+  /// appears in multiple lists under a different URL (the line is
+  /// encoded in the URL's middle path segment). Episodes are merged
+  /// across lists by EXACT title match, in the order lists appear on the
+  /// page -- so [XifanEpisode.watchPageUrls] is ordered with the
+  /// first-encountered line first (the default/primary line).
   Future<List<XifanEpisode>> listEpisodes(int bangumiId) async {
     final response = await _dio.get<String>(
       '$_watchBaseUrl/bangumi/$bangumiId.html',
@@ -83,45 +87,69 @@ class XifanApi {
     );
     final document = html_parser.parse(response.data ?? '');
 
-    final list = document.querySelector('.anthology-list-play');
-    if (list == null) return const [];
+    final lists = document.querySelectorAll('.anthology-list-play');
 
-    final episodes = <XifanEpisode>[];
-    for (final link in list.querySelectorAll('a')) {
-      final href = link.attributes['href'];
-      final title = link.text.trim();
-      if (href == null || title.isEmpty) continue;
-      final url = href.startsWith('http') ? href : '$_watchBaseUrl$href';
-      episodes.add(XifanEpisode(title: title, watchPageUrl: url));
+    final urlsByTitle = <String, List<String>>{};
+    final titleOrder = <String>[];
+    for (final list in lists) {
+      for (final link in list.querySelectorAll('a')) {
+        final href = link.attributes['href'];
+        final title = link.text.trim();
+        if (href == null || title.isEmpty) continue;
+        final url = href.startsWith('http') ? href : '$_watchBaseUrl$href';
+        final urls = urlsByTitle.putIfAbsent(title, () {
+          titleOrder.add(title);
+          return <String>[];
+        });
+        urls.add(url);
+      }
     }
-    return episodes;
+
+    return titleOrder
+        .map(
+          (title) =>
+              XifanEpisode(title: title, watchPageUrls: urlsByTitle[title]!),
+        )
+        .toList();
   }
 
-  /// GET the watch page, extract the inline `var player_aaaa = {...};`
-  /// object, and decrypt its `url` field per the `encrypt` field's rule
-  /// (see this task's description above).
-  Future<XifanPlaybackSource> resolvePlaybackUrl(String watchPageUrl) async {
-    final response = await _dio.get<String>(
-      watchPageUrl,
-      options: Options(responseType: ResponseType.plain),
-    );
-    final body = response.data ?? '';
+  /// Resolves ALL playable line candidates for a logical episode, in the
+  /// order given by [watchPageUrls] (see [XifanEpisode]). Each URL is
+  /// requested, decrypted per its own `encrypt` field, and parsed
+  /// independently; a URL that fails is skipped rather than aborting the
+  /// whole call -- an exception is only thrown if EVERY URL fails.
+  Future<List<XifanPlaybackSource>> resolvePlaybackUrl(
+    List<String> watchPageUrls,
+  ) async {
+    final sources = <XifanPlaybackSource>[];
+    for (final watchPageUrl in watchPageUrls) {
+      try {
+        final response = await _dio.get<String>(
+          watchPageUrl,
+          options: Options(responseType: ResponseType.plain),
+        );
+        final body = response.data ?? '';
 
-    final json = _extractPlayerJson(body);
-    if (json == null) {
+        final json = _extractPlayerJson(body);
+        if (json == null) continue;
+
+        final playerData = jsonDecode(json) as Map<String, dynamic>;
+        final rawUrl = playerData['url'] as String?;
+        if (rawUrl == null || rawUrl.isEmpty) continue;
+
+        final encrypt = playerData['encrypt']?.toString() ?? '0';
+        sources.add(XifanPlaybackSource(url: _decryptUrl(rawUrl, encrypt)));
+      } catch (_) {
+        continue;
+      }
+    }
+
+    if (sources.isEmpty) {
       throw const FormatException(
-        '稀饭动漫 watch page has no player_aaaa script variable',
+        '稀饭动漫: none of the candidate lines resolved to a playable url',
       );
     }
-
-    final playerData = jsonDecode(json) as Map<String, dynamic>;
-    final rawUrl = playerData['url'] as String?;
-    if (rawUrl == null || rawUrl.isEmpty) {
-      throw const FormatException('稀饭动漫 player_aaaa has no "url" field');
-    }
-
-    final encrypt = playerData['encrypt']?.toString() ?? '0';
-    return XifanPlaybackSource(url: _decryptUrl(rawUrl, encrypt));
+    return sources;
   }
 }
 

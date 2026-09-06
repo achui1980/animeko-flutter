@@ -105,7 +105,7 @@ void main() {
           (_) async => [
             const XifanEpisode(
               title: '第01集',
-              watchPageUrl: 'https://dm1.xfdm.pro/watch/1001/1/1.html',
+              watchPageUrls: ['https://dm1.xfdm.pro/watch/1001/1/1.html'],
             ),
           ],
         );
@@ -117,21 +117,21 @@ void main() {
     );
 
     test(
-      "resolvePlayback delegates to resolvePlaybackUrl using the episode's watchPageUrl",
+      "resolvePlayback delegates to resolvePlaybackUrl using the episode's watchPageUrls",
       () async {
         when(
-          () => api.resolvePlaybackUrl(
+          () => api.resolvePlaybackUrl([
             'https://dm1.xfdm.pro/watch/1001/1/1.html',
-          ),
+          ]),
         ).thenAnswer(
-          (_) async => const XifanPlaybackSource(
-            url: 'https://apn.moedot.net/d/wo/1/a.mp4',
-          ),
+          (_) async => const [
+            XifanPlaybackSource(url: 'https://apn.moedot.net/d/wo/1/a.mp4'),
+          ],
         );
         final result = await source.resolvePlayback(
           const XifanEpisode(
             title: '第01集',
-            watchPageUrl: 'https://dm1.xfdm.pro/watch/1001/1/1.html',
+            watchPageUrls: ['https://dm1.xfdm.pro/watch/1001/1/1.html'],
           ),
         );
         expect(result, hasLength(1));

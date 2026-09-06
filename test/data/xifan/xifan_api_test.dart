@@ -43,7 +43,11 @@ void main() {
 
     test('sends the title as the "wd" query param to dm1.xfdm.pro', () async {
       when(
-        () => dio.get<String>(any(), queryParameters: any(named: 'queryParameters'), options: any(named: 'options')),
+        () => dio.get<String>(
+          any(),
+          queryParameters: any(named: 'queryParameters'),
+          options: any(named: 'options'),
+        ),
       ).thenAnswer((_) async => htmlResponse(searchResultsHtml));
 
       await api.search('鬼灭之刃');
@@ -57,24 +61,37 @@ void main() {
       ).called(1);
     });
 
-    test('pairs each .thumb-txt title with its matching .thumb-menu > a link', () async {
-      when(
-        () => dio.get<String>(any(), queryParameters: any(named: 'queryParameters'), options: any(named: 'options')),
-      ).thenAnswer((_) async => htmlResponse(searchResultsHtml));
+    test(
+      'pairs each .thumb-txt title with its matching .thumb-menu > a link',
+      () async {
+        when(
+          () => dio.get<String>(
+            any(),
+            queryParameters: any(named: 'queryParameters'),
+            options: any(named: 'options'),
+          ),
+        ).thenAnswer((_) async => htmlResponse(searchResultsHtml));
 
-      final results = await api.search('鬼灭之刃');
+        final results = await api.search('鬼灭之刃');
 
-      expect(results, hasLength(2));
-      expect(results[0].id, 1001);
-      expect(results[0].title, '鬼灭之刃');
-      expect(results[1].id, 1050);
-      expect(results[1].title, '鬼灭之刃 无限城篇');
-    });
+        expect(results, hasLength(2));
+        expect(results[0].id, 1001);
+        expect(results[0].title, '鬼灭之刃');
+        expect(results[1].id, 1050);
+        expect(results[1].title, '鬼灭之刃 无限城篇');
+      },
+    );
 
     test('returns an empty list when there are no results', () async {
       when(
-        () => dio.get<String>(any(), queryParameters: any(named: 'queryParameters'), options: any(named: 'options')),
-      ).thenAnswer((_) async => htmlResponse('<html><body>no results</body></html>'));
+        () => dio.get<String>(
+          any(),
+          queryParameters: any(named: 'queryParameters'),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer(
+        (_) async => htmlResponse('<html><body>no results</body></html>'),
+      );
 
       final results = await api.search('nonexistent');
 
@@ -83,13 +100,19 @@ void main() {
 
     test('skips a link whose href has no numeric bangumi ID', () async {
       when(
-        () => dio.get<String>(any(), queryParameters: any(named: 'queryParameters'), options: any(named: 'options')),
-      ).thenAnswer((_) async => htmlResponse('''
+        () => dio.get<String>(
+          any(),
+          queryParameters: any(named: 'queryParameters'),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer(
+        (_) async => htmlResponse('''
 <html><body>
   <div class="thumb-content"><div class="thumb-txt cor4 hide">无效结果</div></div>
   <div class="thumb-menu"><a href="/some-other-page.html">无效</a></div>
 </body></html>
-'''));
+'''),
+      );
 
       final results = await api.search('anything');
 
@@ -98,15 +121,14 @@ void main() {
   });
 
   group('listEpisodes', () {
-    // Real bangumi detail-page markup (captured live, 2026-09-01): the
-    // episode list for one "line"/source lives in a
-    // `.anthology-list-play > li > a` list. A bangumi page can offer
-    // several lines (e.g. "稀饭新番主线-1"/"-2", "稀饭备用-1"), each with
-    // its own separate episode list -- this implementation deliberately
-    // only reads the *first* `.anthology-list-play` on the page (v1
-    // simplification: no line-switching/merging within one source, which
-    // is a different axis from the cross-source merge in
-    // `SubjectEpisodesController`).
+    // Real bangumi detail-page markup (captured live, 2026-09-01): a
+    // bangumi page can offer several lines (e.g. "稀饭新番主线-1"/"-2",
+    // "稀饭备用-1"), each its own `<ul class="anthology-list-play">`
+    // sibling under `.anthology-list-box`, with its own separate episode
+    // list. Episodes with the same title across lists are merged into
+    // one XifanEpisode with an ordered list of URLs (first-seen line
+    // first); 第01集 and 第02集 both appear in line-1 and line-2, so both
+    // merge to two URLs each.
     const detailPageHtml = '''
 <html><body>
   <div class="anthology">
@@ -133,33 +155,93 @@ void main() {
       await api.listEpisodes(1001);
 
       verify(
-        () => dio.get<String>('https://dm1.xfdm.pro/bangumi/1001.html', options: any(named: 'options')),
+        () => dio.get<String>(
+          'https://dm1.xfdm.pro/bangumi/1001.html',
+          options: any(named: 'options'),
+        ),
       ).called(1);
     });
 
-    test('parses episodes from only the first anthology-list-play', () async {
-      when(
-        () => dio.get<String>(any(), options: any(named: 'options')),
-      ).thenAnswer((_) async => htmlResponse(detailPageHtml));
+    test(
+      'merges episodes with the same title across anthology-list-play lists',
+      () async {
+        when(
+          () => dio.get<String>(any(), options: any(named: 'options')),
+        ).thenAnswer((_) async => htmlResponse(detailPageHtml));
 
-      final episodes = await api.listEpisodes(1001);
+        final episodes = await api.listEpisodes(1001);
 
-      expect(episodes, hasLength(2));
-      expect(episodes[0].title, '第01集');
-      expect(episodes[0].watchPageUrl, 'https://dm1.xfdm.pro/watch/1001/1/1.html');
-      expect(episodes[1].title, '第02集');
-      expect(episodes[1].watchPageUrl, 'https://dm1.xfdm.pro/watch/1001/1/2.html');
-    });
+        expect(episodes, hasLength(2));
 
-    test('returns an empty list when the page has no anthology-list-play', () async {
-      when(
-        () => dio.get<String>(any(), options: any(named: 'options')),
-      ).thenAnswer((_) async => htmlResponse('<html><body>no episodes</body></html>'));
+        // 第01集 exists in both line-1 and line-2: merged into one episode
+        // with both URLs, first-seen line (line-1) first.
+        expect(episodes[0].title, '第01集');
+        expect(episodes[0].watchPageUrls, [
+          'https://dm1.xfdm.pro/watch/1001/1/1.html',
+          'https://dm1.xfdm.pro/watch/1001/2/1.html',
+        ]);
 
-      final episodes = await api.listEpisodes(9999);
+        // 第02集 exists in both line-1 and line-2 too: same merge pattern.
+        expect(episodes[1].title, '第02集');
+        expect(episodes[1].watchPageUrls, [
+          'https://dm1.xfdm.pro/watch/1001/1/2.html',
+          'https://dm1.xfdm.pro/watch/1001/2/2.html',
+        ]);
+      },
+    );
 
-      expect(episodes, isEmpty);
-    });
+    test(
+      'keeps an episode with a single-URL entry when it only exists in one list',
+      () async {
+        when(
+          () => dio.get<String>(any(), options: any(named: 'options')),
+        ).thenAnswer(
+          (_) async => htmlResponse('''
+<html><body>
+  <div class="anthology-list-box">
+    <ul class="anthology-list-play">
+      <li><a class="hide this-link" href="/watch/1001/1/1.html">第01集</a></li>
+      <li><a class="hide this-link" href="/watch/1001/1/3.html">第03集</a></li>
+    </ul>
+    <ul class="anthology-list-play">
+      <li><a class="hide this-link" href="/watch/1001/2/1.html">第01集</a></li>
+    </ul>
+  </div>
+</body></html>
+'''),
+        );
+
+        final episodes = await api.listEpisodes(1001);
+
+        expect(episodes, hasLength(2));
+        expect(episodes[0].title, '第01集');
+        expect(episodes[0].watchPageUrls, [
+          'https://dm1.xfdm.pro/watch/1001/1/1.html',
+          'https://dm1.xfdm.pro/watch/1001/2/1.html',
+        ]);
+
+        // 第03集 only exists in line-1: single-URL entry.
+        expect(episodes[1].title, '第03集');
+        expect(episodes[1].watchPageUrls, [
+          'https://dm1.xfdm.pro/watch/1001/1/3.html',
+        ]);
+      },
+    );
+
+    test(
+      'returns an empty list when the page has no anthology-list-play',
+      () async {
+        when(
+          () => dio.get<String>(any(), options: any(named: 'options')),
+        ).thenAnswer(
+          (_) async => htmlResponse('<html><body>no episodes</body></html>'),
+        );
+
+        final episodes = await api.listEpisodes(9999);
+
+        expect(episodes, isEmpty);
+      },
+    );
   });
 
   group('resolvePlaybackUrl', () {
@@ -167,7 +249,8 @@ void main() {
     // simplified: `player_aaaa` is a JSON-like object containing a
     // *nested* `vod_data` object -- extraction must brace-balance, not
     // stop at the first `}`.
-    String watchPageHtml(String encrypt, String url) => '''
+    String watchPageHtml(String encrypt, String url) =>
+        '''
 <html><body>
 <script>
 var player_aaaa={"flag":"play","encrypt":$encrypt,"trysee":0,"points":0,
@@ -181,65 +264,141 @@ var player_aaaa={"flag":"play","encrypt":$encrypt,"trysee":0,"points":0,
     test('encrypt=0 (or "0"): uses the url as-is', () async {
       when(
         () => dio.get<String>(any(), options: any(named: 'options')),
-      ).thenAnswer((_) async => htmlResponse(
-        watchPageHtml('0', 'https://apn.moedot.net/d/wo/1/a.mp4'),
-      ));
+      ).thenAnswer(
+        (_) async => htmlResponse(
+          watchPageHtml('0', 'https://apn.moedot.net/d/wo/1/a.mp4'),
+        ),
+      );
 
-      final source = await api.resolvePlaybackUrl('https://dm1.xfdm.pro/watch/1001/1/1.html');
+      final sources = await api.resolvePlaybackUrl([
+        'https://dm1.xfdm.pro/watch/1001/1/1.html',
+      ]);
 
-      expect(source.url, 'https://apn.moedot.net/d/wo/1/a.mp4');
-      expect(source.headers, isEmpty);
+      expect(sources, hasLength(1));
+      expect(sources.single.url, 'https://apn.moedot.net/d/wo/1/a.mp4');
+      expect(sources.single.headers, isEmpty);
     });
 
     test('encrypt=1: percent-decodes the url', () async {
       when(
         () => dio.get<String>(any(), options: any(named: 'options')),
-      ).thenAnswer((_) async => htmlResponse(
-        watchPageHtml('1', 'https%3A%2F%2Fexample.com%2Fvideo.mp4'),
-      ));
+      ).thenAnswer(
+        (_) async => htmlResponse(
+          watchPageHtml('1', 'https%3A%2F%2Fexample.com%2Fvideo.mp4'),
+        ),
+      );
 
-      final source = await api.resolvePlaybackUrl('https://dm1.xfdm.pro/watch/1001/1/1.html');
+      final sources = await api.resolvePlaybackUrl([
+        'https://dm1.xfdm.pro/watch/1001/1/1.html',
+      ]);
 
-      expect(source.url, 'https://example.com/video.mp4');
+      expect(sources, hasLength(1));
+      expect(sources.single.url, 'https://example.com/video.mp4');
     });
 
     test('encrypt=2: base64-decodes then percent-decodes the url', () async {
       when(
         () => dio.get<String>(any(), options: any(named: 'options')),
-      ).thenAnswer((_) async => htmlResponse(
-        watchPageHtml('2', 'aHR0cHM6Ly9leGFtcGxlLmNvbS92aWRlby5tcDQ='),
-      ));
-
-      final source = await api.resolvePlaybackUrl('https://dm1.xfdm.pro/watch/1001/1/1.html');
-
-      expect(source.url, 'https://example.com/video.mp4');
-    });
-
-    test('throws FormatException when there is no player_aaaa variable', () async {
-      when(
-        () => dio.get<String>(any(), options: any(named: 'options')),
-      ).thenAnswer((_) async => htmlResponse('<html><body>no player here</body></html>'));
-
-      expect(
-        () => api.resolvePlaybackUrl('https://dm1.xfdm.pro/watch/1001/1/1.html'),
-        throwsFormatException,
+      ).thenAnswer(
+        (_) async => htmlResponse(
+          watchPageHtml('2', 'aHR0cHM6Ly9leGFtcGxlLmNvbS92aWRlby5tcDQ='),
+        ),
       );
+
+      final sources = await api.resolvePlaybackUrl([
+        'https://dm1.xfdm.pro/watch/1001/1/1.html',
+      ]);
+
+      expect(sources, hasLength(1));
+      expect(sources.single.url, 'https://example.com/video.mp4');
     });
 
-    test('throws FormatException when player_aaaa has no "url" field', () async {
-      when(
-        () => dio.get<String>(any(), options: any(named: 'options')),
-      ).thenAnswer((_) async => htmlResponse('''
+    test(
+      'throws FormatException when there is no player_aaaa variable',
+      () async {
+        when(
+          () => dio.get<String>(any(), options: any(named: 'options')),
+        ).thenAnswer(
+          (_) async => htmlResponse('<html><body>no player here</body></html>'),
+        );
+
+        expect(
+          () => api.resolvePlaybackUrl([
+            'https://dm1.xfdm.pro/watch/1001/1/1.html',
+          ]),
+          throwsFormatException,
+        );
+      },
+    );
+
+    test(
+      'throws FormatException when player_aaaa has no "url" field',
+      () async {
+        when(
+          () => dio.get<String>(any(), options: any(named: 'options')),
+        ).thenAnswer(
+          (_) async => htmlResponse('''
 <html><body><script>
 var player_aaaa={"flag":"play","encrypt":0,"vod_data":{"vod_name":"x"}}
 </script></body></html>
-'''));
+'''),
+        );
 
-      expect(
-        () => api.resolvePlaybackUrl('https://dm1.xfdm.pro/watch/1001/1/1.html'),
-        throwsFormatException,
-      );
-    });
+        expect(
+          () => api.resolvePlaybackUrl([
+            'https://dm1.xfdm.pro/watch/1001/1/1.html',
+          ]),
+          throwsFormatException,
+        );
+      },
+    );
+
+    const primaryUrl = 'https://dm1.xfdm.pro/watch/1001/1/1.html';
+    const fallbackUrl = 'https://dm1.xfdm.pro/watch/1001/2/1.html';
+
+    test(
+      'skips a candidate that throws and returns the successful one',
+      () async {
+        when(
+          () => dio.get<String>(primaryUrl, options: any(named: 'options')),
+        ).thenThrow(
+          DioException(requestOptions: RequestOptions(path: primaryUrl)),
+        );
+        when(
+          () => dio.get<String>(fallbackUrl, options: any(named: 'options')),
+        ).thenAnswer(
+          (_) async => htmlResponse(
+            watchPageHtml('1', 'https%3A%2F%2Fexample.com%2Ffallback.mp4'),
+          ),
+        );
+
+        final sources = await api.resolvePlaybackUrl([primaryUrl, fallbackUrl]);
+
+        expect(sources, hasLength(1));
+        expect(sources.single.url, 'https://example.com/fallback.mp4');
+      },
+    );
+
+    test(
+      'throws FormatException when every candidate fails to resolve',
+      () async {
+        when(
+          () => dio.get<String>(primaryUrl, options: any(named: 'options')),
+        ).thenAnswer(
+          (_) async => htmlResponse('<html><body>no player here</body></html>'),
+        );
+        when(
+          () => dio.get<String>(fallbackUrl, options: any(named: 'options')),
+        ).thenThrow(
+          DioException(requestOptions: RequestOptions(path: fallbackUrl)),
+        );
+
+        expect(
+          () => api.resolvePlaybackUrl([primaryUrl, fallbackUrl]),
+          throwsFormatException,
+        );
+      },
+    );
   });
 
   test('xifanApiProvider builds a XifanApi backed by xifanDioProvider', () {

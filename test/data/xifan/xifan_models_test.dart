@@ -16,11 +16,13 @@ void main() {
     test('implements MediaEpisode with sourceId "xifan"', () {
       const episode = XifanEpisode(
         title: '第01集',
-        watchPageUrl: 'https://dm1.xfdm.pro/watch/1001/1/1.html',
+        watchPageUrls: ['https://dm1.xfdm.pro/watch/1001/1/1.html'],
       );
       expect(episode, isA<MediaEpisode>());
       expect(episode.sourceId, 'xifan');
-      expect(episode.watchPageUrl, 'https://dm1.xfdm.pro/watch/1001/1/1.html');
+      expect(episode.watchPageUrls, [
+        'https://dm1.xfdm.pro/watch/1001/1/1.html',
+      ]);
     });
   });
 
