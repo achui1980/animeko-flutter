@@ -117,13 +117,26 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     _player.stream.error.listen((message) {
       if (!mounted) return;
       final candidates = _candidates;
-      if (candidates != null && _candidateIndex + 1 < candidates.length) {
+      // `candidates == null` means a retry/re-resolution is in flight (see
+      // `_retry()`, which clears `_candidates` before invalidating the
+      // provider) and this error belongs to a stale, already-superseded
+      // player state -- ignore it and let the incoming `AsyncLoading`/
+      // `AsyncData` from `playback.when(...)` drive the UI instead of
+      // racing with it.
+      if (candidates == null) return;
+      if (_candidateIndex + 1 < candidates.length) {
         // Another line is available -- silently advance and retry
         // without surfacing an error to the user. Does not distinguish
         // "failed to open" from "failed mid-stream"; both are handled
         // identically per the design spec.
         _candidateIndex++;
-        _openCandidate(candidates[_candidateIndex]);
+        _openCandidate(candidates[_candidateIndex]).catchError((Object e) {
+          // `_openCandidate` itself failed (e.g. `_player.open()` threw
+          // for the fallback candidate) -- without this, the exception
+          // would become an unobserved async error and playback would
+          // silently strand with no error UI and no way to recover.
+          if (mounted) setState(() => _playbackError = e.toString());
+        });
         return;
       }
       setState(() => _playbackError = message);
@@ -474,6 +487,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   void _retry() {
     setState(() => _playbackError = null);
     _candidateIndex = 0;
+    // Clear `_candidates` (not just the index) so the error listener
+    // above ignores any stale error event that fires for the
+    // about-to-be-superseded player state while the provider is
+    // re-resolving -- see that listener's `candidates == null` guard.
+    _candidates = null;
     ref.invalidate(episodePlayControllerProvider(episode: _currentEpisode));
   }
 
@@ -572,7 +590,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         _candidates = candidates;
         _candidateIndex = 0;
         if (mounted) setState(() => _playbackError = null);
-        await _openCandidate(candidates[_candidateIndex]);
+        try {
+          await _openCandidate(candidates[_candidateIndex]);
+        } catch (e) {
+          // Without this, a failure here (e.g. `_player.open()` itself
+          // throwing for candidate 0) would become an unobserved async
+          // error -- `whenData`'s callback isn't awaited by `ref.listen`,
+          // so nothing else would ever surface it to the UI.
+          if (mounted) setState(() => _playbackError = e.toString());
+        }
       });
     });
     final playback = ref.watch(provider);
