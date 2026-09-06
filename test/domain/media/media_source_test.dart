@@ -31,29 +31,35 @@ class _FakeSource implements MediaSource {
   @override
   String get displayName => 'Fake Source';
   @override
-  Future<List<MediaCandidate>> search(String title) async =>
-      [const _FakeCandidate('Fake Anime')];
+  Future<List<MediaCandidate>> search(String title) async => [
+    const _FakeCandidate('Fake Anime'),
+  ];
   @override
-  Future<List<MediaEpisode>> listEpisodes(MediaCandidate candidate) async =>
-      [const _FakeEpisode('Episode 1')];
+  Future<List<MediaEpisode>> listEpisodes(MediaCandidate candidate) async => [
+    const _FakeEpisode('Episode 1'),
+  ];
   @override
-  Future<MediaPlaybackSource> resolvePlayback(MediaEpisode episode) async =>
-      const _FakePlaybackSource();
+  Future<List<MediaPlaybackSource>> resolvePlayback(
+    MediaEpisode episode,
+  ) async => const [_FakePlaybackSource()];
 }
 
 void main() {
-  test('a MediaSource implementation can search, list episodes, and resolve playback', () async {
-    final source = _FakeSource();
+  test(
+    'a MediaSource implementation can search, list episodes, and resolve playback',
+    () async {
+      final source = _FakeSource();
 
-    final candidates = await source.search('Fake Anime');
-    expect(candidates.single.title, 'Fake Anime');
-    expect(candidates.single.sourceId, 'fake');
+      final candidates = await source.search('Fake Anime');
+      expect(candidates.single.title, 'Fake Anime');
+      expect(candidates.single.sourceId, 'fake');
 
-    final episodes = await source.listEpisodes(candidates.single);
-    expect(episodes.single.title, 'Episode 1');
+      final episodes = await source.listEpisodes(candidates.single);
+      expect(episodes.single.title, 'Episode 1');
 
-    final playback = await source.resolvePlayback(episodes.single);
-    expect(playback.url, 'https://example.com/video.mp4');
-    expect(playback.headers, isEmpty);
-  });
+      final playback = await source.resolvePlayback(episodes.single);
+      expect(playback.single.url, 'https://example.com/video.mp4');
+      expect(playback.single.headers, isEmpty);
+    },
+  );
 }

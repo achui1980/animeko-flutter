@@ -13,7 +13,11 @@ part of 'episode_play_controller.dart';
 final episodePlayControllerProvider = EpisodePlayControllerFamily._();
 
 final class EpisodePlayControllerProvider
-    extends $AsyncNotifierProvider<EpisodePlayController, MediaPlaybackSource> {
+    extends
+        $AsyncNotifierProvider<
+          EpisodePlayController,
+          List<MediaPlaybackSource>
+        > {
   EpisodePlayControllerProvider._({
     required EpisodePlayControllerFamily super.from,
     required MergedEpisode super.argument,
@@ -51,15 +55,15 @@ final class EpisodePlayControllerProvider
 }
 
 String _$episodePlayControllerHash() =>
-    r'c7e74be1e0b9aa809383ad6d2c848197c9d30698';
+    r'a36650394764c0f903418c2d20fb2df1821c8230';
 
 final class EpisodePlayControllerFamily extends $Family
     with
         $ClassFamilyOverride<
           EpisodePlayController,
-          AsyncValue<MediaPlaybackSource>,
-          MediaPlaybackSource,
-          FutureOr<MediaPlaybackSource>,
+          AsyncValue<List<MediaPlaybackSource>>,
+          List<MediaPlaybackSource>,
+          FutureOr<List<MediaPlaybackSource>>,
           MergedEpisode
         > {
   EpisodePlayControllerFamily._()
@@ -79,21 +83,28 @@ final class EpisodePlayControllerFamily extends $Family
 }
 
 abstract class _$EpisodePlayController
-    extends $AsyncNotifier<MediaPlaybackSource> {
+    extends $AsyncNotifier<List<MediaPlaybackSource>> {
   late final _$args = ref.$arg as MergedEpisode;
   MergedEpisode get episode => _$args;
 
-  FutureOr<MediaPlaybackSource> build({required MergedEpisode episode});
+  FutureOr<List<MediaPlaybackSource>> build({required MergedEpisode episode});
   @$mustCallSuper
   @override
   void runBuild() {
     final ref =
-        this.ref as $Ref<AsyncValue<MediaPlaybackSource>, MediaPlaybackSource>;
+        this.ref
+            as $Ref<
+              AsyncValue<List<MediaPlaybackSource>>,
+              List<MediaPlaybackSource>
+            >;
     final element =
         ref.element
             as $ClassProviderElement<
-              AnyNotifier<AsyncValue<MediaPlaybackSource>, MediaPlaybackSource>,
-              AsyncValue<MediaPlaybackSource>,
+              AnyNotifier<
+                AsyncValue<List<MediaPlaybackSource>>,
+                List<MediaPlaybackSource>
+              >,
+              AsyncValue<List<MediaPlaybackSource>>,
               Object?,
               Object?
             >;

@@ -32,78 +32,78 @@ class _FakeSource implements MediaSource {
       const [];
 
   @override
-  Future<MediaPlaybackSource> resolvePlayback(MediaEpisode episode) {
+  Future<List<MediaPlaybackSource>> resolvePlayback(MediaEpisode episode) {
     throw UnimplementedError();
   }
 }
 
 void main() {
   group('EpisodeSourceSheet', () {
-    testWidgets(
-      'shows a filter chip per source and all episodes by default',
-      (tester) async {
-        final episodes = [
-          MergedEpisode(
-            episode: const _FakeEpisode(sourceId: 'anime1', title: '第1集'),
-            sourceId: 'anime1',
-          ),
-          MergedEpisode(
-            episode: const _FakeEpisode(sourceId: 'xifan', title: '第1集'),
-            sourceId: 'xifan',
-          ),
-        ];
-        const sources = [
-          _FakeSource(id: 'anime1', displayName: 'anime1.me'),
-          _FakeSource(id: 'xifan', displayName: '稀饭动漫'),
-        ];
-
-        await tester.pumpWidget(
-          MaterialApp(
-            home: Scaffold(
-              body: EpisodeSourceSheet(
-                episodes: episodes,
-                sources: sources,
-                onEpisodeSelected: (_) {},
-              ),
-            ),
-          ),
-        );
-        await tester.pumpAndSettle();
-
-        expect(find.text('选择集数'), findsOneWidget);
-        expect(find.widgetWithText(ChoiceChip, 'anime1.me'), findsOneWidget);
-        expect(find.widgetWithText(ChoiceChip, '稀饭动漫'), findsOneWidget);
-        expect(find.text('第1集'), findsNWidgets(2));
-      },
-    );
-
-    testWidgets('tapping an episode calls onEpisodeSelected with that episode', (
+    testWidgets('shows a filter chip per source and all episodes by default', (
       tester,
     ) async {
-      MergedEpisode? selected;
-      final episode = MergedEpisode(
-        episode: const _FakeEpisode(sourceId: 'anime1', title: '第1集'),
-        sourceId: 'anime1',
-      );
+      final episodes = [
+        MergedEpisode(
+          episode: const _FakeEpisode(sourceId: 'anime1', title: '第1集'),
+          sourceId: 'anime1',
+        ),
+        MergedEpisode(
+          episode: const _FakeEpisode(sourceId: 'xifan', title: '第1集'),
+          sourceId: 'xifan',
+        ),
+      ];
+      const sources = [
+        _FakeSource(id: 'anime1', displayName: 'anime1.me'),
+        _FakeSource(id: 'xifan', displayName: '稀饭动漫'),
+      ];
 
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
             body: EpisodeSourceSheet(
-              episodes: [episode],
-              sources: const [
-                _FakeSource(id: 'anime1', displayName: 'anime1.me'),
-              ],
-              onEpisodeSelected: (e) => selected = e,
+              episodes: episodes,
+              sources: sources,
+              onEpisodeSelected: (_) {},
             ),
           ),
         ),
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('第1集'));
-
-      expect(selected, same(episode));
+      expect(find.text('选择集数'), findsOneWidget);
+      expect(find.widgetWithText(ChoiceChip, 'anime1.me'), findsOneWidget);
+      expect(find.widgetWithText(ChoiceChip, '稀饭动漫'), findsOneWidget);
+      expect(find.text('第1集'), findsNWidgets(2));
     });
+
+    testWidgets(
+      'tapping an episode calls onEpisodeSelected with that episode',
+      (tester) async {
+        MergedEpisode? selected;
+        final episode = MergedEpisode(
+          episode: const _FakeEpisode(sourceId: 'anime1', title: '第1集'),
+          sourceId: 'anime1',
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: EpisodeSourceSheet(
+                episodes: [episode],
+                sources: const [
+                  _FakeSource(id: 'anime1', displayName: 'anime1.me'),
+                ],
+                onEpisodeSelected: (e) => selected = e,
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('第1集'));
+
+        expect(selected, same(episode));
+      },
+    );
   });
 }

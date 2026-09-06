@@ -37,8 +37,11 @@ class Anime1MediaSource implements MediaSource {
       _api.fetchCategoryEpisodes((candidate as Anime1Category).id);
 
   @override
-  Future<MediaPlaybackSource> resolvePlayback(MediaEpisode episode) =>
-      _api.resolvePlaybackUrl((episode as Anime1Episode).pageUrl);
+  Future<List<MediaPlaybackSource>> resolvePlayback(
+    MediaEpisode episode,
+  ) async => [
+    await _api.resolvePlaybackUrl((episode as Anime1Episode).pageUrl),
+  ];
 }
 
 /// Adapts [XifanApi] to the shared [MediaSource] interface. See
@@ -61,8 +64,11 @@ class XifanMediaSource implements MediaSource {
       _api.listEpisodes((candidate as XifanBangumi).id);
 
   @override
-  Future<MediaPlaybackSource> resolvePlayback(MediaEpisode episode) =>
-      _api.resolvePlaybackUrl((episode as XifanEpisode).watchPageUrl);
+  Future<List<MediaPlaybackSource>> resolvePlayback(
+    MediaEpisode episode,
+  ) async => [
+    await _api.resolvePlaybackUrl((episode as XifanEpisode).watchPageUrl),
+  ];
 }
 
 /// Adapts [YinghuaApi] to the shared [MediaSource] interface. See
@@ -85,8 +91,11 @@ class YinghuaMediaSource implements MediaSource {
       _api.listEpisodes((candidate as YinghuaBangumi).id);
 
   @override
-  Future<MediaPlaybackSource> resolvePlayback(MediaEpisode episode) =>
-      _api.resolvePlaybackUrl((episode as YinghuaEpisode).playPageUrl);
+  Future<List<MediaPlaybackSource>> resolvePlayback(
+    MediaEpisode episode,
+  ) async => [
+    await _api.resolvePlaybackUrl((episode as YinghuaEpisode).playPageUrl),
+  ];
 }
 
 /// Adapts [DilidiliApi] to the shared [MediaSource] interface. See
@@ -109,8 +118,11 @@ class DilidiliMediaSource implements MediaSource {
       _api.listEpisodes((candidate as DilidiliAnime).slug);
 
   @override
-  Future<MediaPlaybackSource> resolvePlayback(MediaEpisode episode) =>
-      _api.resolvePlaybackUrl((episode as DilidiliEpisode).watchPageUrl);
+  Future<List<MediaPlaybackSource>> resolvePlayback(
+    MediaEpisode episode,
+  ) async => [
+    await _api.resolvePlaybackUrl((episode as DilidiliEpisode).watchPageUrl),
+  ];
 }
 
 /// Every registered [MediaSource], queried concurrently by
@@ -118,8 +130,8 @@ class DilidiliMediaSource implements MediaSource {
 /// to make it participate in the merged search/episode-list flow.
 @riverpod
 List<MediaSource> mediaSources(Ref ref) => [
-      Anime1MediaSource(ref.watch(anime1ApiProvider)),
-      XifanMediaSource(ref.watch(xifanApiProvider)),
-      YinghuaMediaSource(ref.watch(yinghuaApiProvider)),
-      DilidiliMediaSource(ref.watch(dilidiliApiProvider)),
-    ];
+  Anime1MediaSource(ref.watch(anime1ApiProvider)),
+  XifanMediaSource(ref.watch(xifanApiProvider)),
+  YinghuaMediaSource(ref.watch(yinghuaApiProvider)),
+  DilidiliMediaSource(ref.watch(dilidiliApiProvider)),
+];

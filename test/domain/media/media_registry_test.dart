@@ -36,31 +36,44 @@ void main() {
     });
 
     test('search delegates to Anime1Api.searchCategories', () async {
-      when(() => api.searchCategories('鬼灭之刃')).thenAnswer(
-        (_) async => [const Anime1Category(id: 1, title: '鬼灭之刃')],
-      );
+      when(
+        () => api.searchCategories('鬼灭之刃'),
+      ).thenAnswer((_) async => [const Anime1Category(id: 1, title: '鬼灭之刃')]);
       final result = await source.search('鬼灭之刃');
       expect(result, hasLength(1));
       expect(result.single.title, '鬼灭之刃');
     });
 
-    test("listEpisodes delegates to fetchCategoryEpisodes using the candidate's id", () async {
-      when(() => api.fetchCategoryEpisodes(87)).thenAnswer(
-        (_) async => [const Anime1Episode(title: 'ep1', pageUrl: 'https://anime1.me/1')],
-      );
-      final result = await source.listEpisodes(const Anime1Category(id: 87, title: 'x'));
-      expect(result, hasLength(1));
-    });
+    test(
+      "listEpisodes delegates to fetchCategoryEpisodes using the candidate's id",
+      () async {
+        when(() => api.fetchCategoryEpisodes(87)).thenAnswer(
+          (_) async => [
+            const Anime1Episode(title: 'ep1', pageUrl: 'https://anime1.me/1'),
+          ],
+        );
+        final result = await source.listEpisodes(
+          const Anime1Category(id: 87, title: 'x'),
+        );
+        expect(result, hasLength(1));
+      },
+    );
 
-    test("resolvePlayback delegates to resolvePlaybackUrl using the episode's pageUrl", () async {
-      when(() => api.resolvePlaybackUrl('https://anime1.me/1')).thenAnswer(
-        (_) async => const Anime1PlaybackSource(url: 'https://video.example.com/a.mp4'),
-      );
-      final result = await source.resolvePlayback(
-        const Anime1Episode(title: 'ep1', pageUrl: 'https://anime1.me/1'),
-      );
-      expect(result.url, 'https://video.example.com/a.mp4');
-    });
+    test(
+      "resolvePlayback delegates to resolvePlaybackUrl using the episode's pageUrl",
+      () async {
+        when(() => api.resolvePlaybackUrl('https://anime1.me/1')).thenAnswer(
+          (_) async => const Anime1PlaybackSource(
+            url: 'https://video.example.com/a.mp4',
+          ),
+        );
+        final result = await source.resolvePlayback(
+          const Anime1Episode(title: 'ep1', pageUrl: 'https://anime1.me/1'),
+        );
+        expect(result, hasLength(1));
+        expect(result.single.url, 'https://video.example.com/a.mp4');
+      },
+    );
   });
 
   group('XifanMediaSource', () {
@@ -78,38 +91,53 @@ void main() {
     });
 
     test('search delegates to XifanApi.search', () async {
-      when(() => api.search('鬼灭之刃')).thenAnswer(
-        (_) async => [const XifanBangumi(id: 1001, title: '鬼灭之刃')],
-      );
+      when(
+        () => api.search('鬼灭之刃'),
+      ).thenAnswer((_) async => [const XifanBangumi(id: 1001, title: '鬼灭之刃')]);
       final result = await source.search('鬼灭之刃');
       expect(result, hasLength(1));
     });
 
-    test("listEpisodes delegates to listEpisodes using the candidate's id", () async {
-      when(() => api.listEpisodes(1001)).thenAnswer(
-        (_) async => [
+    test(
+      "listEpisodes delegates to listEpisodes using the candidate's id",
+      () async {
+        when(() => api.listEpisodes(1001)).thenAnswer(
+          (_) async => [
+            const XifanEpisode(
+              title: '第01集',
+              watchPageUrl: 'https://dm1.xfdm.pro/watch/1001/1/1.html',
+            ),
+          ],
+        );
+        final result = await source.listEpisodes(
+          const XifanBangumi(id: 1001, title: 'x'),
+        );
+        expect(result, hasLength(1));
+      },
+    );
+
+    test(
+      "resolvePlayback delegates to resolvePlaybackUrl using the episode's watchPageUrl",
+      () async {
+        when(
+          () => api.resolvePlaybackUrl(
+            'https://dm1.xfdm.pro/watch/1001/1/1.html',
+          ),
+        ).thenAnswer(
+          (_) async => const XifanPlaybackSource(
+            url: 'https://apn.moedot.net/d/wo/1/a.mp4',
+          ),
+        );
+        final result = await source.resolvePlayback(
           const XifanEpisode(
             title: '第01集',
             watchPageUrl: 'https://dm1.xfdm.pro/watch/1001/1/1.html',
           ),
-        ],
-      );
-      final result = await source.listEpisodes(const XifanBangumi(id: 1001, title: 'x'));
-      expect(result, hasLength(1));
-    });
-
-    test("resolvePlayback delegates to resolvePlaybackUrl using the episode's watchPageUrl", () async {
-      when(() => api.resolvePlaybackUrl('https://dm1.xfdm.pro/watch/1001/1/1.html')).thenAnswer(
-        (_) async => const XifanPlaybackSource(url: 'https://apn.moedot.net/d/wo/1/a.mp4'),
-      );
-      final result = await source.resolvePlayback(
-        const XifanEpisode(
-          title: '第01集',
-          watchPageUrl: 'https://dm1.xfdm.pro/watch/1001/1/1.html',
-        ),
-      );
-      expect(result.url, 'https://apn.moedot.net/d/wo/1/a.mp4');
-    });
+        );
+        expect(result, hasLength(1));
+        expect(result.single.url, 'https://apn.moedot.net/d/wo/1/a.mp4');
+      },
+    );
   });
 
   group('YinghuaMediaSource', () {
@@ -134,33 +162,48 @@ void main() {
       expect(result, hasLength(1));
     });
 
-    test("listEpisodes delegates to listEpisodes using the candidate's id", () async {
-      when(() => api.listEpisodes(58802)).thenAnswer(
-        (_) async => [
+    test(
+      "listEpisodes delegates to listEpisodes using the candidate's id",
+      () async {
+        when(() => api.listEpisodes(58802)).thenAnswer(
+          (_) async => [
+            const YinghuaEpisode(
+              title: '第01集',
+              playPageUrl:
+                  'https://www.yinghua2.com/index.php/vod/play/id/58802/sid/1/nid/1.html',
+            ),
+          ],
+        );
+        final result = await source.listEpisodes(
+          const YinghuaBangumi(id: 58802, title: 'x'),
+        );
+        expect(result, hasLength(1));
+      },
+    );
+
+    test(
+      "resolvePlayback delegates to resolvePlaybackUrl using the episode's playPageUrl",
+      () async {
+        when(
+          () => api.resolvePlaybackUrl(
+            'https://www.yinghua2.com/index.php/vod/play/id/58802/sid/1/nid/1.html',
+          ),
+        ).thenAnswer(
+          (_) async => const YinghuaPlaybackSource(
+            url: 'https://play.example.com/a.m3u8',
+          ),
+        );
+        final result = await source.resolvePlayback(
           const YinghuaEpisode(
             title: '第01集',
-            playPageUrl: 'https://www.yinghua2.com/index.php/vod/play/id/58802/sid/1/nid/1.html',
+            playPageUrl:
+                'https://www.yinghua2.com/index.php/vod/play/id/58802/sid/1/nid/1.html',
           ),
-        ],
-      );
-      final result = await source.listEpisodes(const YinghuaBangumi(id: 58802, title: 'x'));
-      expect(result, hasLength(1));
-    });
-
-    test("resolvePlayback delegates to resolvePlaybackUrl using the episode's playPageUrl", () async {
-      when(
-        () => api.resolvePlaybackUrl('https://www.yinghua2.com/index.php/vod/play/id/58802/sid/1/nid/1.html'),
-      ).thenAnswer(
-        (_) async => const YinghuaPlaybackSource(url: 'https://play.example.com/a.m3u8'),
-      );
-      final result = await source.resolvePlayback(
-        const YinghuaEpisode(
-          title: '第01集',
-          playPageUrl: 'https://www.yinghua2.com/index.php/vod/play/id/58802/sid/1/nid/1.html',
-        ),
-      );
-      expect(result.url, 'https://play.example.com/a.m3u8');
-    });
+        );
+        expect(result, hasLength(1));
+        expect(result.single.url, 'https://play.example.com/a.m3u8');
+      },
+    );
   });
 
   group('DilidiliMediaSource', () {
@@ -185,39 +228,57 @@ void main() {
       expect(result, hasLength(1));
     });
 
-    test("listEpisodes delegates to listEpisodes using the candidate's slug", () async {
-      when(() => api.listEpisodes('one-piece')).thenAnswer(
-        (_) async => [
+    test(
+      "listEpisodes delegates to listEpisodes using the candidate's slug",
+      () async {
+        when(() => api.listEpisodes('one-piece')).thenAnswer(
+          (_) async => [
+            const DilidiliEpisode(
+              title: '第1176集',
+              watchPageUrl: 'https://dilidili.io/watch/one-piece-ep1176/',
+            ),
+          ],
+        );
+        final result = await source.listEpisodes(
+          const DilidiliAnime(slug: 'one-piece', title: 'x'),
+        );
+        expect(result, hasLength(1));
+      },
+    );
+
+    test(
+      "resolvePlayback delegates to resolvePlaybackUrl using the episode's watchPageUrl",
+      () async {
+        when(
+          () => api.resolvePlaybackUrl(
+            'https://dilidili.io/watch/one-piece-ep1176/',
+          ),
+        ).thenAnswer(
+          (_) async => const DilidiliPlaybackSource(
+            url: 'https://v.lzcdn31.com/index.m3u8',
+          ),
+        );
+        final result = await source.resolvePlayback(
           const DilidiliEpisode(
             title: '第1176集',
             watchPageUrl: 'https://dilidili.io/watch/one-piece-ep1176/',
           ),
-        ],
-      );
-      final result = await source.listEpisodes(const DilidiliAnime(slug: 'one-piece', title: 'x'));
-      expect(result, hasLength(1));
-    });
-
-    test("resolvePlayback delegates to resolvePlaybackUrl using the episode's watchPageUrl", () async {
-      when(
-        () => api.resolvePlaybackUrl('https://dilidili.io/watch/one-piece-ep1176/'),
-      ).thenAnswer(
-        (_) async => const DilidiliPlaybackSource(url: 'https://v.lzcdn31.com/index.m3u8'),
-      );
-      final result = await source.resolvePlayback(
-        const DilidiliEpisode(
-          title: '第1176集',
-          watchPageUrl: 'https://dilidili.io/watch/one-piece-ep1176/',
-        ),
-      );
-      expect(result.url, 'https://v.lzcdn31.com/index.m3u8');
-    });
+        );
+        expect(result, hasLength(1));
+        expect(result.single.url, 'https://v.lzcdn31.com/index.m3u8');
+      },
+    );
   });
 
   test('mediaSourcesProvider returns all four registered sources', () {
     final container = ProviderContainer();
     addTearDown(container.dispose);
     final sources = container.read(mediaSourcesProvider);
-    expect(sources.map((s) => s.id), ['anime1', 'xifan', 'yinghua', 'dilidili']);
+    expect(sources.map((s) => s.id), [
+      'anime1',
+      'xifan',
+      'yinghua',
+      'dilidili',
+    ]);
   });
 }

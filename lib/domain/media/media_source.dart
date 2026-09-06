@@ -62,7 +62,10 @@ abstract class MediaSource {
   /// this same source's [search]).
   Future<List<MediaEpisode>> listEpisodes(MediaCandidate candidate);
 
-  /// Resolves [episode] (which must have come from this same source's
-  /// [listEpisodes]) to an actual playable URL.
-  Future<MediaPlaybackSource> resolvePlayback(MediaEpisode episode);
+  /// Resolves every available playback candidate ("line"/"mirror") for
+  /// [episode], in order. Index 0 is the default/primary line; the rest
+  /// are ordered fallback candidates a player should try in sequence if
+  /// an earlier one fails to play. The returned list is never empty --
+  /// implementations throw instead if no candidate could be resolved.
+  Future<List<MediaPlaybackSource>> resolvePlayback(MediaEpisode episode);
 }

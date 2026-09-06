@@ -31,7 +31,7 @@ class _FakeSource implements MediaSource {
       const [];
 
   @override
-  Future<MediaPlaybackSource> resolvePlayback(MediaEpisode episode) {
+  Future<List<MediaPlaybackSource>> resolvePlayback(MediaEpisode episode) {
     throw UnimplementedError();
   }
 }
@@ -146,26 +146,27 @@ void main() {
       expect(find.widgetWithText(OutlinedButton, '第1集'), findsOneWidget);
     });
 
-    testWidgets('tapping an episode calls onEpisodeSelected with that episode', (
-      tester,
-    ) async {
-      MergedEpisode? selected;
+    testWidgets(
+      'tapping an episode calls onEpisodeSelected with that episode',
+      (tester) async {
+        MergedEpisode? selected;
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: EpisodeSourceGrid(
-              episodes: [episode1],
-              sources: sources,
-              onEpisodeSelected: (episode) => selected = episode,
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: EpisodeSourceGrid(
+                episodes: [episode1],
+                sources: sources,
+                onEpisodeSelected: (episode) => selected = episode,
+              ),
             ),
           ),
-        ),
-      );
+        );
 
-      await tester.tap(find.text('第1集'));
+        await tester.tap(find.text('第1集'));
 
-      expect(selected, same(episode1));
-    });
+        expect(selected, same(episode1));
+      },
+    );
   });
 }

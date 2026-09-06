@@ -10,7 +10,7 @@ part 'episode_play_controller.g.dart';
 @riverpod
 class EpisodePlayController extends _$EpisodePlayController {
   @override
-  Future<MediaPlaybackSource> build({required MergedEpisode episode}) {
+  Future<List<MediaPlaybackSource>> build({required MergedEpisode episode}) {
     final sources = ref.watch(mediaSourcesProvider);
     final source = sources.firstWhere((s) => s.id == episode.sourceId);
     return source.resolvePlayback(episode.episode);
