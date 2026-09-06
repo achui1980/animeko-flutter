@@ -272,14 +272,12 @@ void main() {
     );
   });
 
-  test(
-    'mediaSourcesProvider returns the three registered sources '
-    '(yinghua is intentionally disabled -- see mediaSources doc comment)',
-    () {
-      final container = ProviderContainer();
-      addTearDown(container.dispose);
-      final sources = container.read(mediaSourcesProvider);
-      expect(sources.map((s) => s.id), ['anime1', 'xifan', 'dilidili']);
-    },
-  );
+  test('mediaSourcesProvider returns the two registered sources '
+      '(yinghua and dilidili are intentionally disabled -- see mediaSources '
+      'doc comment)', () {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    final sources = container.read(mediaSourcesProvider);
+    expect(sources.map((s) => s.id), ['anime1', 'xifan']);
+  });
 }

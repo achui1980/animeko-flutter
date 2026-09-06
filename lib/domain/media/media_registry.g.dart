@@ -18,6 +18,20 @@ part of 'media_registry.dart';
 /// source is disabled at the app level rather than removed outright --
 /// [YinghuaMediaSource]/[YinghuaApi] remain intact and can be re-added to
 /// this list if the situation improves.
+///
+/// [DilidiliMediaSource] is also intentionally *not* registered here:
+/// users have reported playback repeatedly stalling at ~2 seconds (the
+/// player's reported total duration was only ~2s, not the real episode
+/// length), on at least one real title/CDN line combination. The exact
+/// resolved URL was independently verified (via direct HTTP replication
+/// of the app's own request chain) to be fully reachable and structurally
+/// valid end-to-end -- an AES-128-encrypted HLS playlist with a relative
+/// key URI, all segments and the key itself fetched successfully -- so
+/// the root cause was not conclusively identified (a proxy interaction
+/// with the encrypted/relative-key-URI playlist chain is suspected but
+/// unconfirmed). Disabled as a stopgap per explicit user request rather
+/// than left broken for users. [DilidiliMediaSource]/[DilidiliApi] remain
+/// intact and can be re-added to this list if the issue is resolved.
 
 @ProviderFor(mediaSources)
 final mediaSourcesProvider = MediaSourcesProvider._();
@@ -32,6 +46,20 @@ final mediaSourcesProvider = MediaSourcesProvider._();
 /// source is disabled at the app level rather than removed outright --
 /// [YinghuaMediaSource]/[YinghuaApi] remain intact and can be re-added to
 /// this list if the situation improves.
+///
+/// [DilidiliMediaSource] is also intentionally *not* registered here:
+/// users have reported playback repeatedly stalling at ~2 seconds (the
+/// player's reported total duration was only ~2s, not the real episode
+/// length), on at least one real title/CDN line combination. The exact
+/// resolved URL was independently verified (via direct HTTP replication
+/// of the app's own request chain) to be fully reachable and structurally
+/// valid end-to-end -- an AES-128-encrypted HLS playlist with a relative
+/// key URI, all segments and the key itself fetched successfully -- so
+/// the root cause was not conclusively identified (a proxy interaction
+/// with the encrypted/relative-key-URI playlist chain is suspected but
+/// unconfirmed). Disabled as a stopgap per explicit user request rather
+/// than left broken for users. [DilidiliMediaSource]/[DilidiliApi] remain
+/// intact and can be re-added to this list if the issue is resolved.
 
 final class MediaSourcesProvider
     extends
@@ -51,6 +79,20 @@ final class MediaSourcesProvider
   /// source is disabled at the app level rather than removed outright --
   /// [YinghuaMediaSource]/[YinghuaApi] remain intact and can be re-added to
   /// this list if the situation improves.
+  ///
+  /// [DilidiliMediaSource] is also intentionally *not* registered here:
+  /// users have reported playback repeatedly stalling at ~2 seconds (the
+  /// player's reported total duration was only ~2s, not the real episode
+  /// length), on at least one real title/CDN line combination. The exact
+  /// resolved URL was independently verified (via direct HTTP replication
+  /// of the app's own request chain) to be fully reachable and structurally
+  /// valid end-to-end -- an AES-128-encrypted HLS playlist with a relative
+  /// key URI, all segments and the key itself fetched successfully -- so
+  /// the root cause was not conclusively identified (a proxy interaction
+  /// with the encrypted/relative-key-URI playlist chain is suspected but
+  /// unconfirmed). Disabled as a stopgap per explicit user request rather
+  /// than left broken for users. [DilidiliMediaSource]/[DilidiliApi] remain
+  /// intact and can be re-added to this list if the issue is resolved.
   MediaSourcesProvider._()
     : super(
         from: null,
@@ -85,4 +127,4 @@ final class MediaSourcesProvider
   }
 }
 
-String _$mediaSourcesHash() => r'c59414cdd36c2115cb94832f536462d481d22322';
+String _$mediaSourcesHash() => r'a15f28a1f1f895df925612007045152dd395a1c3';
