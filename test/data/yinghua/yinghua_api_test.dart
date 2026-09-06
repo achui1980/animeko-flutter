@@ -48,7 +48,11 @@ void main() {
 
     test('sends the title as the "wd" query param', () async {
       when(
-        () => dio.get<String>(any(), queryParameters: any(named: 'queryParameters'), options: any(named: 'options')),
+        () => dio.get<String>(
+          any(),
+          queryParameters: any(named: 'queryParameters'),
+          options: any(named: 'options'),
+        ),
       ).thenAnswer((_) async => htmlResponse(searchResultsHtml));
 
       await api.search('鬼灭之刃');
@@ -64,7 +68,11 @@ void main() {
 
     test('parses title and numeric id from each result', () async {
       when(
-        () => dio.get<String>(any(), queryParameters: any(named: 'queryParameters'), options: any(named: 'options')),
+        () => dio.get<String>(
+          any(),
+          queryParameters: any(named: 'queryParameters'),
+          options: any(named: 'options'),
+        ),
       ).thenAnswer((_) async => htmlResponse(searchResultsHtml));
 
       final results = await api.search('鬼灭之刃');
@@ -78,8 +86,14 @@ void main() {
 
     test('returns an empty list when there are no results', () async {
       when(
-        () => dio.get<String>(any(), queryParameters: any(named: 'queryParameters'), options: any(named: 'options')),
-      ).thenAnswer((_) async => htmlResponse('<html><body>no results</body></html>'));
+        () => dio.get<String>(
+          any(),
+          queryParameters: any(named: 'queryParameters'),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer(
+        (_) async => htmlResponse('<html><body>no results</body></html>'),
+      );
 
       final results = await api.search('nonexistent');
 
@@ -90,8 +104,10 @@ void main() {
   group('listEpisodes', () {
     // Real detail-page markup (captured live, 2026-09-05): a title can
     // have multiple "lines", each its own div.stui-pannel.stui-pannel-bg
-    // block with its own .stui-content__playlist. Only the first is
-    // read (v1 simplification, per explicit user decision).
+    // block with its own .stui-content__playlist. Episodes with the same
+    // title across blocks are merged into one YinghuaEpisode with an
+    // ordered list of URLs (first-seen line first); 第01集 appears in
+    // both 线路1 and 线路4, while 第02集 only exists in 线路1.
     const detailPageHtml = '''
 <html><body>
   <div class="stui-pannel stui-pannel-bg clearfix">
@@ -126,22 +142,25 @@ void main() {
 </body></html>
 ''';
 
-    test('fetches https://www.yinghua2.com/index.php/vod/detail/id/<id>.html', () async {
-      when(
-        () => dio.get<String>(any(), options: any(named: 'options')),
-      ).thenAnswer((_) async => htmlResponse('<html><body></body></html>'));
+    test(
+      'fetches https://www.yinghua2.com/index.php/vod/detail/id/<id>.html',
+      () async {
+        when(
+          () => dio.get<String>(any(), options: any(named: 'options')),
+        ).thenAnswer((_) async => htmlResponse('<html><body></body></html>'));
 
-      await api.listEpisodes(76362);
+        await api.listEpisodes(76362);
 
-      verify(
-        () => dio.get<String>(
-          'https://www.yinghua2.com/index.php/vod/detail/id/76362.html',
-          options: any(named: 'options'),
-        ),
-      ).called(1);
-    });
+        verify(
+          () => dio.get<String>(
+            'https://www.yinghua2.com/index.php/vod/detail/id/76362.html',
+            options: any(named: 'options'),
+          ),
+        ).called(1);
+      },
+    );
 
-    test('parses episodes from only the first line', () async {
+    test('merges episodes with the same title across line blocks', () async {
       when(
         () => dio.get<String>(any(), options: any(named: 'options')),
       ).thenAnswer((_) async => htmlResponse(detailPageHtml));
@@ -149,16 +168,28 @@ void main() {
       final episodes = await api.listEpisodes(76362);
 
       expect(episodes, hasLength(2));
+
+      // 第01集 exists in both 线路1 and 线路4: merged into one episode
+      // with both URLs, first-seen line (线路1, sid/5) first.
       expect(episodes[0].title, '第01集');
-      expect(episodes[0].playPageUrl, 'https://www.yinghua2.com/index.php/vod/play/id/76362/sid/5/nid/1.html');
+      expect(episodes[0].playPageUrls, [
+        'https://www.yinghua2.com/index.php/vod/play/id/76362/sid/5/nid/1.html',
+        'https://www.yinghua2.com/index.php/vod/play/id/76362/sid/2/nid/1.html',
+      ]);
+
+      // 第02集 only exists in 线路1: single-URL entry.
       expect(episodes[1].title, '第02集');
-      expect(episodes[1].playPageUrl, 'https://www.yinghua2.com/index.php/vod/play/id/76362/sid/5/nid/2.html');
+      expect(episodes[1].playPageUrls, [
+        'https://www.yinghua2.com/index.php/vod/play/id/76362/sid/5/nid/2.html',
+      ]);
     });
 
     test('returns an empty list when the page has no line blocks', () async {
       when(
         () => dio.get<String>(any(), options: any(named: 'options')),
-      ).thenAnswer((_) async => htmlResponse('<html><body>no episodes</body></html>'));
+      ).thenAnswer(
+        (_) async => htmlResponse('<html><body>no episodes</body></html>'),
+      );
 
       final episodes = await api.listEpisodes(9999);
 
@@ -170,7 +201,8 @@ void main() {
     // Real play-page script content (captured live, 2026-09-05):
     // player_aaaa has a nested vod_data object -- extraction must
     // brace-balance, not stop at the first "}". encrypt is always 0.
-    String playPageHtml(String url) => '''
+    String playPageHtml(String url) =>
+        '''
 <html><body>
 <script type="text/javascript">
 var player_aaaa={"flag":"play","encrypt":0,"trysee":0,"points":0,
@@ -181,54 +213,122 @@ var player_aaaa={"flag":"play","encrypt":0,"trysee":0,"points":0,
 </body></html>
 ''';
 
+    const primaryUrl =
+        'https://www.yinghua2.com/index.php/vod/play/id/76362/sid/5/nid/1.html';
+    const fallbackUrl =
+        'https://www.yinghua2.com/index.php/vod/play/id/76362/sid/2/nid/1.html';
+
     test('uses the url as-is with a defensive Referer header', () async {
       when(
-        () => dio.get<String>(any(), options: any(named: 'options')),
-      ).thenAnswer((_) async => htmlResponse(
-        playPageHtml('https://play.modujx11.com/20260705/gteTofLu/index.m3u8'),
-      ));
-
-      final source = await api.resolvePlaybackUrl(
-        'https://www.yinghua2.com/index.php/vod/play/id/76362/sid/5/nid/1.html',
+        () => dio.get<String>(primaryUrl, options: any(named: 'options')),
+      ).thenAnswer(
+        (_) async => htmlResponse(
+          playPageHtml(
+            'https://play.modujx11.com/20260705/gteTofLu/index.m3u8',
+          ),
+        ),
       );
 
-      expect(source.url, 'https://play.modujx11.com/20260705/gteTofLu/index.m3u8');
-      expect(source.headers['Referer'], 'https://www.yinghua2.com/');
-    });
+      final sources = await api.resolvePlaybackUrl([primaryUrl]);
 
-    test('throws FormatException when there is no player_aaaa variable', () async {
-      when(
-        () => dio.get<String>(any(), options: any(named: 'options')),
-      ).thenAnswer((_) async => htmlResponse('<html><body>no player here</body></html>'));
-
+      expect(sources, hasLength(1));
       expect(
-        () => api.resolvePlaybackUrl('https://www.yinghua2.com/index.php/vod/play/id/76362/sid/5/nid/1.html'),
-        throwsFormatException,
+        sources.single.url,
+        'https://play.modujx11.com/20260705/gteTofLu/index.m3u8',
       );
+      expect(sources.single.headers['Referer'], 'https://www.yinghua2.com/');
     });
 
-    test('throws FormatException when player_aaaa has no "url" field', () async {
-      when(
-        () => dio.get<String>(any(), options: any(named: 'options')),
-      ).thenAnswer((_) async => htmlResponse('''
+    test(
+      'throws FormatException when there is no player_aaaa variable',
+      () async {
+        when(
+          () => dio.get<String>(primaryUrl, options: any(named: 'options')),
+        ).thenAnswer(
+          (_) async => htmlResponse('<html><body>no player here</body></html>'),
+        );
+
+        expect(
+          () => api.resolvePlaybackUrl([primaryUrl]),
+          throwsFormatException,
+        );
+      },
+    );
+
+    test(
+      'throws FormatException when player_aaaa has no "url" field',
+      () async {
+        when(
+          () => dio.get<String>(primaryUrl, options: any(named: 'options')),
+        ).thenAnswer(
+          (_) async => htmlResponse('''
 <html><body><script>
 var player_aaaa={"flag":"play","encrypt":0,"vod_data":{"vod_name":"x"}}
 </script></body></html>
-'''));
+'''),
+        );
 
-      expect(
-        () => api.resolvePlaybackUrl('https://www.yinghua2.com/index.php/vod/play/id/76362/sid/5/nid/1.html'),
-        throwsFormatException,
-      );
-    });
+        expect(
+          () => api.resolvePlaybackUrl([primaryUrl]),
+          throwsFormatException,
+        );
+      },
+    );
+
+    test(
+      'skips a candidate that throws and returns the successful one',
+      () async {
+        when(
+          () => dio.get<String>(primaryUrl, options: any(named: 'options')),
+        ).thenThrow(
+          DioException(requestOptions: RequestOptions(path: primaryUrl)),
+        );
+        when(
+          () => dio.get<String>(fallbackUrl, options: any(named: 'options')),
+        ).thenAnswer(
+          (_) async => htmlResponse(
+            playPageHtml('https://play.example.com/fallback.m3u8'),
+          ),
+        );
+
+        final sources = await api.resolvePlaybackUrl([primaryUrl, fallbackUrl]);
+
+        expect(sources, hasLength(1));
+        expect(sources.single.url, 'https://play.example.com/fallback.m3u8');
+      },
+    );
+
+    test(
+      'throws FormatException when every candidate fails to resolve',
+      () async {
+        when(
+          () => dio.get<String>(primaryUrl, options: any(named: 'options')),
+        ).thenAnswer(
+          (_) async => htmlResponse('<html><body>no player here</body></html>'),
+        );
+        when(
+          () => dio.get<String>(fallbackUrl, options: any(named: 'options')),
+        ).thenThrow(
+          DioException(requestOptions: RequestOptions(path: fallbackUrl)),
+        );
+
+        expect(
+          () => api.resolvePlaybackUrl([primaryUrl, fallbackUrl]),
+          throwsFormatException,
+        );
+      },
+    );
   });
 
-  test('yinghuaApiProvider builds a YinghuaApi backed by yinghuaDioProvider', () {
-    final container = ProviderContainer();
-    addTearDown(container.dispose);
-    final api = container.read(yinghuaApiProvider);
-    expect(api, isA<YinghuaApi>());
-  });
+  test(
+    'yinghuaApiProvider builds a YinghuaApi backed by yinghuaDioProvider',
+    () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final api = container.read(yinghuaApiProvider);
+      expect(api, isA<YinghuaApi>());
+    },
+  );
 
   test('yinghuaDioProvider sets a non-empty User-Agent header', () {
     final container = ProviderContainer();

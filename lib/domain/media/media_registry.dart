@@ -91,11 +91,8 @@ class YinghuaMediaSource implements MediaSource {
       _api.listEpisodes((candidate as YinghuaBangumi).id);
 
   @override
-  Future<List<MediaPlaybackSource>> resolvePlayback(
-    MediaEpisode episode,
-  ) async => [
-    await _api.resolvePlaybackUrl((episode as YinghuaEpisode).playPageUrl),
-  ];
+  Future<List<MediaPlaybackSource>> resolvePlayback(MediaEpisode episode) =>
+      _api.resolvePlaybackUrl((episode as YinghuaEpisode).playPageUrls);
 }
 
 /// Adapts [DilidiliApi] to the shared [MediaSource] interface. See

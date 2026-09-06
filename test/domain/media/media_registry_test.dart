@@ -169,8 +169,9 @@ void main() {
           (_) async => [
             const YinghuaEpisode(
               title: '第01集',
-              playPageUrl:
-                  'https://www.yinghua2.com/index.php/vod/play/id/58802/sid/1/nid/1.html',
+              playPageUrls: [
+                'https://www.yinghua2.com/index.php/vod/play/id/58802/sid/1/nid/1.html',
+              ],
             ),
           ],
         );
@@ -182,22 +183,23 @@ void main() {
     );
 
     test(
-      "resolvePlayback delegates to resolvePlaybackUrl using the episode's playPageUrl",
+      "resolvePlayback delegates to resolvePlaybackUrl using the episode's playPageUrls",
       () async {
         when(
-          () => api.resolvePlaybackUrl(
+          () => api.resolvePlaybackUrl([
             'https://www.yinghua2.com/index.php/vod/play/id/58802/sid/1/nid/1.html',
-          ),
+          ]),
         ).thenAnswer(
-          (_) async => const YinghuaPlaybackSource(
-            url: 'https://play.example.com/a.m3u8',
-          ),
+          (_) async => const [
+            YinghuaPlaybackSource(url: 'https://play.example.com/a.m3u8'),
+          ],
         );
         final result = await source.resolvePlayback(
           const YinghuaEpisode(
             title: '第01集',
-            playPageUrl:
-                'https://www.yinghua2.com/index.php/vod/play/id/58802/sid/1/nid/1.html',
+            playPageUrls: [
+              'https://www.yinghua2.com/index.php/vod/play/id/58802/sid/1/nid/1.html',
+            ],
           ),
         );
         expect(result, hasLength(1));

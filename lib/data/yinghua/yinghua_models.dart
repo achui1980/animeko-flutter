@@ -13,19 +13,23 @@ class YinghuaBangumi implements MediaCandidate {
   String get sourceId => 'yinghua';
 }
 
-/// A single episode: one entry in a bangumi's episode list (only the
-/// *first* line/route -- see [YinghuaApi.listEpisodes]'s doc comment).
+/// One logical episode, merged across all "线路" (line) blocks that
+/// expose it under the same title. [playPageUrls] is ordered by line
+/// appearance on the detail page; index 0 is the default/primary line,
+/// the rest are fallback candidates.
 class YinghuaEpisode implements MediaEpisode {
-  const YinghuaEpisode({required this.title, required this.playPageUrl});
+  const YinghuaEpisode({required this.title, required this.playPageUrls});
 
   /// Episode label, e.g. `第01集`.
   @override
   final String title;
 
-  /// Absolute URL of the play page
+  /// Absolute URLs of the play page, one per "线路" (line) that exposes
+  /// this episode under the same title
   /// (`/index.php/vod/play/id/<id>/sid/<line>/nid/<episode>.html`),
-  /// passed to [YinghuaApi.resolvePlaybackUrl].
-  final String playPageUrl;
+  /// ordered by line appearance on the detail page. Passed to
+  /// [YinghuaApi.resolvePlaybackUrl].
+  final List<String> playPageUrls;
 
   @override
   String get sourceId => 'yinghua';

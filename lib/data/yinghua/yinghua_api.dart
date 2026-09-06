@@ -53,11 +53,14 @@ class YinghuaApi {
 
   /// GET https://www.yinghua2.com/index.php/vod/detail/id/`<id>`.html
   ///
-  /// NOTE (v1 simplification, per explicit user decision): the site
-  /// offers multiple named "lines" per title (e.g. 线路1/线路4/5线),
-  /// each rendered as its own `div.stui-pannel.stui-pannel-bg` block
-  /// with a full, separate episode list. This only reads the *first*
-  /// such block. TODO: support switching between lines.
+  /// Lists episodes merged across ALL "线路" (line) blocks on the detail
+  /// page. Each line block is a `div.stui-pannel.stui-pannel-bg` with its
+  /// own full `<ul class="stui-content__playlist">`; the same logical
+  /// episode appears in multiple blocks under a different URL (the line
+  /// is encoded in the URL's `sid` path segment). Episodes are merged
+  /// across blocks by EXACT title match, in the order blocks appear on
+  /// the page -- so [YinghuaEpisode.playPageUrls] is ordered with the
+  /// first-encountered line first (the default/primary line).
   Future<List<YinghuaEpisode>> listEpisodes(int id) async {
     final response = await _dio.get<String>(
       '$_baseUrl/index.php/vod/detail/id/$id.html',
@@ -65,47 +68,83 @@ class YinghuaApi {
     );
     final document = html_parser.parse(response.data ?? '');
 
-    final firstLine = document.querySelector('div.stui-pannel.stui-pannel-bg');
-    if (firstLine == null) return const [];
+    final lineBlocks = document.querySelectorAll(
+      'div.stui-pannel.stui-pannel-bg',
+    );
 
-    final episodes = <YinghuaEpisode>[];
-    for (final link in firstLine.querySelectorAll('.stui-content__playlist > li > a')) {
-      final href = link.attributes['href'];
-      final title = link.text.trim();
-      if (href == null || title.isEmpty) continue;
-      final url = href.startsWith('http') ? href : '$_baseUrl$href';
-      episodes.add(YinghuaEpisode(title: title, playPageUrl: url));
+    // Title -> ordered list of URLs (first-seen line first).
+    final urlsByTitle = <String, List<String>>{};
+    final titleOrder = <String>[];
+    for (final block in lineBlocks) {
+      for (final link in block.querySelectorAll(
+        '.stui-content__playlist > li > a',
+      )) {
+        final href = link.attributes['href'];
+        final title = link.text.trim();
+        if (href == null || title.isEmpty) continue;
+        final url = href.startsWith('http') ? href : '$_baseUrl$href';
+        final urls = urlsByTitle.putIfAbsent(title, () {
+          titleOrder.add(title);
+          return <String>[];
+        });
+        urls.add(url);
+      }
     }
-    return episodes;
+
+    return titleOrder
+        .map(
+          (title) =>
+              YinghuaEpisode(title: title, playPageUrls: urlsByTitle[title]!),
+        )
+        .toList();
   }
 
   /// GET the play page, extract the inline `var player_aaaa = {...};`
   /// object, and use its `url` field as-is (see `YinghuaPlaybackSource`'s
   /// doc comment -- no decryption is needed on this site).
-  Future<YinghuaPlaybackSource> resolvePlaybackUrl(String playPageUrl) async {
-    final response = await _dio.get<String>(
-      playPageUrl,
-      options: Options(responseType: ResponseType.plain),
-    );
-    final body = response.data ?? '';
+  ///
+  /// Resolves ALL playable line candidates for a logical episode, in the
+  /// order given by [playPageUrls] (see [YinghuaEpisode]). Each URL is
+  /// requested and parsed independently; a URL that fails (network
+  /// error, missing `player_aaaa`, missing `url` field) is skipped
+  /// rather than aborting the whole call -- an exception is only thrown
+  /// if EVERY URL fails.
+  Future<List<YinghuaPlaybackSource>> resolvePlaybackUrl(
+    List<String> playPageUrls,
+  ) async {
+    final sources = <YinghuaPlaybackSource>[];
+    for (final playPageUrl in playPageUrls) {
+      try {
+        final response = await _dio.get<String>(
+          playPageUrl,
+          options: Options(responseType: ResponseType.plain),
+        );
+        final body = response.data ?? '';
 
-    final json = _extractPlayerJson(body);
-    if (json == null) {
+        final json = _extractPlayerJson(body);
+        if (json == null) continue;
+
+        final playerData = jsonDecode(json) as Map<String, dynamic>;
+        final url = playerData['url'] as String?;
+        if (url == null || url.isEmpty) continue;
+
+        sources.add(
+          YinghuaPlaybackSource(
+            url: url,
+            headers: const {'Referer': 'https://www.yinghua2.com/'},
+          ),
+        );
+      } catch (_) {
+        continue;
+      }
+    }
+
+    if (sources.isEmpty) {
       throw const FormatException(
-        '樱花动漫 play page has no player_aaaa script variable',
+        '樱花动漫: none of the candidate lines resolved to a playable url',
       );
     }
-
-    final playerData = jsonDecode(json) as Map<String, dynamic>;
-    final url = playerData['url'] as String?;
-    if (url == null || url.isEmpty) {
-      throw const FormatException('樱花动漫 player_aaaa has no "url" field');
-    }
-
-    return YinghuaPlaybackSource(
-      url: url,
-      headers: const {'Referer': 'https://www.yinghua2.com/'},
-    );
+    return sources;
   }
 }
 
