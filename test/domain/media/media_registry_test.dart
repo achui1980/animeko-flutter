@@ -254,9 +254,9 @@ void main() {
             'https://dilidili.io/watch/one-piece-ep1176/',
           ),
         ).thenAnswer(
-          (_) async => const DilidiliPlaybackSource(
-            url: 'https://v.lzcdn31.com/index.m3u8',
-          ),
+          (_) async => const [
+            DilidiliPlaybackSource(url: 'https://v.lzcdn31.com/index.m3u8'),
+          ],
         );
         final result = await source.resolvePlayback(
           const DilidiliEpisode(

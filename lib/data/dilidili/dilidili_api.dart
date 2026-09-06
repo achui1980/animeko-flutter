@@ -68,7 +68,8 @@ class DilidiliApi {
     for (final link in document.querySelectorAll('.time_con ul.clear li > a')) {
       final href = link.attributes['href'];
       if (href == null) continue;
-      final title = link.querySelector('em > span')?.text.trim() ?? link.text.trim();
+      final title =
+          link.querySelector('em > span')?.text.trim() ?? link.text.trim();
       if (title.isEmpty) continue;
       final url = href.startsWith('http') ? href : '$_baseUrl$href';
       episodes.add(DilidiliEpisode(title: title, watchPageUrl: url));
@@ -76,47 +77,65 @@ class DilidiliApi {
     return episodes;
   }
 
-  /// GET the watch page, take the *first* `button.play-btn`'s `play_id`
-  /// attribute (v1 simplification, per explicit user decision -- the
-  /// site offers multiple named "lines" per episode, e.g.
-  /// 线路ML/MW/MS, each its own play_id. TODO: support switching between
-  /// lines), then GET `/_get_play?id=<play_id>` to resolve the actual
-  /// playable URL (confirmed live 2026-09-05: `result.play_data` is
-  /// already a plain, directly-playable `.m3u8` URL, no decrypt needed).
-  Future<DilidiliPlaybackSource> resolvePlaybackUrl(String watchPageUrl) async {
+  /// Resolves ALL playable "线路" (line) candidates for the given watch
+  /// page, in the order they appear on the page. The watch page can list
+  /// multiple `button.play-btn` elements (one per line), each with its
+  /// own `play_id`; every line is independently resolved via
+  /// `/_get_play`. Lines that fail to resolve (network error, malformed
+  /// JSON, missing `play_data`) are skipped rather than aborting the
+  /// whole call — an exception is only thrown if EVERY line fails.
+  Future<List<DilidiliPlaybackSource>> resolvePlaybackUrl(
+    String watchPageUrl,
+  ) async {
     final watchResponse = await _dio.get<String>(
       watchPageUrl,
       options: Options(responseType: ResponseType.plain),
     );
     final document = html_parser.parse(watchResponse.data ?? '');
 
-    final playButton = document.querySelector('button.play-btn');
-    final playId = playButton?.attributes['play_id'];
-    if (playId == null || playId.isEmpty) {
+    final playIds = document
+        .querySelectorAll('button.play-btn')
+        .map((button) => button.attributes['play_id'])
+        .whereType<String>()
+        .where((id) => id.isNotEmpty)
+        .toList();
+    if (playIds.isEmpty) {
       throw const FormatException(
         '嘀哩嘀哩 watch page has no button.play-btn with a play_id',
       );
     }
 
-    final playResponse = await _dio.get<String>(
-      '$_baseUrl/_get_play',
-      queryParameters: {'id': playId},
-      options: Options(
-        responseType: ResponseType.plain,
-        headers: {'Referer': watchPageUrl},
-      ),
-    );
-    final playData = jsonDecode(playResponse.data ?? '{}') as Map<String, dynamic>;
-    final result = playData['result'] as Map<String, dynamic>?;
-    final url = result?['play_data'] as String?;
-    if (url == null || url.isEmpty) {
-      throw const FormatException('嘀哩嘀哩 /_get_play has no "play_data" field');
+    final sources = <DilidiliPlaybackSource>[];
+    for (final playId in playIds) {
+      try {
+        final playResponse = await _dio.get<String>(
+          '$_baseUrl/_get_play',
+          queryParameters: {'id': playId},
+          options: Options(
+            responseType: ResponseType.plain,
+            headers: {'Referer': watchPageUrl},
+          ),
+        );
+        final playData =
+            jsonDecode(playResponse.data ?? '{}') as Map<String, dynamic>;
+        final result = playData['result'] as Map<String, dynamic>?;
+        final url = result?['play_data'] as String?;
+        if (url == null || url.isEmpty) continue;
+        sources.add(
+          DilidiliPlaybackSource(
+            url: url,
+            headers: const {'Referer': 'https://dilidili.io/'},
+          ),
+        );
+      } catch (_) {
+        continue;
+      }
     }
 
-    return DilidiliPlaybackSource(
-      url: url,
-      headers: const {'Referer': 'https://dilidili.io/'},
-    );
+    if (sources.isEmpty) {
+      throw const FormatException('嘀哩嘀哩 /_get_play has no "play_data" field');
+    }
+    return sources;
   }
 }
 

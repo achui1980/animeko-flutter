@@ -118,11 +118,8 @@ class DilidiliMediaSource implements MediaSource {
       _api.listEpisodes((candidate as DilidiliAnime).slug);
 
   @override
-  Future<List<MediaPlaybackSource>> resolvePlayback(
-    MediaEpisode episode,
-  ) async => [
-    await _api.resolvePlaybackUrl((episode as DilidiliEpisode).watchPageUrl),
-  ];
+  Future<List<MediaPlaybackSource>> resolvePlayback(MediaEpisode episode) =>
+      _api.resolvePlaybackUrl((episode as DilidiliEpisode).watchPageUrl);
 }
 
 /// Every registered [MediaSource], queried concurrently by

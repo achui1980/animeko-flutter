@@ -50,7 +50,11 @@ void main() {
 
     test('sends the title as the "q" query param with kwtype=0', () async {
       when(
-        () => dio.get<String>(any(), queryParameters: any(named: 'queryParameters'), options: any(named: 'options')),
+        () => dio.get<String>(
+          any(),
+          queryParameters: any(named: 'queryParameters'),
+          options: any(named: 'options'),
+        ),
       ).thenAnswer((_) async => htmlResponse(searchResultsHtml));
 
       await api.search('海贼王');
@@ -66,7 +70,11 @@ void main() {
 
     test('parses title and slug from each result', () async {
       when(
-        () => dio.get<String>(any(), queryParameters: any(named: 'queryParameters'), options: any(named: 'options')),
+        () => dio.get<String>(
+          any(),
+          queryParameters: any(named: 'queryParameters'),
+          options: any(named: 'options'),
+        ),
       ).thenAnswer((_) async => htmlResponse(searchResultsHtml));
 
       final results = await api.search('海贼王');
@@ -80,8 +88,14 @@ void main() {
 
     test('returns an empty list when there are no results', () async {
       when(
-        () => dio.get<String>(any(), queryParameters: any(named: 'queryParameters'), options: any(named: 'options')),
-      ).thenAnswer((_) async => htmlResponse('<html><body>no results</body></html>'));
+        () => dio.get<String>(
+          any(),
+          queryParameters: any(named: 'queryParameters'),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer(
+        (_) async => htmlResponse('<html><body>no results</body></html>'),
+      );
 
       final results = await api.search('nonexistent');
 
@@ -122,7 +136,10 @@ void main() {
       await api.listEpisodes('one-piece');
 
       verify(
-        () => dio.get<String>('https://dilidili.io/anime/one-piece/', options: any(named: 'options')),
+        () => dio.get<String>(
+          'https://dilidili.io/anime/one-piece/',
+          options: any(named: 'options'),
+        ),
       ).called(1);
     });
 
@@ -135,15 +152,23 @@ void main() {
 
       expect(episodes, hasLength(2));
       expect(episodes[0].title, '第1176集');
-      expect(episodes[0].watchPageUrl, 'https://dilidili.io/watch/one-piece-ep1176/');
+      expect(
+        episodes[0].watchPageUrl,
+        'https://dilidili.io/watch/one-piece-ep1176/',
+      );
       expect(episodes[1].title, '第1175集');
-      expect(episodes[1].watchPageUrl, 'https://dilidili.io/watch/one-piece-ep1175/');
+      expect(
+        episodes[1].watchPageUrl,
+        'https://dilidili.io/watch/one-piece-ep1175/',
+      );
     });
 
     test('returns an empty list when the page has no episode links', () async {
       when(
         () => dio.get<String>(any(), options: any(named: 'options')),
-      ).thenAnswer((_) async => htmlResponse('<html><body>no episodes</body></html>'));
+      ).thenAnswer(
+        (_) async => htmlResponse('<html><body>no episodes</body></html>'),
+      );
 
       final episodes = await api.listEpisodes('nonexistent');
 
@@ -156,8 +181,7 @@ void main() {
 
     // Real watch-page markup (captured live, 2026-09-05): multiple
     // named "lines" per episode, each its own button.play-btn[play_id].
-    // Only the first is read (v1 simplification, per explicit user
-    // decision).
+    // All lines are resolved as independent fallback candidates.
     const watchPageHtml = '''
 <html><body>
   <div class="player_switch">
@@ -171,49 +195,109 @@ void main() {
 </body></html>
 ''';
 
-    // Real /_get_play response (captured live, 2026-09-05).
-    const getPlayJson = '''
-{"result": {"play_cfg": "m3u8", "play_data": "https://v.lzcdn31.com/20260830/10791_931e1c5f/index.m3u8"}, "id": "_get_play_346921"}
-''';
+    test(
+      'collects every play-btn\'s play_id and resolves each into a candidate, in page order',
+      () async {
+        when(
+          () => dio.get<String>(watchUrl, options: any(named: 'options')),
+        ).thenAnswer((_) async => htmlResponse(watchPageHtml));
+        when(
+          () => dio.get<String>(
+            'https://dilidili.io/_get_play',
+            queryParameters: {'id': '346921'},
+            options: any(named: 'options'),
+          ),
+        ).thenAnswer(
+          (_) async => htmlResponse(
+            '{"result": {"play_data": "https://cdn1.example/a.m3u8"}}',
+          ),
+        );
+        when(
+          () => dio.get<String>(
+            'https://dilidili.io/_get_play',
+            queryParameters: {'id': '346926'},
+            options: any(named: 'options'),
+          ),
+        ).thenAnswer(
+          (_) async => htmlResponse(
+            '{"result": {"play_data": "https://cdn2.example/b.m3u8"}}',
+          ),
+        );
+        when(
+          () => dio.get<String>(
+            'https://dilidili.io/_get_play',
+            queryParameters: {'id': '346928'},
+            options: any(named: 'options'),
+          ),
+        ).thenAnswer(
+          (_) async => htmlResponse(
+            '{"result": {"play_data": "https://cdn3.example/c.m3u8"}}',
+          ),
+        );
 
-    test('uses the first play-btn\'s play_id and returns play_data as-is', () async {
-      when(
-        () => dio.get<String>(watchUrl, options: any(named: 'options')),
-      ).thenAnswer((_) async => htmlResponse(watchPageHtml));
-      when(
-        () => dio.get<String>(
-          'https://dilidili.io/_get_play',
-          queryParameters: any(named: 'queryParameters'),
-          options: any(named: 'options'),
-        ),
-      ).thenAnswer((_) async => htmlResponse(getPlayJson));
+        final result = await api.resolvePlaybackUrl(watchUrl);
 
-      final source = await api.resolvePlaybackUrl(watchUrl);
-
-      expect(source.url, 'https://v.lzcdn31.com/20260830/10791_931e1c5f/index.m3u8');
-      expect(source.headers['Referer'], 'https://dilidili.io/');
-
-      verify(
-        () => dio.get<String>(
-          'https://dilidili.io/_get_play',
-          queryParameters: {'id': '346921'},
-          options: any(named: 'options'),
-        ),
-      ).called(1);
-    });
+        expect(result.map((s) => s.url), [
+          'https://cdn1.example/a.m3u8',
+          'https://cdn2.example/b.m3u8',
+          'https://cdn3.example/c.m3u8',
+        ]);
+        expect(
+          result.every((s) => s.headers['Referer'] == 'https://dilidili.io/'),
+          isTrue,
+        );
+      },
+    );
 
     test('throws FormatException when there is no play-btn', () async {
       when(
         () => dio.get<String>(watchUrl, options: any(named: 'options')),
-      ).thenAnswer((_) async => htmlResponse('<html><body>no player here</body></html>'));
-
-      expect(
-        () => api.resolvePlaybackUrl(watchUrl),
-        throwsFormatException,
+      ).thenAnswer(
+        (_) async => htmlResponse('<html><body>no player here</body></html>'),
       );
+
+      expect(() => api.resolvePlaybackUrl(watchUrl), throwsFormatException);
     });
 
-    test('throws FormatException when /_get_play has no play_data', () async {
+    test(
+      'skips a candidate whose /_get_play call fails, keeps the rest',
+      () async {
+        when(
+          () => dio.get<String>(watchUrl, options: any(named: 'options')),
+        ).thenAnswer((_) async => htmlResponse(watchPageHtml));
+        when(
+          () => dio.get<String>(
+            'https://dilidili.io/_get_play',
+            queryParameters: {'id': '346921'},
+            options: any(named: 'options'),
+          ),
+        ).thenThrow(Exception('network error'));
+        when(
+          () => dio.get<String>(
+            'https://dilidili.io/_get_play',
+            queryParameters: {'id': '346926'},
+            options: any(named: 'options'),
+          ),
+        ).thenAnswer(
+          (_) async => htmlResponse(
+            '{"result": {"play_data": "https://cdn2.example/b.m3u8"}}',
+          ),
+        );
+        when(
+          () => dio.get<String>(
+            'https://dilidili.io/_get_play',
+            queryParameters: {'id': '346928'},
+            options: any(named: 'options'),
+          ),
+        ).thenAnswer((_) async => htmlResponse('{"result": {}}'));
+
+        final result = await api.resolvePlaybackUrl(watchUrl);
+
+        expect(result.map((s) => s.url), ['https://cdn2.example/b.m3u8']);
+      },
+    );
+
+    test('throws FormatException when every line fails to resolve', () async {
       when(
         () => dio.get<String>(watchUrl, options: any(named: 'options')),
       ).thenAnswer((_) async => htmlResponse(watchPageHtml));
@@ -223,21 +307,51 @@ void main() {
           queryParameters: any(named: 'queryParameters'),
           options: any(named: 'options'),
         ),
-      ).thenAnswer((_) async => htmlResponse('{"result": {"play_cfg": "m3u8"}}'));
+      ).thenAnswer((_) async => htmlResponse('{"result": {}}'));
 
       expect(
         () => api.resolvePlaybackUrl(watchUrl),
-        throwsFormatException,
+        throwsA(isA<FormatException>()),
       );
     });
+
+    test(
+      'throws FormatException when /_get_play has no play_data (single line)',
+      () async {
+        const singleButtonHtml = '''
+<html><body>
+  <div class="player_switch">
+    <button class="play-btn on" id="1" play_id="346921">第1176集 (线路ML)</button>
+  </div>
+</body></html>
+''';
+        when(
+          () => dio.get<String>(watchUrl, options: any(named: 'options')),
+        ).thenAnswer((_) async => htmlResponse(singleButtonHtml));
+        when(
+          () => dio.get<String>(
+            'https://dilidili.io/_get_play',
+            queryParameters: any(named: 'queryParameters'),
+            options: any(named: 'options'),
+          ),
+        ).thenAnswer(
+          (_) async => htmlResponse('{"result": {"play_cfg": "m3u8"}}'),
+        );
+
+        expect(() => api.resolvePlaybackUrl(watchUrl), throwsFormatException);
+      },
+    );
   });
 
-  test('dilidiliApiProvider builds a DilidiliApi backed by dilidiliDioProvider', () {
-    final container = ProviderContainer();
-    addTearDown(container.dispose);
-    final api = container.read(dilidiliApiProvider);
-    expect(api, isA<DilidiliApi>());
-  });
+  test(
+    'dilidiliApiProvider builds a DilidiliApi backed by dilidiliDioProvider',
+    () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final api = container.read(dilidiliApiProvider);
+      expect(api, isA<DilidiliApi>());
+    },
+  );
 
   test('dilidiliDioProvider sets a non-empty User-Agent header', () {
     final container = ProviderContainer();
