@@ -11,6 +11,13 @@ part of 'media_registry.dart';
 /// Every registered [MediaSource], queried concurrently by
 /// `SubjectEpisodesController`. Add a new source here (and nowhere else)
 /// to make it participate in the merged search/episode-list flow.
+///
+/// [YinghuaMediaSource] is intentionally *not* registered here: its CDN
+/// lines have repeatedly been observed dead/blocked in the wild (e.g. a
+/// `vip.ffzy-plays.com` line returning HTTP 403 on every request), so the
+/// source is disabled at the app level rather than removed outright --
+/// [YinghuaMediaSource]/[YinghuaApi] remain intact and can be re-added to
+/// this list if the situation improves.
 
 @ProviderFor(mediaSources)
 final mediaSourcesProvider = MediaSourcesProvider._();
@@ -18,6 +25,13 @@ final mediaSourcesProvider = MediaSourcesProvider._();
 /// Every registered [MediaSource], queried concurrently by
 /// `SubjectEpisodesController`. Add a new source here (and nowhere else)
 /// to make it participate in the merged search/episode-list flow.
+///
+/// [YinghuaMediaSource] is intentionally *not* registered here: its CDN
+/// lines have repeatedly been observed dead/blocked in the wild (e.g. a
+/// `vip.ffzy-plays.com` line returning HTTP 403 on every request), so the
+/// source is disabled at the app level rather than removed outright --
+/// [YinghuaMediaSource]/[YinghuaApi] remain intact and can be re-added to
+/// this list if the situation improves.
 
 final class MediaSourcesProvider
     extends
@@ -30,6 +44,13 @@ final class MediaSourcesProvider
   /// Every registered [MediaSource], queried concurrently by
   /// `SubjectEpisodesController`. Add a new source here (and nowhere else)
   /// to make it participate in the merged search/episode-list flow.
+  ///
+  /// [YinghuaMediaSource] is intentionally *not* registered here: its CDN
+  /// lines have repeatedly been observed dead/blocked in the wild (e.g. a
+  /// `vip.ffzy-plays.com` line returning HTTP 403 on every request), so the
+  /// source is disabled at the app level rather than removed outright --
+  /// [YinghuaMediaSource]/[YinghuaApi] remain intact and can be re-added to
+  /// this list if the situation improves.
   MediaSourcesProvider._()
     : super(
         from: null,
@@ -64,4 +85,4 @@ final class MediaSourcesProvider
   }
 }
 
-String _$mediaSourcesHash() => r'633bcc2d0984c246bde54789f008cdcaf740e064';
+String _$mediaSourcesHash() => r'c59414cdd36c2115cb94832f536462d481d22322';

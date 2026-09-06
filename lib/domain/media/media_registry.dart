@@ -119,10 +119,16 @@ class DilidiliMediaSource implements MediaSource {
 /// Every registered [MediaSource], queried concurrently by
 /// `SubjectEpisodesController`. Add a new source here (and nowhere else)
 /// to make it participate in the merged search/episode-list flow.
+///
+/// [YinghuaMediaSource] is intentionally *not* registered here: its CDN
+/// lines have repeatedly been observed dead/blocked in the wild (e.g. a
+/// `vip.ffzy-plays.com` line returning HTTP 403 on every request), so the
+/// source is disabled at the app level rather than removed outright --
+/// [YinghuaMediaSource]/[YinghuaApi] remain intact and can be re-added to
+/// this list if the situation improves.
 @riverpod
 List<MediaSource> mediaSources(Ref ref) => [
   Anime1MediaSource(ref.watch(anime1ApiProvider)),
   XifanMediaSource(ref.watch(xifanApiProvider)),
-  YinghuaMediaSource(ref.watch(yinghuaApiProvider)),
   DilidiliMediaSource(ref.watch(dilidiliApiProvider)),
 ];
