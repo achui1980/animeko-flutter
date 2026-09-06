@@ -14,6 +14,7 @@ import 'package:screen_brightness/screen_brightness.dart';
 import '../../app/theme/app_theme.dart';
 import '../../data/play/playback_position_storage.dart';
 import '../../domain/media/media_registry.dart';
+import '../../domain/media/media_source.dart';
 import '../../domain/play/episode_play_controller.dart';
 import '../../domain/play/subject_episodes_controller.dart';
 import '../../domain/settings/playback_speed_controller.dart';
@@ -66,6 +67,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   /// failure.
   String? _playbackError;
 
+  List<MediaPlaybackSource>? _candidates;
+  int _candidateIndex = 0;
+
   StreamSubscription<bool>? _completedSubscription;
   bool _hasAdvancedToNextEpisode = false;
   bool _drawerOpen = false;
@@ -111,7 +115,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     _currentEpisode = widget.episode;
     _storageFuture = ref.read(playbackPositionStorageProvider.future);
     _player.stream.error.listen((message) {
-      if (mounted) setState(() => _playbackError = message);
+      if (!mounted) return;
+      final candidates = _candidates;
+      if (candidates != null && _candidateIndex + 1 < candidates.length) {
+        // Another line is available -- silently advance and retry
+        // without surfacing an error to the user. Does not distinguish
+        // "failed to open" from "failed mid-stream"; both are handled
+        // identically per the design spec.
+        _candidateIndex++;
+        _openCandidate(candidates[_candidateIndex]);
+        return;
+      }
+      setState(() => _playbackError = message);
     });
     _completedSubscription = _player.stream.completed.listen((completed) {
       if (completed) {
@@ -458,7 +473,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   void _retry() {
     setState(() => _playbackError = null);
+    _candidateIndex = 0;
     ref.invalidate(episodePlayControllerProvider(episode: _currentEpisode));
+  }
+
+  Future<void> _openCandidate(MediaPlaybackSource source) async {
+    await _player.open(Media(source.url, httpHeaders: source.headers));
+    final speed = await ref.read(playbackSpeedControllerProvider.future);
+    await _player.setRate(speed);
+    await _maybeResumePosition();
+    if (mounted) _hasAdvancedToNextEpisode = false;
   }
 
   /// Renders the collapsible episode/source drawer. `child` is `null`
@@ -544,27 +568,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     // as a side effect exactly once per successful resolution, not on
     // every `build()` (see design doc "数据流" step 3).
     ref.listen(provider, (previous, next) {
-      next.whenData((source) async {
-        await _player.open(
-          Media(
-            source.url,
-            // Some sources' video CDNs (e.g. anime1.me) reject direct
-            // requests without specific headers -- see each concrete
-            // MediaPlaybackSource's own `headers` doc comment. Others
-            // (e.g. 稀饭动漫) need none, in which case this is empty.
-            httpHeaders: source.headers,
-          ),
-        );
-        final speed = await ref.read(playbackSpeedControllerProvider.future);
-        await _player.setRate(speed);
-        await _maybeResumePosition();
-        // The newly-selected episode's media has now actually finished
-        // opening (and any saved position restored) -- only now is it
-        // safe to disarm the guard set in `_maybePlayNextEpisode`. See
-        // that method's doc comment for why this can't be disarmed any
-        // earlier (e.g. right after the `setState` that swaps
-        // `_currentEpisode`).
-        if (mounted) _hasAdvancedToNextEpisode = false;
+      next.whenData((candidates) async {
+        _candidates = candidates;
+        _candidateIndex = 0;
+        if (mounted) setState(() => _playbackError = null);
+        await _openCandidate(candidates[_candidateIndex]);
       });
     });
     final playback = ref.watch(provider);
@@ -598,7 +606,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                         // disabled (controls: NoVideoControls) -- this app
                         // renders its own custom top/bottom control bars
                         // instead (see PlayerTopBar/PlayerBottomBar).
-                        : Video(controller: _controller, controls: NoVideoControls),
+                        : Video(
+                            controller: _controller,
+                            controls: NoVideoControls,
+                          ),
                   ),
                   if (_showVolumeHud)
                     Center(
@@ -632,7 +643,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                       left: 0,
                       right: 0,
                       child: PlayerTopBar(
-                        title: '${widget.subjectName} · ${_currentEpisode.title}',
+                        title:
+                            '${widget.subjectName} · ${_currentEpisode.title}',
                         onBack: () => Navigator.of(context).pop(),
                         onScreenshot: _takeScreenshot,
                       ),
@@ -645,7 +657,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                       child: Consumer(
                         builder: (context, ref, _) {
                           final speed =
-                              ref.watch(playbackSpeedControllerProvider).value ??
+                              ref
+                                  .watch(playbackSpeedControllerProvider)
+                                  .value ??
                               1.0;
                           return StreamBuilder<bool>(
                             stream: _player.stream.playing,
@@ -660,7 +674,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                                     initialData: _player.state.duration,
                                     builder: (context, durationSnapshot) {
                                       return PlayerBottomBar(
-                                        isPlaying: playingSnapshot.data ?? false,
+                                        isPlaying:
+                                            playingSnapshot.data ?? false,
                                         position:
                                             positionSnapshot.data ??
                                             Duration.zero,
