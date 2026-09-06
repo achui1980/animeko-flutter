@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "org.openani" "\0"
-            VALUE "FileDescription", "animeko_flutter" "\0"
+            VALUE "FileDescription", "AniMeow" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "animeko_flutter" "\0"
+            VALUE "InternalName", "AniMeow" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 org.openani. All rights reserved." "\0"
-            VALUE "OriginalFilename", "animeko_flutter.exe" "\0"
-            VALUE "ProductName", "animeko_flutter" "\0"
+            VALUE "OriginalFilename", "AniMeow.exe" "\0"
+            VALUE "ProductName", "AniMeow" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END
