@@ -47,8 +47,36 @@
 
 ## 第 2 段：剧集号码网格 UI/数据来源
 
-- **新增 Bangumi 剧集列表接口**：`GET /v0/episodes?subject_id={id}&limit=100`（`limit=100` 覆盖绝大多数番剧总集数，超过 100 集的极少数长篇不在本次设计范围内）。**注：确切的 endpoint 路径/响应字段形状尚未对照 Bangumi 官方 API 文档核实，实现计划阶段需要先核实确认。**
-- **新模型 `BangumiEpisode`**：`id`（Bangumi 剧集 ID）、`sort`（集数序号，用于排序及跟爬虫剧集匹配）、`name`/`nameCn`（原名/中文名，展示优先用中文名）、`airdate`（播出日期）、`type`（0=正片/1=SP/2=OP/3=ED 等——**本次只展示 type=0 的正片**，SP/OP/ED 不放入号码网格）。
+- **架构决策（重要变更）**：调研发现本应用现有后端 `https://api.animeko.org`（`lib/data/api_client.dart` 的 `aniApiBaseUrl`，本应用所有现存 API 客户端——`subject_api.dart`/`home_recommendations_api.dart`/`schedule_api.dart`/`trends_api.dart`/`user_api.dart`/`search_api.dart`/`session_api.dart`/`bangumi_oauth_api.dart`——都经由此域名）**完全没有剧集列表接口**：对真实 subject（如 id=400602《葬送的芳莉莲》）逐一实测了 20+ 个猜测路径（`/v0/episodes?subject_id=`、`/v2/subjects/{id}/episodes`、`/v1/subjects/{id}/episodes`、`/v2/episodes?subjectId=` 等），均为路由级 404；唯一确认存在的相关路由是单集详情 `GET /v2/subjects/{id}/episodes/{episodeId:Long}`（返回语义级 404 "Episode with id 1 of subject 400602 not found"，证明路由真实存在但无法枚举/发现某个 subject 下有哪些 `episodeId`）；`/openapi.json` 存在但返回 401，此沙箱环境中无可用鉴权凭据可解锁。**已与用户确认：改为绕开 `api.animeko.org`，由 Flutter 客户端直接调用 Bangumi 官方公开 API `https://api.bgm.tv`**——这是本应用中第一个不经由自有后端、直接对接 Bangumi 官方接口读取数据的客户端（现有 `bangumi_oauth_api.dart` 仅通过自有后端代理 OAuth 流程，并非直接数据读取）。
+- **已通过真实请求核实 Bangumi 官方接口的确切响应形状**（`curl "https://api.bgm.tv/v0/episodes?subject_id=400602&type=0&limit=1"`，真实返回，非猜测）：
+  ```json
+  {
+    "data": [
+      {
+        "airdate": "2023-09-29",
+        "name": "冒険の終わり",
+        "name_cn": "冒险结束",
+        "duration": "00:26:00",
+        "desc": "……（较长的分集简介，本次不展示）",
+        "ep": 1,
+        "sort": 1,
+        "id": 1227087,
+        "subject_id": 400602,
+        "comment": 297,
+        "type": 0,
+        "disc": 0,
+        "duration_seconds": 1560
+      }
+    ],
+    "total": 28,
+    "limit": 1,
+    "offset": 0
+  }
+  ```
+  顶层为分页包裹对象 `{data: [...], total, limit, offset}`，`total`（该请求实测=28）与该 subject 的 `infobox.话数`字段（同为 28）一致，可交叉验证。请求已用 `type=0` 查询参数在服务端侧过滤掉 SP/OP/ED，故客户端通常无需再次按 `type` 过滤，但模型仍保留 `type` 字段作为防御性二次校验。
+  端点：`GET https://api.bgm.tv/v0/episodes`，查询参数 `subject_id`（必填）、`type`（可选，0=正片/1=SP/2=OP/3=ED）、`limit`（默认视 Bangumi 官方文档而定，本次固定传 `100`）、`offset`（本次不做分页，固定 `0`）。**无需鉴权即可读取**（未带任何 Authorization header 即拿到完整数据）。
+- **新模型 `BangumiEpisode`**：`id`（Bangumi 剧集 ID，`int`）、`sort`（集数序号，`num`——注意 Bangumi 官方字段是 `sort`，用于排序及跟爬虫剧集顺序匹配）、`name`/`nameCn`（原名/中文名，对应 wire 字段 `name`/`name_cn`，展示优先用中文名，为空则回退原名）、`airdate`（播出日期，`String`，对应 wire 字段 `airdate`）、`type`（`int`，0=正片/1=SP/2=OP/3=ED 等——**本次只展示 type=0 的正片**，SP/OP/ED 不放入号码网格，尽管请求时已用 `type=0` 参数过滤，模型仍保留该字段做二次防御性过滤）。`desc`/`duration`/`comment`/`disc`/`duration_seconds`/`ep`/`subject_id` 等其它 wire 字段本次不建模（YAGNI，当前 UI 不需要）。
+- **新增 API 客户端**：新文件（如 `lib/data/subject/bangumi_episodes_api.dart`），独立的 `Dio` 实例、独立的 base URL 常量（`https://api.bgm.tv`，与 `lib/data/api_client.dart` 的 `aniApiBaseUrl` 完全分离，不共用现有的认证/拦截器配置，因为该请求本身不需要鉴权且目标域名不同）。
 - **新增 Provider**：`SubjectBangumiEpisodesController(subjectId)`，独立于现有的 `subjectEpisodesControllerProvider`（爬虫源），两者并行获取，互不阻塞。
 - **号码网格 UI/交互**：`Wrap` 排列的紧凑数字按钮（圆角小方块），按 `sort` 升序，标签 `01`/`02`……。三种视觉状态：
   1. 有匹配播放源 = 正常可点击；
@@ -94,5 +122,6 @@
 
 ## 风险与已知未知
 
-- Bangumi `GET /v0/episodes` 的确切响应字段形状尚未核实，实现计划阶段需要先确认（可能需要查阅 Bangumi 官方 API 文档或做一次实际请求验证）。
+- ~~Bangumi 剧集列表接口的确切响应字段形状尚未核实~~ **（已解决）**：已通过第 2 段中记录的真实请求核实了 `https://api.bgm.tv/v0/episodes` 的确切响应形状与字段。
+- **新增风险（因架构决策变更引入，已排查确认无阻塞）**：本次改为直接调用 Bangumi 官方 `api.bgm.tv`，绕开了本应用现有的统一后端 `api.animeko.org`。已确认 `lib/data/settings/proxy_dio_config.dart` 的 `configureProxy(Dio dio, Ref ref)` 是一个与 base URL 无关的通用函数（`lib/data/dilidili/dilidili_api.dart` 等爬虫数据源客户端已采用同样方式接入代理），新的 Bangumi 直连客户端只需同样调用 `configureProxy(dio, ref)` 即可复用现有代理配置，不需要新的代理接入机制。唯一保留的差异点：该请求不经过本应用后端，因此不受后端自身可能存在的缓存/限流保护，纯粹依赖 Bangumi 官方接口自身的可用性与限流策略（已实测该接口无需鉴权即可读取）。
 - `matchEpisodeSources` 的序号匹配假设"各爬虫源返回的剧集列表顺序与 Bangumi 集数顺序一致"——这是一个基于观察的合理假设（各源的 `listEpisodes` 目前确实按页面顺序返回，通常就是集数顺序），但没有做强校验；如果某个源的剧集列表顺序与实际集数不一致，会导致该源在弹窗里显示错误的集数对应关系。此风险已知但本次不做额外校验（范围外）。
