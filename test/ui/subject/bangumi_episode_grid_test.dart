@@ -104,4 +104,31 @@ void main() {
       expect(find.widgetWithText(OutlinedButton, '01'), findsNothing);
     },
   );
+
+  testWidgets(
+    'dims all buttons (OutlinedButton) when mergedEpisodesAsync settled '
+    'with an error and no data (e.g. no scraper source matched at all)',
+    (tester) async {
+      final merged = AsyncValue<List<MergedEpisode>>.error(
+        Exception('no source'),
+        StackTrace.current,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: BangumiEpisodeGrid(
+              episodes: episodes,
+              mergedEpisodesAsync: merged,
+              onEpisodeTap: (_, _) {},
+            ),
+          ),
+        ),
+      );
+      // Settled-with-error-and-no-data is a deterministic "no source
+      // will ever be found" outcome, distinct from still-loading -- every
+      // button should render dimmed, matching the no-match case above.
+      expect(find.widgetWithText(OutlinedButton, '01'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, '02'), findsOneWidget);
+    },
+  );
 }

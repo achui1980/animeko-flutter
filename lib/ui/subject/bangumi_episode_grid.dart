@@ -11,12 +11,18 @@ import '../../domain/play/subject_episodes_controller.dart';
 ///
 /// Each button's visual state depends on the *scraper* episode list
 /// ([mergedEpisodesAsync]), matched positionally via
-/// [matchEpisodeSources]: while it's still loading, every button
-/// renders in the same normal/neutral style (not yet distinguishing
-/// has-source/no-source, per the design doc's Section 2 state 3); once
-/// loaded, a button renders normal/clickable if at least one scraper
-/// source has an episode at that position, or dimmed (but still
-/// clickable -- tapping shows "暂无播放源") otherwise.
+/// [matchEpisodeSources]: while it's still loading (and no previous
+/// data is available yet), every button renders in the same
+/// normal/neutral style (not yet distinguishing has-source/no-source,
+/// per the design doc's Section 2 state 3); once settled with data, a
+/// button renders normal/clickable if at least one scraper source has
+/// an episode at that position, or dimmed (but still clickable --
+/// tapping shows "暂无播放源") otherwise. If [mergedEpisodesAsync]
+/// settles into an error with no previous data (e.g.
+/// `MediaNotFoundException` -- no registered scraper source matched
+/// the anime's title at all), every button renders dimmed as well,
+/// since the "no source will ever be found" outcome is already
+/// deterministic at that point.
 class BangumiEpisodeGrid extends StatelessWidget {
   const BangumiEpisodeGrid({
     super.key,
@@ -32,6 +38,15 @@ class BangumiEpisodeGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final merged = mergedEpisodesAsync.value;
+    // AsyncValue.value returns null both while genuinely loading with no
+    // prior data, and when settled in an error state with no prior data
+    // (e.g. MediaNotFoundException -- no scraper source matched this
+    // title at all). Distinguish them: only the former should render as
+    // the neutral "still loading" style; the latter is a deterministic
+    // "no source will ever be found" outcome and should render the same
+    // as an empty match (dimmed, but still tappable -- tapping shows
+    // "暂无播放源").
+    final isStillLoading = merged == null && mergedEpisodesAsync.isLoading;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -50,10 +65,13 @@ class BangumiEpisodeGrid extends StatelessWidget {
               for (var i = 0; i < episodes.length; i++)
                 _EpisodeNumberButton(
                   episode: episodes[i],
-                  // merged == null means the scraper fetch is still in
-                  // flight -- neutral state, not yet has/no-source.
+                  // merged == null means either the scraper fetch is
+                  // still in flight (neutral state, not yet
+                  // has/no-source) or it settled with an error and no
+                  // source will ever be found (dimmed, same as an empty
+                  // match) -- see isStillLoading above.
                   hasSource: merged == null
-                      ? null
+                      ? (isStillLoading ? null : false)
                       : matchEpisodeSources(
                           ordinalIndex: i,
                           allMerged: merged,
@@ -77,9 +95,10 @@ class _EpisodeNumberButton extends StatelessWidget {
 
   final BangumiEpisode episode;
 
-  /// null = still loading (neutral state); true = at least one scraper
-  /// source matched; false = no source matched (dimmed, still
-  /// tappable).
+  /// null = still loading with no previous data (neutral state); true =
+  /// at least one scraper source matched; false = no source matched, or
+  /// settled in an error state with no data (e.g. no scraper source
+  /// matched this title at all) -- dimmed, still tappable.
   final bool? hasSource;
   final VoidCallback onTap;
 
