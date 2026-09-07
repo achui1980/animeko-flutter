@@ -86,6 +86,18 @@ void main() {
       final detail = SubjectDetail.fromJson(baseJson(collectionType: 'ON_HOLD'));
       expect(detail.toJson()['collectionType'], 'ON_HOLD');
     });
+
+    test('parses aliases when present', () {
+      final json = baseJson()
+        ..['aliases'] = ['Sousou no Frieren', '葬送のフリーレン'];
+      final detail = SubjectDetail.fromJson(json);
+      expect(detail.aliases, ['Sousou no Frieren', '葬送のフリーレン']);
+    });
+
+    test('defaults aliases to an empty list when absent from JSON', () {
+      final detail = SubjectDetail.fromJson(baseJson());
+      expect(detail.aliases, isEmpty);
+    });
   });
 
   group('CharacterInfo / RelatedCharacter', () {

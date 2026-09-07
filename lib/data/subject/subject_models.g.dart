@@ -21,25 +21,27 @@ Map<String, dynamic> _$SelfRatingToJson(SelfRating instance) =>
       'comment': instance.comment,
     };
 
-SubjectDetail _$SubjectDetailFromJson(Map<String, dynamic> json) =>
-    SubjectDetail(
-      id: (json['id'] as num).toInt(),
-      name: json['name'] as String,
-      nameCn: json['nameCn'] as String,
-      summary: json['summary'] as String,
-      airDate: json['airDate'] as String,
-      tags: (json['tags'] as List<dynamic>)
-          .map((e) => SubjectTag.fromJson(e as Map<String, dynamic>))
-          .toList(),
-      score: json['score'] as String?,
-      rank: (json['rank'] as num?)?.toInt(),
-      collectionType: collectionTypeFromWireNullable(
-        json['collectionType'] as String?,
-      ),
-      selfRating: SelfRating.fromJson(
-        json['selfRating'] as Map<String, dynamic>,
-      ),
-    );
+SubjectDetail _$SubjectDetailFromJson(
+  Map<String, dynamic> json,
+) => SubjectDetail(
+  id: (json['id'] as num).toInt(),
+  name: json['name'] as String,
+  nameCn: json['nameCn'] as String,
+  summary: json['summary'] as String,
+  airDate: json['airDate'] as String,
+  tags: (json['tags'] as List<dynamic>)
+      .map((e) => SubjectTag.fromJson(e as Map<String, dynamic>))
+      .toList(),
+  score: json['score'] as String?,
+  rank: (json['rank'] as num?)?.toInt(),
+  collectionType: collectionTypeFromWireNullable(
+    json['collectionType'] as String?,
+  ),
+  selfRating: SelfRating.fromJson(json['selfRating'] as Map<String, dynamic>),
+  aliases:
+      (json['aliases'] as List<dynamic>?)?.map((e) => e as String).toList() ??
+      [],
+);
 
 Map<String, dynamic> _$SubjectDetailToJson(SubjectDetail instance) =>
     <String, dynamic>{
@@ -49,6 +51,7 @@ Map<String, dynamic> _$SubjectDetailToJson(SubjectDetail instance) =>
       'summary': instance.summary,
       'airDate': instance.airDate,
       'tags': instance.tags,
+      'aliases': instance.aliases,
       'score': instance.score,
       'rank': instance.rank,
       'collectionType': collectionTypeToWireNullable(instance.collectionType),

@@ -51,6 +51,7 @@ class SubjectDetail {
     this.rank,
     this.collectionType,
     required this.selfRating,
+    this.aliases = const [],
   });
 
   final int id;
@@ -59,6 +60,15 @@ class SubjectDetail {
   final String summary;
   final String airDate;
   final List<SubjectTag> tags;
+
+  /// Alternate titles for this subject (e.g. original Japanese title,
+  /// English title). Parsed from the `aliases` field already present in
+  /// the raw `api.animeko.org` `/v2/subjects/{id}` response but not
+  /// previously modeled here. Defaults to an empty list when the key is
+  /// absent, so existing test fixtures/responses without this key still
+  /// parse cleanly.
+  @JsonKey(defaultValue: <String>[])
+  final List<String> aliases;
 
   /// Official rating, string-encoded float (e.g. `"8.4"`) or null if the
   /// subject has too few ratings.
