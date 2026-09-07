@@ -6,6 +6,7 @@ import 'package:animeko_flutter/domain/media/media_source.dart';
 import 'package:animeko_flutter/ui/subject/episode_playback_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -41,11 +42,7 @@ void main() {
     type: 0,
   );
 
-  // Riverpod 3.x's `Override` type isn't re-exported publicly (unlike
-  // 2.x), so this can't be spelled as `List<Override>` here; `dynamic`
-  // lets the call sites' literal override lists flow through to
-  // `ProviderScope.overrides` with a runtime-checked implicit cast.
-  Widget wrap(Widget child, {required dynamic overrides}) {
+  Widget wrap(Widget child, {required List<Override> overrides}) {
     return ProviderScope(
       overrides: overrides,
       child: MaterialApp(home: Scaffold(body: child)),
