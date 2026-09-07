@@ -1,18 +1,17 @@
 // lib/ui/subject/subject_detail_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../data/subject/collection_type.dart';
 import '../../data/subject/subject_models.dart';
-import '../../domain/media/media_registry.dart';
-import '../../domain/media/media_source.dart';
 import '../../domain/play/subject_episodes_controller.dart';
+import '../../domain/subject/subject_bangumi_episodes_controller.dart';
 import '../../domain/subject/subject_collection_controller.dart';
 import '../../domain/subject/subject_detail_controller.dart';
 import '../common/error_retry_view.dart';
 import '../common/rating_stars.dart';
-import 'episode_source_sheet.dart';
+import 'bangumi_episode_grid.dart';
+import 'episode_playback_sheet.dart';
 import 'expandable_summary.dart';
 import 'subject_blurred_header.dart';
 import 'subject_tags_row.dart';
@@ -31,79 +30,66 @@ class SubjectDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final provider = subjectEpisodesControllerProvider(
-      subjectId: subjectId,
-      subjectName: subjectName,
-    );
-    final episodes = ref.watch(provider);
-    final sources = ref.watch(mediaSourcesProvider);
-
     return Scaffold(
       appBar: AppBar(title: Text(subjectName)),
       body: ListView(
         children: [
           if (imageUrl != null) _ImmersiveHeader(subjectId: subjectId, imageUrl: imageUrl!),
+          _BangumiEpisodesSection(subjectId: subjectId, subjectName: subjectName),
           _SubjectInfoSection(subjectId: subjectId),
           _CastStaffSection(subjectId: subjectId),
-          const Divider(),
-          episodes.when(
-            loading: () => const Padding(
-              padding: EdgeInsets.all(24),
-              child: Center(child: CircularProgressIndicator()),
-            ),
-            error: (error, stack) {
-              if (error is MediaNotFoundException) {
-                return const Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Center(child: Text('未找到该番剧的播放资源')),
-                );
-              }
-              return ErrorRetryView(
-                message: '加载失败：$error',
-                onRetry: () => ref.invalidate(provider),
-              );
-            },
-            data: (episodeList) => Padding(
-              padding: const EdgeInsets.all(16),
-              child: FilledButton.icon(
-                icon: const Icon(Icons.play_arrow),
-                label: Text('开始观看 (${episodeList.length}集)'),
-                onPressed: () =>
-                    _openEpisodeSheet(context, episodeList, sources, subjectId, subjectName),
-              ),
-            ),
-          ),
         ],
       ),
     );
   }
 }
 
-/// Opens [EpisodeSourceSheet] as a modal bottom sheet, closing it and
-/// navigating to the player when an episode is picked.
-void _openEpisodeSheet(
-  BuildContext context,
-  List<MergedEpisode> episodeList,
-  List<MediaSource> sources,
-  int subjectId,
-  String subjectName,
-) {
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    builder: (sheetContext) => EpisodeSourceSheet(
-      episodes: episodeList,
-      sources: sources,
-      onEpisodeSelected: (episode) {
-        Navigator.of(sheetContext).pop();
-        context.push(
-          '/subject/$subjectId/play'
-          '?name=${Uri.encodeComponent(subjectName)}',
-          extra: episode,
+/// The Bangumi-canonical episode-number grid, replacing the old single
+/// "开始观看" button. Sits directly after the immersive header and
+/// before [_SubjectInfoSection] (design doc Section 1). Tapping a
+/// number opens [EpisodePlaybackSheet] for that one episode -- see
+/// Section 3.
+class _BangumiEpisodesSection extends ConsumerWidget {
+  const _BangumiEpisodesSection({required this.subjectId, required this.subjectName});
+
+  final int subjectId;
+  final String subjectName;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final bangumiProvider = subjectBangumiEpisodesControllerProvider(subjectId: subjectId);
+    final bangumiEpisodes = ref.watch(bangumiProvider);
+    final mergedEpisodesAsync = ref.watch(
+      subjectEpisodesControllerProvider(subjectId: subjectId, subjectName: subjectName),
+    );
+
+    return bangumiEpisodes.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.all(24),
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (error, stack) => ErrorRetryView(
+        message: '加载剧集列表失败：$error',
+        onRetry: () => ref.invalidate(bangumiProvider),
+      ),
+      data: (episodes) {
+        if (episodes.isEmpty) return const SizedBox.shrink();
+        return BangumiEpisodeGrid(
+          episodes: episodes,
+          mergedEpisodesAsync: mergedEpisodesAsync,
+          onEpisodeTap: (ordinalIndex, episode) => showModalBottomSheet(
+            context: context,
+            builder: (_) => EpisodePlaybackSheet(
+              subjectId: subjectId,
+              subjectName: subjectName,
+              ordinalIndex: ordinalIndex,
+              bangumiEpisode: episode,
+            ),
+          ),
         );
       },
-    ),
-  );
+    );
+  }
 }
 
 /// Summary/tags/score/rank + the collection-status buttons + the rating
@@ -181,6 +167,9 @@ class _HeaderInfo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final score = subject.score != null ? double.tryParse(subject.score!) : null;
+    final airDateLabel = _formatAirDateYearMonth(subject.airDate);
+    final hasScoreOrRank = score != null || subject.rank != null;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -194,7 +183,7 @@ class _HeaderInfo extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: 4),
-        if (score != null || subject.rank != null)
+        if (hasScoreOrRank || airDateLabel != null)
           Row(
             children: [
               if (score != null) RatingStars(score: score),
@@ -206,6 +195,14 @@ class _HeaderInfo extends StatelessWidget {
                     style: const TextStyle(color: Colors.white70, fontSize: 12),
                   ),
                 ),
+              if (airDateLabel != null)
+                Padding(
+                  padding: EdgeInsets.only(left: hasScoreOrRank ? 12 : 0),
+                  child: Text(
+                    hasScoreOrRank ? '· $airDateLabel' : airDateLabel,
+                    style: const TextStyle(color: Colors.white70, fontSize: 12),
+                  ),
+                ),
             ],
           ),
         const SizedBox(height: 8),
@@ -213,6 +210,17 @@ class _HeaderInfo extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Formats [airDate] (e.g. `"2023-09-29"`) as `"2023年9月"` for the
+/// header's metadata row (design doc Section 5: year-month
+/// granularity, not a full date). Returns null for an empty/unparsable
+/// date so the caller can omit the whole element rather than showing a
+/// blank `"· "`.
+String? _formatAirDateYearMonth(String airDate) {
+  final date = DateTime.tryParse(airDate);
+  if (date == null) return null;
+  return '${date.year}年${date.month}月';
 }
 
 /// The 5 collection-status buttons + a "移除" (remove) button, shown
