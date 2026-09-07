@@ -34,10 +34,33 @@ class SubjectDetailScreen extends ConsumerWidget {
       appBar: AppBar(title: Text(subjectName)),
       body: ListView(
         children: [
-          if (imageUrl != null) _ImmersiveHeader(subjectId: subjectId, imageUrl: imageUrl!),
-          _BangumiEpisodesSection(subjectId: subjectId, subjectName: subjectName),
-          _SubjectInfoSection(subjectId: subjectId),
-          _CastStaffSection(subjectId: subjectId),
+          if (imageUrl != null)
+            _ImmersiveHeader(subjectId: subjectId, imageUrl: imageUrl!),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _WorkInfoSection(subjectId: subjectId),
+                      _SubjectInfoSection(subjectId: subjectId),
+                      _BangumiEpisodesSection(
+                        subjectId: subjectId,
+                        subjectName: subjectName,
+                      ),
+                      _CharacterSection(subjectId: subjectId),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(flex: 1, child: _StaffSection(subjectId: subjectId)),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -50,17 +73,25 @@ class SubjectDetailScreen extends ConsumerWidget {
 /// number opens [EpisodePlaybackSheet] for that one episode -- see
 /// Section 3.
 class _BangumiEpisodesSection extends ConsumerWidget {
-  const _BangumiEpisodesSection({required this.subjectId, required this.subjectName});
+  const _BangumiEpisodesSection({
+    required this.subjectId,
+    required this.subjectName,
+  });
 
   final int subjectId;
   final String subjectName;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final bangumiProvider = subjectBangumiEpisodesControllerProvider(subjectId: subjectId);
+    final bangumiProvider = subjectBangumiEpisodesControllerProvider(
+      subjectId: subjectId,
+    );
     final bangumiEpisodes = ref.watch(bangumiProvider);
     final mergedEpisodesAsync = ref.watch(
-      subjectEpisodesControllerProvider(subjectId: subjectId, subjectName: subjectName),
+      subjectEpisodesControllerProvider(
+        subjectId: subjectId,
+        subjectName: subjectName,
+      ),
     );
 
     return bangumiEpisodes.when(
@@ -85,6 +116,55 @@ class _BangumiEpisodesSection extends ConsumerWidget {
               ordinalIndex: ordinalIndex,
               bangumiEpisode: episode,
             ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// New "作品信息" (work info) block: shows the subject's broadcast
+/// start date, episode count, aliases, and tags. Combines data from two
+/// independent providers (`subjectDetailControllerProvider` for
+/// airDate/aliases/tags, `subjectBangumiEpisodesControllerProvider` for
+/// the episode count) -- if either hasn't resolved yet, the
+/// corresponding line is simply omitted rather than shown as a loading
+/// placeholder, since this is a low-priority informational block.
+class _WorkInfoSection extends ConsumerWidget {
+  const _WorkInfoSection({required this.subjectId});
+
+  final int subjectId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final detailAsync = ref.watch(
+      subjectDetailControllerProvider(subjectId: subjectId),
+    );
+    final episodesAsync = ref.watch(
+      subjectBangumiEpisodesControllerProvider(subjectId: subjectId),
+    );
+
+    return detailAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (error, stack) => const SizedBox.shrink(),
+      data: (subject) {
+        final airDateLabel = _formatAirDateYearMonth(subject.airDate);
+        final episodeCount = episodesAsync.value?.length;
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('作品信息', style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: 8),
+              if (airDateLabel != null) Text('放送开始：$airDateLabel'),
+              if (episodeCount != null) Text('话数：$episodeCount'),
+              if (subject.aliases.isNotEmpty)
+                Text('别名：${subject.aliases.join(' / ')}'),
+              const SizedBox(height: 8),
+              SubjectTagsRow(tags: subject.tags),
+            ],
           ),
         );
       },
@@ -120,8 +200,6 @@ class _SubjectInfoSection extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ExpandableSummary(text: subject.summary),
-            const SizedBox(height: 8),
-            SubjectTagsRow(tags: subject.tags),
             const SizedBox(height: 16),
             _RatingSection(subjectId: subjectId),
           ],
@@ -166,9 +244,9 @@ class _HeaderInfo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final score = subject.score != null ? double.tryParse(subject.score!) : null;
-    final airDateLabel = _formatAirDateYearMonth(subject.airDate);
-    final hasScoreOrRank = score != null || subject.rank != null;
+    final score = subject.score != null
+        ? double.tryParse(subject.score!)
+        : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -176,14 +254,15 @@ class _HeaderInfo extends StatelessWidget {
       children: [
         Text(
           subject.nameCn.isNotEmpty ? subject.nameCn : subject.name,
-          style: Theme.of(
-            context,
-          ).textTheme.titleLarge?.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: 4),
-        if (hasScoreOrRank || airDateLabel != null)
+        if (score != null || subject.rank != null)
           Row(
             children: [
               if (score != null) RatingStars(score: score),
@@ -192,14 +271,6 @@ class _HeaderInfo extends StatelessWidget {
                   padding: const EdgeInsets.only(left: 12),
                   child: Text(
                     '排名：#${subject.rank}',
-                    style: const TextStyle(color: Colors.white70, fontSize: 12),
-                  ),
-                ),
-              if (airDateLabel != null)
-                Padding(
-                  padding: EdgeInsets.only(left: hasScoreOrRank ? 12 : 0),
-                  child: Text(
-                    hasScoreOrRank ? '· $airDateLabel' : airDateLabel,
                     style: const TextStyle(color: Colors.white70, fontSize: 12),
                   ),
                 ),
@@ -257,11 +328,17 @@ class _CollectionButtonsState extends ConsumerState<_CollectionButtons> {
     setState(() => _busy = true);
     try {
       await ref
-          .read(subjectCollectionControllerProvider(subjectId: widget.subjectId).notifier)
+          .read(
+            subjectCollectionControllerProvider(
+              subjectId: widget.subjectId,
+            ).notifier,
+          )
           .setCollectionType(type);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('更新收藏状态失败：$e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('更新收藏状态失败：$e')));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -272,11 +349,17 @@ class _CollectionButtonsState extends ConsumerState<_CollectionButtons> {
     setState(() => _busy = true);
     try {
       await ref
-          .read(subjectCollectionControllerProvider(subjectId: widget.subjectId).notifier)
+          .read(
+            subjectCollectionControllerProvider(
+              subjectId: widget.subjectId,
+            ).notifier,
+          )
           .removeFromCollection();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('取消收藏失败：$e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('取消收藏失败：$e')));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -285,7 +368,9 @@ class _CollectionButtonsState extends ConsumerState<_CollectionButtons> {
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(subjectCollectionControllerProvider(subjectId: widget.subjectId));
+    final state = ref.watch(
+      subjectCollectionControllerProvider(subjectId: widget.subjectId),
+    );
     return state.when(
       loading: () => const SizedBox.shrink(),
       error: (error, stack) => const SizedBox.shrink(),
@@ -299,7 +384,10 @@ class _CollectionButtonsState extends ConsumerState<_CollectionButtons> {
               onSelected: _busy ? null : (_) => _setType(type),
             ),
           if (collection.collectionType != null)
-            ActionChip(label: const Text('移除'), onPressed: _busy ? null : _remove),
+            ActionChip(
+              label: const Text('移除'),
+              onPressed: _busy ? null : _remove,
+            ),
         ],
       ),
     );
@@ -337,26 +425,38 @@ class _RatingSectionState extends ConsumerState<_RatingSection> {
   Future<void> _submit() async {
     try {
       await ref
-          .read(subjectCollectionControllerProvider(subjectId: widget.subjectId).notifier)
+          .read(
+            subjectCollectionControllerProvider(
+              subjectId: widget.subjectId,
+            ).notifier,
+          )
           .submitRating(
             _score,
-            comment: _commentController.text.isEmpty ? null : _commentController.text,
+            comment: _commentController.text.isEmpty
+                ? null
+                : _commentController.text,
             isPrivate: _isPrivate,
           );
       if (mounted) setState(() => _expanded = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('评分已提交')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('评分已提交')));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('提交评分失败：$e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('提交评分失败：$e')));
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(subjectCollectionControllerProvider(subjectId: widget.subjectId));
+    final state = ref.watch(
+      subjectCollectionControllerProvider(subjectId: widget.subjectId),
+    );
     return state.when(
       loading: () => const SizedBox.shrink(),
       error: (error, stack) => const SizedBox.shrink(),
@@ -364,11 +464,15 @@ class _RatingSectionState extends ConsumerState<_RatingSection> {
         if (!_expanded) {
           return TextButton(
             onPressed: () => setState(() {
-              _score = collection.selfRating.score > 0 ? collection.selfRating.score : 5;
+              _score = collection.selfRating.score > 0
+                  ? collection.selfRating.score
+                  : 5;
               _expanded = true;
             }),
             child: Text(
-              collection.selfRating.score > 0 ? '我的评分：${collection.selfRating.score}' : '评分',
+              collection.selfRating.score > 0
+                  ? '我的评分：${collection.selfRating.score}'
+                  : '评分',
             ),
           );
         }
@@ -400,109 +504,150 @@ class _RatingSectionState extends ConsumerState<_RatingSection> {
   }
 }
 
-/// Two vertical [ListTile] lists (cast, then staff). Either list fails
-/// silently (hides itself entirely) without affecting the other or
-/// `_SubjectInfoSection` -- the design doc's "per-source silent
-/// failure" pattern.
-class _CastStaffSection extends ConsumerWidget {
-  const _CastStaffSection({required this.subjectId});
+/// Horizontal, scrollable row of character avatars, matching the
+/// Animeko reference layout. Deliberately renders the character name
+/// ONLY -- there is no voice-actor/CV field anywhere on
+/// [CharacterInfo]/[RelatedCharacter] today, so a CV line (present in
+/// the reference screenshot) cannot be shown without adding a new,
+/// unconfirmed API field, which is out of scope for this pass. The
+/// "查看全部" text is a static label with no navigation/expand
+/// behavior, per the approved design.
+class _CharacterSection extends ConsumerWidget {
+  const _CharacterSection({required this.subjectId});
 
   final int subjectId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final characters = ref.watch(subjectCharactersProvider(subjectId: subjectId));
-    final staff = ref.watch(subjectStaffProvider(subjectId: subjectId));
+    final charactersAsync = ref.watch(
+      subjectCharactersProvider(subjectId: subjectId),
+    );
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        characters.when(
-          loading: () => const SizedBox.shrink(),
-          error: (error, stack) => const SizedBox.shrink(),
-          data: (list) => list.isEmpty
-              ? const SizedBox.shrink()
-              : _PersonList(
-                  title: '角色',
-                  items: list
-                      .map(
-                        (c) => (
-                          c.character.name,
-                          c.character.imageUrl,
-                          _characterRoleLabel(c.role),
+    return charactersAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (error, stack) => const SizedBox.shrink(),
+      data: (characters) {
+        if (characters.isEmpty) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text('角色', style: Theme.of(context).textTheme.titleSmall),
+                  const Spacer(),
+                  Text(
+                    '查看全部',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).hintColor,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (final related in characters)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 12),
+                        child: Column(
+                          children: [
+                            CircleAvatar(
+                              radius: 32,
+                              backgroundImage:
+                                  related.character.imageUrl != null
+                                  ? NetworkImage(related.character.imageUrl!)
+                                  : null,
+                              child: related.character.imageUrl == null
+                                  ? const Icon(Icons.person)
+                                  : null,
+                            ),
+                            const SizedBox(height: 4),
+                            SizedBox(
+                              width: 72,
+                              child: Text(
+                                related.character.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ],
                         ),
-                      )
-                      .toList(),
+                      ),
+                  ],
                 ),
-        ),
-        staff.when(
-          loading: () => const SizedBox.shrink(),
-          error: (error, stack) => const SizedBox.shrink(),
-          data: (list) => list.isEmpty
-              ? const SizedBox.shrink()
-              : _PersonList(
-                  title: '制作人员',
-                  items: list.map((s) => (s.name, s.imageUrl, s.role ?? '')).toList(),
-                ),
-        ),
-      ],
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
 
-/// A titled vertical list of people ([ListTile]s: avatar, name, and an
-/// optional relation/role subtitle) -- e.g. "主角"/"配角"/"客串" for
-/// cast, or a staff role like "导演". Replaces the previous horizontal
-/// avatar-only carousel (Kazumi's `character_card.dart`/`staff_card.dart`
-/// use this same vertical-`ListTile` layout, which surfaces the
-/// relation/role that a bare avatar row can't). No tap-through to a
-/// person detail page (explicitly excluded, see the design doc).
-class _PersonList extends StatelessWidget {
-  const _PersonList({required this.title, required this.items});
+/// Right-column "制作人员" (staff) table: a flat, two-column
+/// key/value list of every (role, name) pair from the API response, in
+/// original order. Deliberately NOT deduplicated by role -- if two
+/// staff members share the same role (e.g. two "音乐" credits), both
+/// render as separate rows. No avatars (the reference screenshot's
+/// staff table is text-only) and no "查看全部" link (unlike the
+/// 角色 section), per the approved design.
+class _StaffSection extends ConsumerWidget {
+  const _StaffSection({required this.subjectId});
 
-  final String title;
-
-  /// (name, imageUrl, subtitle) -- subtitle is '' when there's nothing
-  /// to show (no `ListTile.subtitle` is rendered in that case).
-  final List<(String, String?, String)> items;
+  final int subjectId;
 
   @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-          child: Text(title, style: Theme.of(context).textTheme.titleSmall),
-        ),
-        for (final (name, imageUrl, subtitle) in items)
-          ListTile(
-            leading: CircleAvatar(
-              backgroundImage: imageUrl != null ? NetworkImage(imageUrl) : null,
-              child: imageUrl == null ? const Icon(Icons.person) : null,
-            ),
-            title: Text(name),
-            subtitle: subtitle.isEmpty ? null : Text(subtitle),
-          ),
-      ],
-    );
-  }
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final staffAsync = ref.watch(subjectStaffProvider(subjectId: subjectId));
 
-/// Maps a [RelatedCharacter.role] to Bangumi's confirmed convention
-/// (verified against the real Kotlin client's `AniCharacterSubject.kt`
-/// doc comment: `1 = 主角, 2 = 配角, 3 = 客串`). Any other value
-/// (including future additions) falls back to an empty string rather
-/// than guessing.
-String _characterRoleLabel(int role) {
-  switch (role) {
-    case 1:
-      return '主角';
-    case 2:
-      return '配角';
-    case 3:
-      return '客串';
-    default:
-      return '';
+    return staffAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (error, stack) => const SizedBox.shrink(),
+      data: (staff) {
+        if (staff.isEmpty) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('制作人员', style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: 8),
+              Table(
+                columnWidths: const {
+                  0: IntrinsicColumnWidth(),
+                  1: FlexColumnWidth(),
+                },
+                children: [
+                  for (final member in staff)
+                    TableRow(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(right: 12, bottom: 6),
+                          child: Text(
+                            member.role ?? '',
+                            style: TextStyle(
+                              color: Theme.of(context).hintColor,
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Text(member.name),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }
