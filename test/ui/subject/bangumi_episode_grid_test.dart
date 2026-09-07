@@ -131,4 +131,48 @@ void main() {
       expect(find.widgetWithText(OutlinedButton, '02'), findsOneWidget);
     },
   );
+
+  testWidgets('shows the title snippet below the number', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: BangumiEpisodeGrid(
+            episodes: episodes,
+            mergedEpisodesAsync: const AsyncLoading(),
+            onEpisodeTap: (_, _) {},
+          ),
+        ),
+      ),
+    );
+    expect(find.text('第1集'), findsOneWidget);
+    expect(find.text('第2集'), findsOneWidget);
+  });
+
+  testWidgets('renders number-only (no title line) when displayName is empty', (
+    tester,
+  ) async {
+    const noTitleEpisodes = [
+      BangumiEpisode(id: 11, sort: 11, name: '', nameCn: '', airdate: '', type: 0),
+    ];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: BangumiEpisodeGrid(
+            episodes: noTitleEpisodes,
+            mergedEpisodesAsync: const AsyncLoading(),
+            onEpisodeTap: (_, _) {},
+          ),
+        ),
+      ),
+    );
+    expect(find.text('11'), findsOneWidget);
+    // No second, empty/blank Text line should be rendered for this button.
+    expect(
+      find.descendant(
+        of: find.byType(FilledButton),
+        matching: find.byType(Text),
+      ),
+      findsOneWidget,
+    );
+  });
 }

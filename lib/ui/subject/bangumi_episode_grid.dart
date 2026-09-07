@@ -104,26 +104,41 @@ class _EpisodeNumberButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final label = Text(episode.sort.round().toString().padLeft(2, '0'));
+    final numberLabel = Text(episode.sort.round().toString().padLeft(2, '0'));
+    final title = episode.displayName;
+    final Widget child = title.isEmpty
+        ? numberLabel
+        : Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              numberLabel,
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 11),
+              ),
+            ],
+          );
 
     if (hasSource == false) {
       final disabledColor = Theme.of(context).disabledColor;
       return OutlinedButton(
         onPressed: onTap,
         style: OutlinedButton.styleFrom(
-          minimumSize: const Size(48, 40),
+          minimumSize: const Size(96, 40),
           foregroundColor: disabledColor,
           side: BorderSide(color: disabledColor),
         ),
-        child: label,
+        child: child,
       );
     }
     // hasSource == true or null (still loading) both render as the
     // normal/neutral clickable style -- see the class doc comment.
     return FilledButton.tonal(
       onPressed: onTap,
-      style: FilledButton.styleFrom(minimumSize: const Size(48, 40)),
-      child: label,
+      style: FilledButton.styleFrom(minimumSize: const Size(96, 40)),
+      child: child,
     );
   }
 }
