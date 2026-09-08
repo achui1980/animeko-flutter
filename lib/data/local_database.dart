@@ -4,6 +4,7 @@ import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'local_database.g.dart';
 
@@ -56,12 +57,32 @@ class SearchHistory extends Table {
   DateTimeColumn get searchedAt => dateTime()();
 }
 
-@DriftDatabase(tables: [Subjects, Episodes, SubjectCollections, SearchHistory])
+/// Locally-recorded `subjectId -> imageUrl` mapping, written when the
+/// user collects/changes a subject's status on the detail page while its
+/// cover image URL happens to be known (see
+/// `SubjectCollectionController.setCollectionType`'s `imageUrl` param).
+/// Exists because `GET /v2/subjects/list` (the "My Collection" list API)
+/// never returns an image field -- see `MyCollectionSubject`'s doc
+/// comment in `subject_models.dart`. Deliberately a standalone table
+/// (not a column on [SubjectCollections]) so it doesn't take on that
+/// table's cloud-sync semantics (`dirty`/`syncedAt`) or its non-nullable
+/// unrelated columns (design doc "关键发现").
+class SubjectImageCache extends Table {
+  IntColumn get subjectId => integer()();
+  TextColumn get imageUrl => text()();
+
+  @override
+  Set<Column> get primaryKey => {subjectId};
+}
+
+@DriftDatabase(
+  tables: [Subjects, Episodes, SubjectCollections, SearchHistory, SubjectImageCache],
+)
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   /// SQLite does not enforce declared FOREIGN KEY constraints unless this
   /// pragma is turned on for the connection -- drift does not do this
@@ -70,6 +91,11 @@ class AppDatabase extends _$AppDatabase {
   /// of throwing.
   @override
   MigrationStrategy get migration => MigrationStrategy(
+        onUpgrade: (m, from, to) async {
+          if (from < 2) {
+            await m.createTable(subjectImageCache);
+          }
+        },
         beforeOpen: (details) async {
           await customStatement('PRAGMA foreign_keys = ON');
         },
@@ -83,3 +109,11 @@ class AppDatabase extends _$AppDatabase {
     });
   }
 }
+
+/// Keeps the SQLite connection alive across page navigation -- unlike
+/// every other provider in this codebase (all `autoDispose`), the DB
+/// connection must not be torn down when e.g. the user leaves the
+/// collection page, or every provider that reads/writes it would pay a
+/// reconnect cost (and, worse, could race a half-closed connection).
+@Riverpod(keepAlive: true)
+AppDatabase appDatabase(Ref ref) => AppDatabase();

@@ -62,6 +62,25 @@ void main() {
     expect(rows.single.isPrivate, isFalse);
   });
 
+  test('subjectImageCache table round-trips a row', () async {
+    await db.into(db.subjectImageCache).insert(
+          SubjectImageCacheCompanion.insert(
+            subjectId: const Value(42),
+            imageUrl: 'https://example.com/a.jpg',
+          ),
+        );
+
+    final rows = await db.select(db.subjectImageCache).get();
+
+    expect(rows, hasLength(1));
+    expect(rows.single.subjectId, 42);
+    expect(rows.single.imageUrl, 'https://example.com/a.jpg');
+  });
+
+  test('AppDatabase.schemaVersion is 2 (bumped for subjectImageCache)', () {
+    expect(db.schemaVersion, 2);
+  });
+
   test('searchHistory table round-trips a row', () async {
     await db.into(db.searchHistory).insert(
           SearchHistoryCompanion.insert(query: 'mahou shoujo', searchedAt: DateTime(2026, 1, 1)),

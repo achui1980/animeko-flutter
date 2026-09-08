@@ -1321,6 +1321,215 @@ class SearchHistoryCompanion extends UpdateCompanion<SearchHistoryData> {
   }
 }
 
+class $SubjectImageCacheTable extends SubjectImageCache
+    with TableInfo<$SubjectImageCacheTable, SubjectImageCacheData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SubjectImageCacheTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _subjectIdMeta = const VerificationMeta(
+    'subjectId',
+  );
+  @override
+  late final GeneratedColumn<int> subjectId = GeneratedColumn<int>(
+    'subject_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _imageUrlMeta = const VerificationMeta(
+    'imageUrl',
+  );
+  @override
+  late final GeneratedColumn<String> imageUrl = GeneratedColumn<String>(
+    'image_url',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [subjectId, imageUrl];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'subject_image_cache';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<SubjectImageCacheData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('subject_id')) {
+      context.handle(
+        _subjectIdMeta,
+        subjectId.isAcceptableOrUnknown(data['subject_id']!, _subjectIdMeta),
+      );
+    }
+    if (data.containsKey('image_url')) {
+      context.handle(
+        _imageUrlMeta,
+        imageUrl.isAcceptableOrUnknown(data['image_url']!, _imageUrlMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_imageUrlMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {subjectId};
+  @override
+  SubjectImageCacheData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SubjectImageCacheData(
+      subjectId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}subject_id'],
+      )!,
+      imageUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}image_url'],
+      )!,
+    );
+  }
+
+  @override
+  $SubjectImageCacheTable createAlias(String alias) {
+    return $SubjectImageCacheTable(attachedDatabase, alias);
+  }
+}
+
+class SubjectImageCacheData extends DataClass
+    implements Insertable<SubjectImageCacheData> {
+  final int subjectId;
+  final String imageUrl;
+  const SubjectImageCacheData({
+    required this.subjectId,
+    required this.imageUrl,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['subject_id'] = Variable<int>(subjectId);
+    map['image_url'] = Variable<String>(imageUrl);
+    return map;
+  }
+
+  SubjectImageCacheCompanion toCompanion(bool nullToAbsent) {
+    return SubjectImageCacheCompanion(
+      subjectId: Value(subjectId),
+      imageUrl: Value(imageUrl),
+    );
+  }
+
+  factory SubjectImageCacheData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SubjectImageCacheData(
+      subjectId: serializer.fromJson<int>(json['subjectId']),
+      imageUrl: serializer.fromJson<String>(json['imageUrl']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'subjectId': serializer.toJson<int>(subjectId),
+      'imageUrl': serializer.toJson<String>(imageUrl),
+    };
+  }
+
+  SubjectImageCacheData copyWith({int? subjectId, String? imageUrl}) =>
+      SubjectImageCacheData(
+        subjectId: subjectId ?? this.subjectId,
+        imageUrl: imageUrl ?? this.imageUrl,
+      );
+  SubjectImageCacheData copyWithCompanion(SubjectImageCacheCompanion data) {
+    return SubjectImageCacheData(
+      subjectId: data.subjectId.present ? data.subjectId.value : this.subjectId,
+      imageUrl: data.imageUrl.present ? data.imageUrl.value : this.imageUrl,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SubjectImageCacheData(')
+          ..write('subjectId: $subjectId, ')
+          ..write('imageUrl: $imageUrl')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(subjectId, imageUrl);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SubjectImageCacheData &&
+          other.subjectId == this.subjectId &&
+          other.imageUrl == this.imageUrl);
+}
+
+class SubjectImageCacheCompanion
+    extends UpdateCompanion<SubjectImageCacheData> {
+  final Value<int> subjectId;
+  final Value<String> imageUrl;
+  const SubjectImageCacheCompanion({
+    this.subjectId = const Value.absent(),
+    this.imageUrl = const Value.absent(),
+  });
+  SubjectImageCacheCompanion.insert({
+    this.subjectId = const Value.absent(),
+    required String imageUrl,
+  }) : imageUrl = Value(imageUrl);
+  static Insertable<SubjectImageCacheData> custom({
+    Expression<int>? subjectId,
+    Expression<String>? imageUrl,
+  }) {
+    return RawValuesInsertable({
+      if (subjectId != null) 'subject_id': subjectId,
+      if (imageUrl != null) 'image_url': imageUrl,
+    });
+  }
+
+  SubjectImageCacheCompanion copyWith({
+    Value<int>? subjectId,
+    Value<String>? imageUrl,
+  }) {
+    return SubjectImageCacheCompanion(
+      subjectId: subjectId ?? this.subjectId,
+      imageUrl: imageUrl ?? this.imageUrl,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (subjectId.present) {
+      map['subject_id'] = Variable<int>(subjectId.value);
+    }
+    if (imageUrl.present) {
+      map['image_url'] = Variable<String>(imageUrl.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SubjectImageCacheCompanion(')
+          ..write('subjectId: $subjectId, ')
+          ..write('imageUrl: $imageUrl')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -1329,6 +1538,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $SubjectCollectionsTable subjectCollections =
       $SubjectCollectionsTable(this);
   late final $SearchHistoryTable searchHistory = $SearchHistoryTable(this);
+  late final $SubjectImageCacheTable subjectImageCache =
+      $SubjectImageCacheTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -1338,6 +1549,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     episodes,
     subjectCollections,
     searchHistory,
+    subjectImageCache,
   ];
 }
 
@@ -2550,6 +2762,156 @@ typedef $$SearchHistoryTableProcessedTableManager =
       SearchHistoryData,
       PrefetchHooks Function()
     >;
+typedef $$SubjectImageCacheTableCreateCompanionBuilder =
+    SubjectImageCacheCompanion Function({
+      Value<int> subjectId,
+      required String imageUrl,
+    });
+typedef $$SubjectImageCacheTableUpdateCompanionBuilder =
+    SubjectImageCacheCompanion Function({
+      Value<int> subjectId,
+      Value<String> imageUrl,
+    });
+
+class $$SubjectImageCacheTableFilterComposer
+    extends Composer<_$AppDatabase, $SubjectImageCacheTable> {
+  $$SubjectImageCacheTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get subjectId => $composableBuilder(
+    column: $table.subjectId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get imageUrl => $composableBuilder(
+    column: $table.imageUrl,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$SubjectImageCacheTableOrderingComposer
+    extends Composer<_$AppDatabase, $SubjectImageCacheTable> {
+  $$SubjectImageCacheTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get subjectId => $composableBuilder(
+    column: $table.subjectId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get imageUrl => $composableBuilder(
+    column: $table.imageUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$SubjectImageCacheTableAnnotationComposer
+    extends Composer<_$AppDatabase, $SubjectImageCacheTable> {
+  $$SubjectImageCacheTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get subjectId =>
+      $composableBuilder(column: $table.subjectId, builder: (column) => column);
+
+  GeneratedColumn<String> get imageUrl =>
+      $composableBuilder(column: $table.imageUrl, builder: (column) => column);
+}
+
+class $$SubjectImageCacheTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $SubjectImageCacheTable,
+          SubjectImageCacheData,
+          $$SubjectImageCacheTableFilterComposer,
+          $$SubjectImageCacheTableOrderingComposer,
+          $$SubjectImageCacheTableAnnotationComposer,
+          $$SubjectImageCacheTableCreateCompanionBuilder,
+          $$SubjectImageCacheTableUpdateCompanionBuilder,
+          (
+            SubjectImageCacheData,
+            BaseReferences<
+              _$AppDatabase,
+              $SubjectImageCacheTable,
+              SubjectImageCacheData
+            >,
+          ),
+          SubjectImageCacheData,
+          PrefetchHooks Function()
+        > {
+  $$SubjectImageCacheTableTableManager(
+    _$AppDatabase db,
+    $SubjectImageCacheTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SubjectImageCacheTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SubjectImageCacheTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SubjectImageCacheTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> subjectId = const Value.absent(),
+                Value<String> imageUrl = const Value.absent(),
+              }) => SubjectImageCacheCompanion(
+                subjectId: subjectId,
+                imageUrl: imageUrl,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> subjectId = const Value.absent(),
+                required String imageUrl,
+              }) => SubjectImageCacheCompanion.insert(
+                subjectId: subjectId,
+                imageUrl: imageUrl,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$SubjectImageCacheTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $SubjectImageCacheTable,
+      SubjectImageCacheData,
+      $$SubjectImageCacheTableFilterComposer,
+      $$SubjectImageCacheTableOrderingComposer,
+      $$SubjectImageCacheTableAnnotationComposer,
+      $$SubjectImageCacheTableCreateCompanionBuilder,
+      $$SubjectImageCacheTableUpdateCompanionBuilder,
+      (
+        SubjectImageCacheData,
+        BaseReferences<
+          _$AppDatabase,
+          $SubjectImageCacheTable,
+          SubjectImageCacheData
+        >,
+      ),
+      SubjectImageCacheData,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -2562,4 +2924,70 @@ class $AppDatabaseManager {
       $$SubjectCollectionsTableTableManager(_db, _db.subjectCollections);
   $$SearchHistoryTableTableManager get searchHistory =>
       $$SearchHistoryTableTableManager(_db, _db.searchHistory);
+  $$SubjectImageCacheTableTableManager get subjectImageCache =>
+      $$SubjectImageCacheTableTableManager(_db, _db.subjectImageCache);
 }
+
+// **************************************************************************
+// RiverpodGenerator
+// **************************************************************************
+
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint, type=warning
+/// Keeps the SQLite connection alive across page navigation -- unlike
+/// every other provider in this codebase (all `autoDispose`), the DB
+/// connection must not be torn down when e.g. the user leaves the
+/// collection page, or every provider that reads/writes it would pay a
+/// reconnect cost (and, worse, could race a half-closed connection).
+
+@ProviderFor(appDatabase)
+final appDatabaseProvider = AppDatabaseProvider._();
+
+/// Keeps the SQLite connection alive across page navigation -- unlike
+/// every other provider in this codebase (all `autoDispose`), the DB
+/// connection must not be torn down when e.g. the user leaves the
+/// collection page, or every provider that reads/writes it would pay a
+/// reconnect cost (and, worse, could race a half-closed connection).
+
+final class AppDatabaseProvider
+    extends $FunctionalProvider<AppDatabase, AppDatabase, AppDatabase>
+    with $Provider<AppDatabase> {
+  /// Keeps the SQLite connection alive across page navigation -- unlike
+  /// every other provider in this codebase (all `autoDispose`), the DB
+  /// connection must not be torn down when e.g. the user leaves the
+  /// collection page, or every provider that reads/writes it would pay a
+  /// reconnect cost (and, worse, could race a half-closed connection).
+  AppDatabaseProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'appDatabaseProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$appDatabaseHash();
+
+  @$internal
+  @override
+  $ProviderElement<AppDatabase> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  AppDatabase create(Ref ref) {
+    return appDatabase(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(AppDatabase value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<AppDatabase>(value),
+    );
+  }
+}
+
+String _$appDatabaseHash() => r'98a09c6cfd43966155dfbdb0787fa18c85438e13';
