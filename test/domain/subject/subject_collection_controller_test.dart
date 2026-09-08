@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:animeko_flutter/data/subject/collection_type.dart';
 import 'package:animeko_flutter/data/subject/subject_api.dart';
+import 'package:animeko_flutter/data/subject/subject_image_cache_repository.dart';
 import 'package:animeko_flutter/data/subject/subject_models.dart';
 import 'package:animeko_flutter/domain/subject/subject_collection_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,6 +10,8 @@ import 'package:mocktail/mocktail.dart';
 import 'package:riverpod/riverpod.dart';
 
 class MockSubjectApi extends Mock implements SubjectApi {}
+
+class MockSubjectImageCacheRepository extends Mock implements SubjectImageCacheRepository {}
 
 const _unratedSelfRating = SelfRating(score: 0, tags: [], isPrivate: false);
 
@@ -45,12 +48,17 @@ const _detailWithTags = SubjectDetail(
 
 void main() {
   late MockSubjectApi api;
+  late MockSubjectImageCacheRepository imageCacheRepo;
   late ProviderContainer container;
 
   setUp(() {
     api = MockSubjectApi();
+    imageCacheRepo = MockSubjectImageCacheRepository();
     container = ProviderContainer(
-      overrides: [subjectApiProvider.overrideWithValue(api)],
+      overrides: [
+        subjectApiProvider.overrideWithValue(api),
+        subjectImageCacheRepositoryProvider.overrideWithValue(imageCacheRepo),
+      ],
       retry: (retryCount, error) => null,
     );
     addTearDown(container.dispose);
@@ -114,6 +122,54 @@ void main() {
       );
 
       expect(container.read(provider).value!.collectionType, isNull);
+    });
+  });
+
+  group('setCollectionType image cache', () {
+    test('saves the imageUrl to the local cache after a successful update', () async {
+      when(() => api.getSubject(1)).thenAnswer((_) async => _detail);
+      await container.read(provider.future);
+
+      when(() => api.updateCollection(1, collectionType: CollectionType.doing))
+          .thenAnswer((_) async {});
+      when(() => imageCacheRepo.save(1, 'https://example.com/a.jpg'))
+          .thenAnswer((_) async {});
+
+      await container.read(provider.notifier).setCollectionType(
+            CollectionType.doing,
+            imageUrl: 'https://example.com/a.jpg',
+          );
+
+      verify(() => imageCacheRepo.save(1, 'https://example.com/a.jpg')).called(1);
+    });
+
+    test('does not touch the image cache when imageUrl is not provided', () async {
+      when(() => api.getSubject(1)).thenAnswer((_) async => _detail);
+      await container.read(provider.future);
+
+      when(() => api.updateCollection(1, collectionType: CollectionType.doing))
+          .thenAnswer((_) async {});
+
+      await container.read(provider.notifier).setCollectionType(CollectionType.doing);
+
+      verifyNever(() => imageCacheRepo.save(any(), any()));
+    });
+
+    test('does not fail setCollectionType when the image cache save throws', () async {
+      when(() => api.getSubject(1)).thenAnswer((_) async => _detail);
+      await container.read(provider.future);
+
+      when(() => api.updateCollection(1, collectionType: CollectionType.doing))
+          .thenAnswer((_) async {});
+      when(() => imageCacheRepo.save(1, 'https://example.com/a.jpg'))
+          .thenThrow(Exception('disk full'));
+
+      await container.read(provider.notifier).setCollectionType(
+            CollectionType.doing,
+            imageUrl: 'https://example.com/a.jpg',
+          );
+
+      expect(container.read(provider).value!.collectionType, CollectionType.doing);
     });
   });
 

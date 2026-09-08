@@ -2,6 +2,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../data/subject/collection_type.dart';
 import '../../data/subject/subject_api.dart';
+import '../../data/subject/subject_image_cache_repository.dart';
 import '../../data/subject/subject_models.dart';
 import 'subject_detail_controller.dart';
 
@@ -44,7 +45,16 @@ class SubjectCollectionController extends _$SubjectCollectionController {
   /// resolves, then rolls back to the pre-call state if it fails
   /// (design doc "收藏状态切换"). Rethrows on failure so the caller can
   /// show a one-off error -- see `SubjectDetailScreen` (Task 10).
-  Future<void> setCollectionType(CollectionType type) async {
+  ///
+  /// If [imageUrl] is given (the caller knows the subject's cover image
+  /// URL -- see `_CollectionButtons` in `subject_detail_screen.dart`),
+  /// records it to the local image cache once the remote update
+  /// succeeds, so `MyCollectionsController` can show a cover for a list
+  /// endpoint that itself never returns one (design doc "写入路径").
+  /// A failure to write the cache is swallowed -- it must never surface
+  /// as a collection-update failure, since the remote update already
+  /// succeeded by that point (design doc "风险与已知限制").
+  Future<void> setCollectionType(CollectionType type, {String? imageUrl}) async {
     final previous = state;
     final current = await future;
     state = AsyncData(current.copyWith(collectionType: type));
@@ -53,6 +63,14 @@ class SubjectCollectionController extends _$SubjectCollectionController {
     } catch (_) {
       state = previous;
       rethrow;
+    }
+    if (imageUrl != null) {
+      try {
+        await ref.read(subjectImageCacheRepositoryProvider).save(subjectId, imageUrl);
+      } catch (_) {
+        // Best-effort local cache only -- never let this fail the
+        // (already-succeeded) collection-status update.
+      }
     }
   }
 
