@@ -1,4 +1,6 @@
 // lib/ui/subject/subject_detail_screen.dart
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -57,7 +59,16 @@ class SubjectDetailScreen extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(width: 16),
-                Expanded(flex: 1, child: _StaffSection(subjectId: subjectId)),
+                Expanded(
+                  flex: 1,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _RatingHistogramSection(subjectId: subjectId),
+                      _StaffSection(subjectId: subjectId),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -586,6 +597,105 @@ class _CharacterSection extends ConsumerWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// Shows a small 1-10 score-distribution bar chart at the top of the
+/// right sidebar, using [SubjectDetail.scoreDetails] -- data the app's
+/// own backend already returns inside the same response
+/// [subjectDetailControllerProvider] already fetches, so this needs no
+/// new API call/provider. Silently hides (matching [_StaffSection]'s
+/// convention) while loading, on error, or when `scoreDetails` is null
+/// or empty (e.g. a subject with too few ratings to have a breakdown).
+class _RatingHistogramSection extends ConsumerWidget {
+  const _RatingHistogramSection({required this.subjectId});
+
+  final int subjectId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final subjectAsync = ref.watch(
+      subjectDetailControllerProvider(subjectId: subjectId),
+    );
+
+    return subjectAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (error, stack) => const SizedBox.shrink(),
+      data: (subject) {
+        final details = subject.scoreDetails;
+        if (details == null || details.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        final total = details.values.fold(0, (sum, count) => sum + count);
+        final maxCount = details.values.reduce(max);
+        if (total == 0 || maxCount == 0) return const SizedBox.shrink();
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${subject.score ?? '--'}分 · $total人评价',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  for (var score = 1; score <= 10; score++)
+                    _HistogramBar(
+                      score: score,
+                      count: details['$score'] ?? 0,
+                      maxCount: maxCount,
+                    ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _HistogramBar extends StatelessWidget {
+  const _HistogramBar({
+    required this.score,
+    required this.count,
+    required this.maxCount,
+  });
+
+  final int score;
+  final int count;
+  final int maxCount;
+
+  static const double _maxBarHeight = 48;
+  static const double _minBarHeight = 2;
+
+  @override
+  Widget build(BuildContext context) {
+    final barHeight = count == 0
+        ? _minBarHeight
+        : max(_minBarHeight, _maxBarHeight * count / maxCount);
+
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        Container(
+          width: 12,
+          height: barHeight,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primary,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text('$score', style: Theme.of(context).textTheme.labelSmall),
+      ],
     );
   }
 }
