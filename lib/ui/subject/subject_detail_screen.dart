@@ -241,7 +241,11 @@ class _ImmersiveHeader extends ConsumerWidget {
     return SubjectBlurredHeader(
       imageUrl: imageUrl,
       info: detail.maybeWhen(
-        data: (subject) => _HeaderInfo(subjectId: subjectId, subject: subject),
+        data: (subject) => _HeaderInfo(
+          subjectId: subjectId,
+          subject: subject,
+          imageUrl: imageUrl,
+        ),
         orElse: () => null,
       ),
     );
@@ -249,10 +253,15 @@ class _ImmersiveHeader extends ConsumerWidget {
 }
 
 class _HeaderInfo extends StatelessWidget {
-  const _HeaderInfo({required this.subjectId, required this.subject});
+  const _HeaderInfo({
+    required this.subjectId,
+    required this.subject,
+    required this.imageUrl,
+  });
 
   final int subjectId;
   final SubjectDetail subject;
+  final String imageUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -289,7 +298,7 @@ class _HeaderInfo extends StatelessWidget {
             ],
           ),
         const SizedBox(height: 8),
-        _CollectionButtons(subjectId: subjectId),
+        _CollectionButtons(subjectId: subjectId, imageUrl: imageUrl),
       ],
     );
   }
@@ -317,9 +326,10 @@ String? _formatAirDateYearMonth(String airDate) {
 /// has no mutex, so without this guard a second tap's optimistic update
 /// could be stomped by the first tap's failure-triggered rollback.
 class _CollectionButtons extends ConsumerStatefulWidget {
-  const _CollectionButtons({required this.subjectId});
+  const _CollectionButtons({required this.subjectId, required this.imageUrl});
 
   final int subjectId;
+  final String imageUrl;
 
   @override
   ConsumerState<_CollectionButtons> createState() => _CollectionButtonsState();
@@ -345,7 +355,7 @@ class _CollectionButtonsState extends ConsumerState<_CollectionButtons> {
               subjectId: widget.subjectId,
             ).notifier,
           )
-          .setCollectionType(type);
+          .setCollectionType(type, imageUrl: widget.imageUrl);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
