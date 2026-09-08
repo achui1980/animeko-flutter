@@ -66,6 +66,13 @@ class SubjectCard {
         imageUrl: s.imageLarge,
       );
 
-  factory SubjectCard.fromMyCollectionSubject(MyCollectionSubject s) =>
-      SubjectCard(id: s.subjectId, name: s.name, nameCn: s.nameCn);
+  factory SubjectCard.fromMyCollectionSubject(
+    MyCollectionSubject s, {
+    String? imageUrl,
+  }) => SubjectCard(
+    id: s.subjectId,
+    name: s.name,
+    nameCn: s.nameCn,
+    imageUrl: imageUrl,
+  );
 }

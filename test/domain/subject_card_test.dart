@@ -1,3 +1,4 @@
+import 'package:animeko_flutter/data/subject/subject_models.dart';
 import 'package:animeko_flutter/domain/subject_card.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -28,5 +29,28 @@ void main() {
     expect(card.score, '8.5');
     expect(card.tags, ['Comedy', 'Drama']);
     expect(card.airDate, '2024-01-01');
+  });
+
+  test('fromMyCollectionSubject assigns the given imageUrl when provided', () {
+    const subject = MyCollectionSubject(
+      subjectId: 5,
+      name: 'C',
+      nameCn: 'C-cn',
+    );
+    final card = SubjectCard.fromMyCollectionSubject(
+      subject,
+      imageUrl: 'https://example.com/c.jpg',
+    );
+    expect(card.imageUrl, 'https://example.com/c.jpg');
+  });
+
+  test('fromMyCollectionSubject leaves imageUrl null when not provided', () {
+    const subject = MyCollectionSubject(
+      subjectId: 6,
+      name: 'D',
+      nameCn: 'D-cn',
+    );
+    final card = SubjectCard.fromMyCollectionSubject(subject);
+    expect(card.imageUrl, isNull);
   });
 }
