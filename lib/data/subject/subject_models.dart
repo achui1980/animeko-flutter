@@ -34,7 +34,7 @@ class SelfRating {
 /// Response of `GET /v2/subjects/{subjectId}` -- verified against the
 /// real `AniSubjectCollection` model. This is a deliberately lean subset
 /// (the real wire shape also has `type`/`nsfw`/`aliases`/`favorite`/
-/// `metaTags`/`scoreDetails`/`episodes`/`relations`/`infobox`/`platform`/
+/// `metaTags`/`episodes`/`relations`/`infobox`/`platform`/
 /// `airingInfo`/`updatedAt`, none of which the UI needs) --
 /// json_serializable's generated `fromJson` ignores undeclared keys, so
 /// omitting fields is safe.
@@ -52,6 +52,7 @@ class SubjectDetail {
     this.collectionType,
     required this.selfRating,
     this.aliases = const [],
+    this.scoreDetails,
   });
 
   final int id;
@@ -81,6 +82,17 @@ class SubjectDetail {
   final CollectionType? collectionType;
 
   final SelfRating selfRating;
+
+  /// Per-score-bucket vote counts (score "1" through "10" as string keys,
+  /// vote count as int values), e.g. `{"1": 130, "2": 37, ..., "10": 7445}`.
+  /// Parsed from the `scoreDetails` field already present in the raw
+  /// `api.animeko.org` `/v2/subjects/{id}` response but not previously
+  /// modeled here. Verified live to match Bangumi's own official
+  /// `GET /v0/subjects/{id}` response's `rating.count` field almost
+  /// exactly (negligible caching/sync lag between the two backends).
+  /// Null when the response omits this key (or for older cached
+  /// responses that predate this field being added).
+  final Map<String, int>? scoreDetails;
 
   factory SubjectDetail.fromJson(Map<String, dynamic> json) =>
       _$SubjectDetailFromJson(json);

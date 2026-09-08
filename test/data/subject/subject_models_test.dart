@@ -98,6 +98,40 @@ void main() {
       final detail = SubjectDetail.fromJson(baseJson());
       expect(detail.aliases, isEmpty);
     });
+
+    test('parses scoreDetails when present', () {
+      final json = baseJson()
+        ..['scoreDetails'] = {
+          '1': 130,
+          '2': 37,
+          '3': 51,
+          '4': 111,
+          '5': 352,
+          '6': 1081,
+          '7': 3659,
+          '8': 10440,
+          '9': 12845,
+          '10': 7445,
+        };
+      final detail = SubjectDetail.fromJson(json);
+      expect(detail.scoreDetails, {
+        '1': 130,
+        '2': 37,
+        '3': 51,
+        '4': 111,
+        '5': 352,
+        '6': 1081,
+        '7': 3659,
+        '8': 10440,
+        '9': 12845,
+        '10': 7445,
+      });
+    });
+
+    test('scoreDetails is null when absent from JSON', () {
+      final detail = SubjectDetail.fromJson(baseJson());
+      expect(detail.scoreDetails, isNull);
+    });
   });
 
   group('CharacterInfo / RelatedCharacter', () {
