@@ -67,10 +67,21 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   /// failure.
   String? _playbackError;
 
+  /// Whether the underlying media_kit `Player` is currently buffering --
+  /// i.e. has an `open()` in flight or is stalled mid-playback waiting
+  /// for more data. Distinct from `episodePlayControllerProvider`'s own
+  /// `AsyncLoading`/`AsyncData`, which only reflects whether a playback
+  /// URL has been *resolved*, not whether the player has actually opened
+  /// it and rendered a first frame. Starts `true` so the loading overlay
+  /// stays up until the very first `_player.open()` call resolves this
+  /// via `_player.stream.buffering`.
+  bool _isBuffering = true;
+
   List<MediaPlaybackSource>? _candidates;
   int _candidateIndex = 0;
 
   StreamSubscription<bool>? _completedSubscription;
+  StreamSubscription<bool>? _bufferingSubscription;
   bool _hasAdvancedToNextEpisode = false;
   bool _drawerOpen = false;
   bool _controlsVisible = true;
@@ -114,6 +125,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     super.initState();
     _currentEpisode = widget.episode;
     _storageFuture = ref.read(playbackPositionStorageProvider.future);
+    _bufferingSubscription = _player.stream.buffering.listen((buffering) {
+      if (mounted) setState(() => _isBuffering = buffering);
+    });
     _player.stream.error.listen((message) {
       if (!mounted) return;
       final candidates = _candidates;
@@ -451,6 +465,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   @override
   void dispose() {
     unawaited(_completedSubscription?.cancel());
+    unawaited(_bufferingSubscription?.cancel());
     _savePositionTimer?.cancel();
     _hideControlsTimer?.cancel();
     unawaited(_savePosition());
@@ -496,6 +511,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   }
 
   Future<void> _openCandidate(MediaPlaybackSource source) async {
+    // Close the gap between the `data` branch of `playback.when(...)`
+    // rendering (i.e. `episodePlayControllerProvider` resolved a
+    // playback URL) and media_kit's own `stream.buffering` event
+    // actually firing (which happens asynchronously after `open()` is
+    // called) -- without this, there's a brief window where the loading
+    // overlay would incorrectly disappear.
+    if (mounted) setState(() => _isBuffering = true);
     await _player.open(Media(source.url, httpHeaders: source.headers));
     final speed = await ref.read(playbackSpeedControllerProvider.future);
     await _player.setRate(speed);
@@ -632,9 +654,26 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                         // disabled (controls: NoVideoControls) -- this app
                         // renders its own custom top/bottom control bars
                         // instead (see PlayerTopBar/PlayerBottomBar).
-                        : Video(
-                            controller: _controller,
-                            controls: NoVideoControls,
+                        //
+                        // `_isBuffering` overlay covers the gap between
+                        // `episodePlayControllerProvider` resolving a
+                        // playback URL (this `data` branch) and
+                        // media_kit actually opening/buffering that URL
+                        // and rendering a first frame -- without it, the
+                        // screen would otherwise go black with no
+                        // indication that it's still loading (also
+                        // covers mid-playback rebuffering stalls).
+                        : Stack(
+                            children: [
+                              Video(
+                                controller: _controller,
+                                controls: NoVideoControls,
+                              ),
+                              if (_isBuffering)
+                                const Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                            ],
                           ),
                   ),
                   if (_showVolumeHud)
