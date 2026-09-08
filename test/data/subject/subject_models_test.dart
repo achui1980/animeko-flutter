@@ -29,7 +29,12 @@ void main() {
     });
 
     test('round-trips through toJson', () {
-      const rating = SelfRating(score: 7, tags: ['a'], isPrivate: true, comment: 'x');
+      const rating = SelfRating(
+        score: 7,
+        tags: ['a'],
+        isPrivate: true,
+        comment: 'x',
+      );
       final json = rating.toJson();
       expect(SelfRating.fromJson(json).score, 7);
       expect(json['isPrivate'], true);
@@ -76,20 +81,23 @@ void main() {
     });
 
     test('parses a subject with null score and rank', () {
-      final json = baseJson()..['score'] = null..['rank'] = null;
+      final json = baseJson()
+        ..['score'] = null
+        ..['rank'] = null;
       final detail = SubjectDetail.fromJson(json);
       expect(detail.score, isNull);
       expect(detail.rank, isNull);
     });
 
     test('round-trips collectionType through toJson', () {
-      final detail = SubjectDetail.fromJson(baseJson(collectionType: 'ON_HOLD'));
+      final detail = SubjectDetail.fromJson(
+        baseJson(collectionType: 'ON_HOLD'),
+      );
       expect(detail.toJson()['collectionType'], 'ON_HOLD');
     });
 
     test('parses aliases when present', () {
-      final json = baseJson()
-        ..['aliases'] = ['Sousou no Frieren', '葬送のフリーレン'];
+      final json = baseJson()..['aliases'] = ['Sousou no Frieren', '葬送のフリーレン'];
       final detail = SubjectDetail.fromJson(json);
       expect(detail.aliases, ['Sousou no Frieren', '葬送のフリーレン']);
     });
@@ -132,6 +140,24 @@ void main() {
       final detail = SubjectDetail.fromJson(baseJson());
       expect(detail.scoreDetails, isNull);
     });
+
+    test('counts only MAIN-type entries in the embedded episodes array', () {
+      final json = baseJson()
+        ..['episodes'] = [
+          {'episodeId': 1, 'type': 'MAIN', 'sort': '1'},
+          {'episodeId': 2, 'type': 'MAIN', 'sort': '2'},
+          {'episodeId': 3, 'type': 'OP', 'sort': '1'},
+          {'episodeId': 4, 'type': 'ED', 'sort': '1'},
+          {'episodeId': 5, 'type': 'SPECIAL', 'sort': '1'},
+        ];
+      final detail = SubjectDetail.fromJson(json);
+      expect(detail.episodeCount, 2);
+    });
+
+    test('episodeCount is null when episodes is absent from JSON', () {
+      final detail = SubjectDetail.fromJson(baseJson());
+      expect(detail.episodeCount, isNull);
+    });
   });
 
   group('CharacterInfo / RelatedCharacter', () {
@@ -170,7 +196,11 @@ void main() {
     });
 
     test('parses a staff member with null role and image', () {
-      final staff = StaffMember.fromJson({'name': '某人', 'imageUrl': null, 'role': null});
+      final staff = StaffMember.fromJson({
+        'name': '某人',
+        'imageUrl': null,
+        'role': null,
+      });
       expect(staff.imageUrl, isNull);
       expect(staff.role, isNull);
     });
@@ -188,18 +218,15 @@ void main() {
       expect(item.collectionType, CollectionType.wish);
     });
 
-    test(
-      'parses a collection-list item that uses "id" instead of "subjectId" '
-      '(real server observed to omit "subjectId" entirely)',
-      () {
-        final item = MyCollectionSubject.fromJson({
-          'id': 900,
-          'name': 'Nikogyanya',
-          'nameCn': '尼古喵喵',
-        });
-        expect(item.subjectId, 900);
-      },
-    );
+    test('parses a collection-list item that uses "id" instead of "subjectId" '
+        '(real server observed to omit "subjectId" entirely)', () {
+      final item = MyCollectionSubject.fromJson({
+        'id': 900,
+        'name': 'Nikogyanya',
+        'nameCn': '尼古喵喵',
+      });
+      expect(item.subjectId, 900);
+    });
 
     test(
       'parses a response with no total field (real server observed to omit it)',
@@ -218,8 +245,18 @@ void main() {
     test('parses a paginated response with items and total', () {
       final page = PaginatedCollections.fromJson({
         'items': [
-          {'subjectId': 1, 'name': 'A', 'nameCn': 'A-cn', 'collectionType': 'DOING'},
-          {'subjectId': 2, 'name': 'B', 'nameCn': 'B-cn', 'collectionType': null},
+          {
+            'subjectId': 1,
+            'name': 'A',
+            'nameCn': 'A-cn',
+            'collectionType': 'DOING',
+          },
+          {
+            'subjectId': 2,
+            'name': 'B',
+            'nameCn': 'B-cn',
+            'collectionType': null,
+          },
         ],
         'total': 2,
       });

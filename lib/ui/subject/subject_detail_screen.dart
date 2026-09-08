@@ -135,12 +135,16 @@ class _BangumiEpisodesSection extends ConsumerWidget {
 }
 
 /// New "作品信息" (work info) block: shows the subject's broadcast
-/// start date, episode count, aliases, and tags. Combines data from two
-/// independent providers (`subjectDetailControllerProvider` for
-/// airDate/aliases/tags, `subjectBangumiEpisodesControllerProvider` for
-/// the episode count) -- if either hasn't resolved yet, the
-/// corresponding line is simply omitted rather than shown as a loading
-/// placeholder, since this is a low-priority informational block.
+/// start date, episode count, aliases, and tags -- all sourced from a
+/// single provider, `subjectDetailControllerProvider` (the episode count
+/// in particular is `SubjectDetail.episodeCount`, derived client-side
+/// from the `episodes` array already embedded in that same response, so
+/// this line renders as soon as the subject detail loads and does NOT
+/// wait on the separate, slower, direct-to-Bangumi
+/// `subjectBangumiEpisodesControllerProvider` call). If the provider
+/// hasn't resolved yet or errors, the whole block is omitted rather than
+/// shown as a loading placeholder, since this is a low-priority
+/// informational block.
 class _WorkInfoSection extends ConsumerWidget {
   const _WorkInfoSection({required this.subjectId});
 
@@ -151,16 +155,13 @@ class _WorkInfoSection extends ConsumerWidget {
     final detailAsync = ref.watch(
       subjectDetailControllerProvider(subjectId: subjectId),
     );
-    final episodesAsync = ref.watch(
-      subjectBangumiEpisodesControllerProvider(subjectId: subjectId),
-    );
 
     return detailAsync.when(
       loading: () => const SizedBox.shrink(),
       error: (error, stack) => const SizedBox.shrink(),
       data: (subject) {
         final airDateLabel = _formatAirDateYearMonth(subject.airDate);
-        final episodeCount = episodesAsync.value?.length;
+        final episodeCount = subject.episodeCount;
 
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),

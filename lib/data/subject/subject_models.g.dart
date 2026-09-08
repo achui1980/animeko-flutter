@@ -44,6 +44,7 @@ SubjectDetail _$SubjectDetailFromJson(
   scoreDetails: (json['scoreDetails'] as Map<String, dynamic>?)?.map(
     (k, e) => MapEntry(k, (e as num).toInt()),
   ),
+  episodeCount: _mainEpisodeCountFromRaw(json['episodes']),
 );
 
 Map<String, dynamic> _$SubjectDetailToJson(SubjectDetail instance) =>

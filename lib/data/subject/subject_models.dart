@@ -33,11 +33,10 @@ class SelfRating {
 
 /// Response of `GET /v2/subjects/{subjectId}` -- verified against the
 /// real `AniSubjectCollection` model. This is a deliberately lean subset
-/// (the real wire shape also has `type`/`nsfw`/`aliases`/`favorite`/
-/// `metaTags`/`episodes`/`relations`/`infobox`/`platform`/
-/// `airingInfo`/`updatedAt`, none of which the UI needs) --
-/// json_serializable's generated `fromJson` ignores undeclared keys, so
-/// omitting fields is safe.
+/// (the real wire shape also has `type`/`nsfw`/`favorite`/`metaTags`/
+/// `relations`/`infobox`/`platform`/`airingInfo`/`updatedAt`, none of
+/// which the UI needs) -- json_serializable's generated `fromJson`
+/// ignores undeclared keys, so omitting fields is safe.
 @JsonSerializable()
 class SubjectDetail {
   const SubjectDetail({
@@ -53,6 +52,7 @@ class SubjectDetail {
     required this.selfRating,
     this.aliases = const [],
     this.scoreDetails,
+    this.episodeCount,
   });
 
   final int id;
@@ -78,7 +78,10 @@ class SubjectDetail {
 
   /// The current user's own collection status. Null means "not in the
   /// user's collection at all" (distinct from any of the 5 real states).
-  @JsonKey(fromJson: collectionTypeFromWireNullable, toJson: collectionTypeToWireNullable)
+  @JsonKey(
+    fromJson: collectionTypeFromWireNullable,
+    toJson: collectionTypeToWireNullable,
+  )
   final CollectionType? collectionType;
 
   final SelfRating selfRating;
@@ -94,10 +97,43 @@ class SubjectDetail {
   /// responses that predate this field being added).
   final Map<String, int>? scoreDetails;
 
+  /// Count of "main" episodes (`type == "MAIN"`), derived client-side by
+  /// counting entries in the raw `episodes` array that's already
+  /// embedded directly inside this same `/v2/subjects/{id}` response
+  /// (confirmed live: entries also carry `type` values `"OP"`/`"ED"`/
+  /// `"SPECIAL"`, which are deliberately excluded from this count).
+  ///
+  /// This exists so the "作品信息" block's episode-count line can render
+  /// immediately from data that's already being fetched here, instead of
+  /// depending on the separate, slower, and sometimes-unreachable direct
+  /// call to Bangumi's own `https://api.bgm.tv/v0/episodes` endpoint
+  /// (`SubjectBangumiEpisodesController`) purely to show a count.
+  ///
+  /// Null when the response omits the `episodes` key (or for older
+  /// cached responses that predate this field).
+  @JsonKey(
+    name: 'episodes',
+    fromJson: _mainEpisodeCountFromRaw,
+    includeToJson: false,
+  )
+  final int? episodeCount;
+
   factory SubjectDetail.fromJson(Map<String, dynamic> json) =>
       _$SubjectDetailFromJson(json);
 
   Map<String, dynamic> toJson() => _$SubjectDetailToJson(this);
+}
+
+/// Counts the entries in the raw `episodes` JSON array (as embedded in
+/// `GET /v2/subjects/{subjectId}`'s response) whose `type` is `"MAIN"`.
+/// Returns null if [raw] isn't a list (i.e. the key was absent from the
+/// response, in which case json_serializable passes `null` through).
+int? _mainEpisodeCountFromRaw(dynamic raw) {
+  if (raw is! List) return null;
+  return raw
+      .whereType<Map<String, dynamic>>()
+      .where((episode) => episode['type'] == 'MAIN')
+      .length;
 }
 
 /// A single character (with its voice actor's info, since
@@ -183,7 +219,10 @@ class MyCollectionSubject {
   final String name;
   final String nameCn;
 
-  @JsonKey(fromJson: collectionTypeFromWireNullable, toJson: collectionTypeToWireNullable)
+  @JsonKey(
+    fromJson: collectionTypeFromWireNullable,
+    toJson: collectionTypeToWireNullable,
+  )
   final CollectionType? collectionType;
 
   /// Hand-written (not `json_serializable`-generated) because the real
