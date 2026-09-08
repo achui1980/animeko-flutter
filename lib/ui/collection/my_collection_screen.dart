@@ -69,6 +69,7 @@ class _MyCollectionScreenState extends ConsumerState<MyCollectionScreen> {
               data: (page) => _CollectionList(
                 type: _selected,
                 subjects: page.items,
+                imageUrls: page.imageUrls,
                 hasMore: page.hasMore,
                 editMode: _editMode,
               ),
@@ -89,12 +90,14 @@ class _CollectionList extends ConsumerStatefulWidget {
   const _CollectionList({
     required this.type,
     required this.subjects,
+    required this.imageUrls,
     required this.hasMore,
     required this.editMode,
   });
 
   final CollectionType type;
   final List<MyCollectionSubject> subjects;
+  final Map<int, String> imageUrls;
   final bool hasMore;
   final bool editMode;
 
@@ -152,7 +155,10 @@ class _CollectionListState extends ConsumerState<_CollectionList> {
             return const SizedBox.shrink();
           }
           final subject = widget.subjects[index];
-          final card = SubjectCard.fromMyCollectionSubject(subject);
+          final card = SubjectCard.fromMyCollectionSubject(
+            subject,
+            imageUrl: widget.imageUrls[subject.subjectId],
+          );
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             child: Stack(
