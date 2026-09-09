@@ -225,5 +225,22 @@ void main() {
         2: 'https://example.com/b.jpg',
       });
     });
+
+    test('build does not fail the whole page load when the image cache read throws', () async {
+      when(() => api.getMyCollections(type: CollectionType.doing, offset: 0, limit: 20)).thenAnswer(
+        (_) async => const PaginatedCollections(
+          items: [MyCollectionSubject(subjectId: 1, name: 'A', nameCn: 'A-cn')],
+          total: 1,
+        ),
+      );
+      when(() => imageCacheRepo.getFor([1])).thenThrow(Exception('disk full'));
+
+      final result = await container.read(
+        myCollectionsControllerProvider(type: CollectionType.doing).future,
+      );
+
+      expect(result.items, hasLength(1));
+      expect(result.imageUrls, isEmpty);
+    });
   });
 }

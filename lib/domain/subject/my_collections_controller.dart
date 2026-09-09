@@ -76,16 +76,27 @@ class MyCollectionsController extends _$MyCollectionsController {
     );
   }
 
-  Future<Map<int, String>> _imageUrlsFor(List<MyCollectionSubject> items) {
-    // `.toList()`: mocktail's exact-argument matcher (`DeepCollectionEquality`)
-    // only does element-wise comparison when both sides are `List`s -- a lazy
-    // `Iterable` actual argument against a `List`-literal stub (e.g.
-    // `when(() => imageCacheRepo.getFor([1]))`) falls through to the `any()`
-    // catch-all instead of matching. Materializing to a `List` here also
-    // avoids passing a lazy iterable across the repository boundary, which
-    // is good practice regardless of the test-tooling reason.
-    return ref
-        .read(subjectImageCacheRepositoryProvider)
-        .getFor(items.map((item) => item.subjectId).toList());
+  /// Best-effort: a local Drift read failure here (e.g. a disk error) must
+  /// never fail the whole page load just to show cover images, which are
+  /// non-critical enrichment on top of the always-authoritative remote
+  /// list. Mirrors the write path's best-effort handling in
+  /// `SubjectCollectionController.setCollectionType`.
+  Future<Map<int, String>> _imageUrlsFor(
+    List<MyCollectionSubject> items,
+  ) async {
+    try {
+      // `.toList()`: mocktail's exact-argument matcher (`DeepCollectionEquality`)
+      // only does element-wise comparison when both sides are `List`s -- a lazy
+      // `Iterable` actual argument against a `List`-literal stub (e.g.
+      // `when(() => imageCacheRepo.getFor([1]))`) falls through to the `any()`
+      // catch-all instead of matching. Materializing to a `List` here also
+      // avoids passing a lazy iterable across the repository boundary, which
+      // is good practice regardless of the test-tooling reason.
+      return await ref
+          .read(subjectImageCacheRepositoryProvider)
+          .getFor(items.map((item) => item.subjectId).toList());
+    } catch (_) {
+      return {};
+    }
   }
 }
