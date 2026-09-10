@@ -15,10 +15,50 @@ part 'xifan_api.g.dart';
 /// before this is trusted in production (see design doc's "测试策略"
 /// section).
 class XifanApi {
-  XifanApi(this._dio);
+  XifanApi(this._dio, [Dio? supabaseDio]) : _supabaseDio = supabaseDio ?? Dio();
   final Dio _dio;
+  final Dio _supabaseDio;
 
   static const _searchBaseUrl = 'https://dm1.xfdm.pro';
+  static const _supabaseSearchUrl =
+      'https://rzmsnqblptbceicadbyd.supabase.co/rest/v1/rpc/search_animes';
+
+  /// Searches 稀饭动漫 for [title]. Tries the primary dm1.xfdm.pro HTML
+  /// search first (see [_searchViaHtml]); if that throws (network error,
+  /// timeout, etc.) or comes back empty, falls back to the site's newer
+  /// Supabase-backed search API (`next.xifanacg.com`, reverse-engineered
+  /// 2026-09-10) to resolve a canonical title, then retries the HTML
+  /// search with that title. This recovers cases where dm1.xfdm.pro's
+  /// own search index doesn't match the caller's (Bangumi-sourced) title
+  /// even though dm1.xfdm.pro itself is reachable -- e.g. translation or
+  /// aliasing differences.
+  ///
+  /// Known limitation: if dm1.xfdm.pro is entirely unreachable (a full
+  /// domain outage, not just a title-matching miss), this fallback
+  /// cannot help end-to-end -- [listEpisodes] and [resolvePlaybackUrl]
+  /// still require dm1.xfdm.pro, so a domain-wide outage breaks episode
+  /// listing and playback regardless of whether search itself succeeds
+  /// via Supabase. See the design doc's "已知限制" for the accepted scope
+  /// of this fallback: search-resilience only, not a full alternate
+  /// provider.
+  Future<List<XifanBangumi>> search(String title) async {
+    List<XifanBangumi> primary;
+    try {
+      primary = await _searchViaHtml(title);
+    } catch (_) {
+      primary = const [];
+    }
+    if (primary.isNotEmpty) return primary;
+
+    final canonicalTitle = await _resolveCanonicalTitleViaSupabase(title);
+    if (canonicalTitle == null || canonicalTitle == title) return primary;
+
+    try {
+      return await _searchViaHtml(canonicalTitle);
+    } catch (_) {
+      return primary;
+    }
+  }
 
   /// GET https://dm1.xfdm.pro/search.html?wd=`<title>`
   ///
@@ -35,7 +75,7 @@ class XifanApi {
   /// container -- no single enclosing element for one result was
   /// confirmed live. If this proves wrong, re-scope both selectors to a
   /// shared parent instead of pairing by index.
-  Future<List<XifanBangumi>> search(String title) async {
+  Future<List<XifanBangumi>> _searchViaHtml(String title) async {
     final response = await _dio.get<String>(
       '$_searchBaseUrl/search.html',
       queryParameters: {'wd': title},
@@ -66,6 +106,30 @@ class XifanApi {
       results.add(XifanBangumi(id: id, title: titles[i]));
     }
     return results;
+  }
+
+  /// Queries the Supabase-backed `search_animes` RPC used by
+  /// `next.xifanacg.com` (reverse-engineered 2026-09-10: it calls
+  /// `createClient().rpc('search_animes', {search_term: ...})` against
+  /// project `rzmsnqblptbceicadbyd`) for a better-matching canonical
+  /// title. Returns `null` on any failure -- network error, unexpected
+  /// response shape, or no results -- since this is a best-effort
+  /// fallback used only by [search], never a hard failure.
+  Future<String?> _resolveCanonicalTitleViaSupabase(String title) async {
+    try {
+      final response = await _supabaseDio.post<List<dynamic>>(
+        _supabaseSearchUrl,
+        data: {'search_term': title},
+      );
+      final results = response.data;
+      if (results == null || results.isEmpty) return null;
+      final first = results.first;
+      if (first is! Map) return null;
+      final canonicalTitle = first['title'];
+      return canonicalTitle is String ? canonicalTitle : null;
+    } catch (_) {
+      return null;
+    }
   }
 
   static const _watchBaseUrl = 'https://dm1.xfdm.pro';
@@ -169,8 +233,38 @@ Dio xifanDio(Ref ref) {
   return dio;
 }
 
+const _xifanSupabaseConnectTimeout = Duration(seconds: 10);
+const _xifanSupabaseReceiveTimeout = Duration(seconds: 10);
+
+/// This is Supabase's "publishable" key (the modern replacement for the
+/// old JWT-format "anon" key) for the `rzmsnqblptbceicadbyd` project
+/// backing `next.xifanacg.com`. By Supabase's design this key is meant
+/// to be embedded client-side -- access control is enforced server-side
+/// via row-level security, not by keeping this value secret.
+const _xifanSupabaseApiKey = 'sb_publishable_aCb7uwyLN6H-sMjze4dRGA_2MDuROLF';
+
+/// Dio for 稀饭动漫's newer Supabase-backed search API
+/// (`next.xifanacg.com`), used only as a fallback when the primary
+/// dm1.xfdm.pro HTML search misses -- see [XifanApi.search].
 @riverpod
-XifanApi xifanApi(Ref ref) => XifanApi(ref.watch(xifanDioProvider));
+Dio xifanSupabaseDio(Ref ref) {
+  final dio = Dio(
+    BaseOptions(
+      headers: {
+        'apikey': _xifanSupabaseApiKey,
+        'Content-Type': 'application/json',
+      },
+      connectTimeout: _xifanSupabaseConnectTimeout,
+      receiveTimeout: _xifanSupabaseReceiveTimeout,
+    ),
+  );
+  configureProxy(dio, ref);
+  return dio;
+}
+
+@riverpod
+XifanApi xifanApi(Ref ref) =>
+    XifanApi(ref.watch(xifanDioProvider), ref.watch(xifanSupabaseDioProvider));
 
 /// Scans forward from `var player_aaaa` for its `{...}` object literal,
 /// tracking brace depth so a nested object (e.g. `vod_data`) doesn't

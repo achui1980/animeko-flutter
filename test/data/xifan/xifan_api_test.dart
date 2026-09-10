@@ -8,16 +8,26 @@ class MockDio extends Mock implements Dio {}
 
 void main() {
   late MockDio dio;
+  late MockDio supabaseDio;
   late XifanApi api;
 
   setUp(() {
     dio = MockDio();
-    api = XifanApi(dio);
+    supabaseDio = MockDio();
+    api = XifanApi(dio, supabaseDio);
   });
 
   Response<String> htmlResponse(String body) {
     return Response(
       data: body,
+      requestOptions: RequestOptions(path: '/'),
+      statusCode: 200,
+    );
+  }
+
+  Response<List<dynamic>> supabaseResponse(List<Map<String, dynamic>> rows) {
+    return Response(
+      data: rows,
       requestOptions: RequestOptions(path: '/'),
       statusCode: 200,
     );
@@ -117,6 +127,174 @@ void main() {
       final results = await api.search('anything');
 
       expect(results, isEmpty);
+    });
+  });
+
+  group('search Supabase fallback', () {
+    const emptyHtml = '<html><body>no results</body></html>';
+    const searchResultsHtml = '''
+<html><body>
+  <div class="thumb-content"><div class="thumb-txt cor4 hide">穹庐下的魔女</div></div>
+  <div class="thumb-menu"><a target="_self" href="/bangumi/3384.html" class="button cr3">播放正片</a></div>
+</body></html>
+''';
+
+    test(
+      'does not call the Supabase API when the HTML search already has results',
+      () async {
+        when(
+          () => dio.get<String>(
+            any(),
+            queryParameters: any(named: 'queryParameters'),
+            options: any(named: 'options'),
+          ),
+        ).thenAnswer((_) async => htmlResponse(searchResultsHtml));
+
+        final results = await api.search('穹庐下的魔女');
+
+        expect(results, hasLength(1));
+        verifyNever(
+          () =>
+              supabaseDio.post<List<dynamic>>(any(), data: any(named: 'data')),
+        );
+      },
+    );
+
+    test('falls back to Supabase and retries the HTML search with the '
+        'canonical title when the HTML search throws', () async {
+      when(
+        () => dio.get<String>(
+          'https://dm1.xfdm.pro/search.html',
+          queryParameters: {'wd': '天幕的魔法使'},
+          options: any(named: 'options'),
+        ),
+      ).thenThrow(
+        DioException(requestOptions: RequestOptions(path: '/search.html')),
+      );
+      when(
+        () => supabaseDio.post<List<dynamic>>(
+          any(),
+          data: {'search_term': '天幕的魔法使'},
+        ),
+      ).thenAnswer(
+        (_) async => supabaseResponse([
+          {'id': 3384, 'title': '穹庐下的魔女'},
+        ]),
+      );
+      when(
+        () => dio.get<String>(
+          'https://dm1.xfdm.pro/search.html',
+          queryParameters: {'wd': '穹庐下的魔女'},
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer((_) async => htmlResponse(searchResultsHtml));
+
+      final results = await api.search('天幕的魔法使');
+
+      expect(results, hasLength(1));
+      expect(results.single.id, 3384);
+      expect(results.single.title, '穹庐下的魔女');
+    });
+
+    test('falls back to Supabase and retries the HTML search when the HTML '
+        'search returns no results', () async {
+      when(
+        () => dio.get<String>(
+          'https://dm1.xfdm.pro/search.html',
+          queryParameters: {'wd': '天幕的魔法使'},
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer((_) async => htmlResponse(emptyHtml));
+      when(
+        () => supabaseDio.post<List<dynamic>>(
+          any(),
+          data: {'search_term': '天幕的魔法使'},
+        ),
+      ).thenAnswer(
+        (_) async => supabaseResponse([
+          {'id': 3384, 'title': '穹庐下的魔女'},
+        ]),
+      );
+      when(
+        () => dio.get<String>(
+          'https://dm1.xfdm.pro/search.html',
+          queryParameters: {'wd': '穹庐下的魔女'},
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer((_) async => htmlResponse(searchResultsHtml));
+
+      final results = await api.search('天幕的魔法使');
+
+      expect(results, hasLength(1));
+      expect(results.single.title, '穹庐下的魔女');
+    });
+
+    test('returns an empty list when both the HTML search and the Supabase '
+        'fallback have nothing', () async {
+      when(
+        () => dio.get<String>(
+          any(),
+          queryParameters: any(named: 'queryParameters'),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer((_) async => htmlResponse(emptyHtml));
+      when(
+        () => supabaseDio.post<List<dynamic>>(any(), data: any(named: 'data')),
+      ).thenAnswer((_) async => supabaseResponse(const []));
+
+      final results = await api.search('nonexistent');
+
+      expect(results, isEmpty);
+    });
+
+    test('returns an empty list (rather than throwing) when the Supabase '
+        'fallback itself fails', () async {
+      when(
+        () => dio.get<String>(
+          any(),
+          queryParameters: any(named: 'queryParameters'),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer((_) async => htmlResponse(emptyHtml));
+      when(
+        () => supabaseDio.post<List<dynamic>>(any(), data: any(named: 'data')),
+      ).thenThrow(DioException(requestOptions: RequestOptions(path: '/rpc')));
+
+      final results = await api.search('nonexistent');
+
+      expect(results, isEmpty);
+    });
+
+    test('does not retry the HTML search when Supabase returns the same '
+        'title (avoids an infinite/duplicate request)', () async {
+      when(
+        () => dio.get<String>(
+          any(),
+          queryParameters: any(named: 'queryParameters'),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer((_) async => htmlResponse(emptyHtml));
+      when(
+        () => supabaseDio.post<List<dynamic>>(
+          any(),
+          data: {'search_term': '穹庐下的魔女'},
+        ),
+      ).thenAnswer(
+        (_) async => supabaseResponse([
+          {'id': 3384, 'title': '穹庐下的魔女'},
+        ]),
+      );
+
+      final results = await api.search('穹庐下的魔女');
+
+      expect(results, isEmpty);
+      verify(
+        () => dio.get<String>(
+          any(),
+          queryParameters: any(named: 'queryParameters'),
+          options: any(named: 'options'),
+        ),
+      ).called(1);
     });
   });
 
@@ -413,5 +591,12 @@ var player_aaaa={"flag":"play","encrypt":0,"vod_data":{"vod_name":"x"}}
     addTearDown(container.dispose);
     final dio = container.read(xifanDioProvider);
     expect(dio.options.headers['User-Agent'], isNotEmpty);
+  });
+
+  test('xifanSupabaseDioProvider sets a non-empty apikey header', () {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    final dio = container.read(xifanSupabaseDioProvider);
+    expect(dio.options.headers['apikey'], isNotEmpty);
   });
 }
