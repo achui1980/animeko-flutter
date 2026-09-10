@@ -160,7 +160,12 @@ class RssMediaSource implements MediaSource {
 
     return [
       for (final release in sortedReleases)
-        TorrentPlaybackSource(release: release, engine: _engine),
+        // Reuse the RSS Dio (already proxy-aware and timeout-bounded, see
+        // `mikanRssDio` below) to fetch the `.torrent` bytes: the download
+        // URL is on the same host as the search feed, so it needs the same
+        // proxy/timeout handling -- a fresh unconfigured `Dio()` would
+        // silently bypass the user's proxy and could hang forever.
+        TorrentPlaybackSource(release: release, engine: _engine, dio: _dio),
     ];
   }
 }

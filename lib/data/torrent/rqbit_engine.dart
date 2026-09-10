@@ -93,7 +93,17 @@ class RqbitEngine {
       rethrow;
     }
     _process = process;
-    _dio = Dio(BaseOptions(baseUrl: 'http://127.0.0.1:$_port'));
+    // Bounded so a hung rqbit sidecar (or a request that never completes,
+    // e.g. an unreachable tracker during add) fails within a fixed time
+    // instead of leaving prepare() hanging indefinitely (see design doc
+    // 4.4: "POST /torrents: 设定一个保守超时（如 10 秒）防止极端情况卡死").
+    _dio = Dio(
+      BaseOptions(
+        baseUrl: 'http://127.0.0.1:$_port',
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 10),
+      ),
+    );
   }
 
   Future<AddTorrentResult> addTorrent(List<int> torrentBytes) async {
