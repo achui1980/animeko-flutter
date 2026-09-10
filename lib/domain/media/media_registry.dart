@@ -5,6 +5,8 @@ import '../../data/anime1/anime1_api.dart';
 import '../../data/anime1/anime1_models.dart';
 import '../../data/dilidili/dilidili_api.dart';
 import '../../data/dilidili/dilidili_models.dart';
+import '../../data/rss/rss_media_source.dart';
+import '../../data/torrent/rqbit_engine.dart';
 import '../../data/xifan/xifan_api.dart';
 import '../../data/xifan/xifan_models.dart';
 import '../../data/yinghua/yinghua_api.dart';
@@ -144,4 +146,9 @@ class DilidiliMediaSource implements MediaSource {
 List<MediaSource> mediaSources(Ref ref) => [
   Anime1MediaSource(ref.watch(anime1ApiProvider)),
   XifanMediaSource(ref.watch(xifanApiProvider)),
+  RssMediaSource(
+    mikanRssSourceConfig,
+    ref.watch(mikanRssDioProvider),
+    ref.watch(rqbitEngineProvider),
+  ),
 ];
