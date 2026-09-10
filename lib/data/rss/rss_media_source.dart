@@ -1,6 +1,14 @@
+import 'package:dio/dio.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+
 import '../../domain/media/media_source.dart';
 import '../../domain/media/title_parser.dart';
+import '../settings/proxy_dio_config.dart';
+import '../torrent/rqbit_engine.dart';
+import '../torrent/torrent_playback_source.dart';
 import 'rss_parser.dart';
+
+part 'rss_media_source.g.dart';
 
 /// Configuration for one instance of the generic RSS BT media source.
 ///
@@ -87,4 +95,78 @@ class RssEpisode implements MediaEpisode {
   final String title;
   final int episodeNumber;
   final List<RssRelease> releases;
+}
+
+/// Generic RSS BT media source, driven by a template [RssSourceConfig].
+///
+/// A single RSS search already returns every release for every episode, so
+/// all parsing/grouping happens once inside [search]. [listEpisodes] and
+/// [resolvePlayback] only ever read from the cached [RssSeriesCandidate],
+/// issuing no further network requests.
+class RssMediaSource implements MediaSource {
+  RssMediaSource(this.config, this._dio, this._engine);
+
+  final RssSourceConfig config;
+  final Dio _dio;
+  final RqbitEngine _engine;
+
+  @override
+  String get id => config.name;
+
+  @override
+  String get displayName => config.name;
+
+  @override
+  Future<List<MediaCandidate>> search(String title) async {
+    final url = config.searchUrl.replaceAll(
+      '{keyword}',
+      Uri.encodeQueryComponent(title),
+    );
+    final response = await _dio.get<String>(url);
+    final items = parseRssFeed(response.data ?? '');
+    final groups = groupByEpisode(items);
+
+    return [
+      RssSeriesCandidate(sourceId: config.name, title: title, groups: groups),
+    ];
+  }
+
+  @override
+  Future<List<MediaEpisode>> listEpisodes(MediaCandidate candidate) async {
+    final rssCandidate = candidate as RssSeriesCandidate;
+    final episodeNumbers = rssCandidate.groups.keys.toList()..sort();
+    return [
+      for (final episodeNumber in episodeNumbers)
+        RssEpisode(
+          sourceId: config.name,
+          title: '第 $episodeNumber 集',
+          episodeNumber: episodeNumber,
+          releases: rssCandidate.groups[episodeNumber]!,
+        ),
+    ];
+  }
+
+  @override
+  Future<List<MediaPlaybackSource>> resolvePlayback(
+    MediaEpisode episode,
+  ) async {
+    final rssEpisode = episode as RssEpisode;
+    final sortedReleases = [...rssEpisode.releases]..sort((a, b) {
+      final resA = a.parsed.resolution ?? '';
+      final resB = b.parsed.resolution ?? '';
+      return resB.compareTo(resA);
+    });
+
+    return [
+      for (final release in sortedReleases)
+        TorrentPlaybackSource(release: release, engine: _engine),
+    ];
+  }
+}
+
+@riverpod
+Dio mikanRssDio(Ref ref) {
+  final dio = Dio(BaseOptions(headers: {'User-Agent': 'Mozilla/5.0'}));
+  configureProxy(dio, ref);
+  return dio;
 }
