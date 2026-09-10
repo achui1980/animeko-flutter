@@ -60,6 +60,7 @@ void main() {
 
       expect(result.id, 0);
       expect(result.files.single.name, 'a.mp4');
+      expect(result.files.single.length, 100);
 
       final captured = verify(() => dio.post<Map<String, dynamic>>(
             captureAny(),

@@ -47,7 +47,9 @@ class RqbitEngine {
 
   /// Test-only constructor that skips process management and talks to a
   /// pre-configured [Dio] on a fixed port.
-  RqbitEngine.forTesting(this._dio, {required int port}) : _port = port;
+  RqbitEngine.forTesting(Dio dio, {required int port})
+      : _dio = dio,
+        _port = port;
 
   Dio? _dio;
   int? _port;
