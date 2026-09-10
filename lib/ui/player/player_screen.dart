@@ -82,6 +82,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   StreamSubscription<bool>? _completedSubscription;
   StreamSubscription<bool>? _bufferingSubscription;
+
+  /// Guards against the mid-playback stall (buffering with no progress)
+  /// hanging forever -- e.g. a `TorrentPlaybackSource` whose swarm has
+  /// no seeders for the needed piece. Armed whenever
+  /// `_player.stream.buffering` reports `true`, cancelled the moment it
+  /// reports `false` again (see the listener in `initState`); if it
+  /// fires, [_handleBufferTimeout] falls back to the next candidate
+  /// (or surfaces an error if none remain), mirroring how the error
+  /// listener already handles outright playback failures.
+  Timer? _bufferTimeoutTimer;
   bool _hasAdvancedToNextEpisode = false;
   bool _drawerOpen = false;
   bool _controlsVisible = true;
@@ -127,6 +137,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     _storageFuture = ref.read(playbackPositionStorageProvider.future);
     _bufferingSubscription = _player.stream.buffering.listen((buffering) {
       if (mounted) setState(() => _isBuffering = buffering);
+      if (buffering) {
+        _bufferTimeoutTimer ??= Timer(
+          const Duration(seconds: 30),
+          _handleBufferTimeout,
+        );
+      } else {
+        _bufferTimeoutTimer?.cancel();
+        _bufferTimeoutTimer = null;
+      }
     });
     _player.stream.error.listen((message) {
       if (!mounted) return;
@@ -143,7 +162,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         // without surfacing an error to the user. Does not distinguish
         // "failed to open" from "failed mid-stream"; both are handled
         // identically per the design spec.
+        final previousCandidate = candidates[_candidateIndex];
         _candidateIndex++;
+        unawaited(previousCandidate.dispose());
         _openCandidate(candidates[_candidateIndex]).catchError((Object e) {
           // `_openCandidate` itself failed (e.g. `_player.open()` threw
           // for the fallback candidate) -- without this, the exception
@@ -468,6 +489,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     unawaited(_bufferingSubscription?.cancel());
     _savePositionTimer?.cancel();
     _hideControlsTimer?.cancel();
+    _bufferTimeoutTimer?.cancel();
     unawaited(_savePosition());
     _hudHideTimer?.cancel();
     _screenshotFlashTimer?.cancel();
@@ -501,6 +523,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   void _retry() {
     setState(() => _playbackError = null);
+    // Release the currently-open candidate (e.g. a `TorrentPlaybackSource`
+    // holding a live torrent download) before the provider re-resolves
+    // and opens a new one -- see `MediaPlaybackSource.dispose()`.
+    final previousCandidates = _candidates;
+    if (previousCandidates != null) {
+      unawaited(previousCandidates[_candidateIndex].dispose());
+    }
     _candidateIndex = 0;
     // Clear `_candidates` (not just the index) so the error listener
     // above ignores any stale error event that fires for the
@@ -518,11 +547,35 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     // called) -- without this, there's a brief window where the loading
     // overlay would incorrectly disappear.
     if (mounted) setState(() => _isBuffering = true);
-    await _player.open(Media(source.url, httpHeaders: source.headers));
+    final playableUrl = await source.prepare();
+    await _player.open(Media(playableUrl, httpHeaders: source.headers));
     final speed = await ref.read(playbackSpeedControllerProvider.future);
     await _player.setRate(speed);
     await _maybeResumePosition();
     if (mounted) _hasAdvancedToNextEpisode = false;
+  }
+
+  /// Falls back to the next candidate (or surfaces an error) when
+  /// buffering has been stuck for [_bufferTimeoutTimer]'s duration with
+  /// no progress -- e.g. a `TorrentPlaybackSource` stalled with no
+  /// seeders for the needed piece. Mirrors the same-shaped fallback in
+  /// the `_player.stream.error` listener in `initState`, just triggered
+  /// by a timeout instead of an explicit error event.
+  void _handleBufferTimeout() {
+    _bufferTimeoutTimer = null;
+    if (!mounted) return;
+    final candidates = _candidates;
+    if (candidates == null) return;
+    if (_candidateIndex + 1 < candidates.length) {
+      final previousCandidate = candidates[_candidateIndex];
+      _candidateIndex++;
+      unawaited(previousCandidate.dispose());
+      _openCandidate(candidates[_candidateIndex]).catchError((Object e) {
+        if (mounted) setState(() => _playbackError = e.toString());
+      });
+    } else {
+      setState(() => _playbackError = '缓冲超时，未找到可用线路');
+    }
   }
 
   /// Renders the collapsible episode/source drawer. `child` is `null`
