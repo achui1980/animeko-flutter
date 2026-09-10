@@ -70,13 +70,29 @@ class RqbitEngine {
         await _downloadDir(),
       ],
     );
-    _process = process;
     unawaited(process.exitCode.then((_) {
-      _process = null;
-      _port = null;
+      // Only clear state if this exit event belongs to the process we are
+      // still tracking. Without this identity check, a late exit event from
+      // a previously-killed process (e.g. right after shutdown() is followed
+      // by a fresh ensureStarted() that started a new process) could wipe
+      // out the new process's state.
+      if (identical(_process, process)) {
+        _process = null;
+        _port = null;
+      }
     }));
 
-    _port = await _readAssignedPort(process);
+    try {
+      _port = await _readAssignedPort(process);
+    } catch (e) {
+      // Failed to read the assigned port (e.g. rqbit crashed before
+      // printing the expected "started HTTP API" line). Kill the
+      // half-started process and leave fields null so a later
+      // ensureStarted() call starts fresh instead of leaking this process.
+      process.kill();
+      rethrow;
+    }
+    _process = process;
     _dio = Dio(BaseOptions(baseUrl: 'http://127.0.0.1:$_port'));
   }
 
@@ -106,8 +122,12 @@ class RqbitEngine {
   Future<void> deleteTorrent(int torrentId) async {
     try {
       await _dioClient.post<dynamic>('$_base/torrents/$torrentId/delete');
-    } catch (_) {
+    } on DioException {
       // Cleanup failures are non-fatal: worst case is extra disk usage.
+      // Deliberately narrower than a blanket `catch` so that programming
+      // errors (e.g. calling this before ensureStarted() has completed,
+      // which would throw a null-check error on `_dioClient`/`_base`) are
+      // not silently swallowed.
     }
   }
 

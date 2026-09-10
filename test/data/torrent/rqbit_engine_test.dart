@@ -82,5 +82,23 @@ void main() {
 
       verify(() => dio.post<dynamic>('http://127.0.0.1:3030/torrents/7/delete')).called(1);
     });
+
+    test('deleteTorrent swallows DioException (cleanup failures are non-fatal)', () async {
+      when(() => dio.post<dynamic>(any())).thenThrow(
+        DioException(requestOptions: RequestOptions(path: '/')),
+      );
+
+      // Should not throw.
+      await engine.deleteTorrent(7);
+    });
+
+    test('deleteTorrent rethrows non-Dio exceptions instead of swallowing them', () async {
+      when(() => dio.post<dynamic>(any())).thenThrow(StateError('boom'));
+
+      await expectLater(
+        engine.deleteTorrent(7),
+        throwsA(isA<StateError>()),
+      );
+    });
   });
 }
