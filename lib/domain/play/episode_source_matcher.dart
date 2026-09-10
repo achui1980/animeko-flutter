@@ -1,3 +1,4 @@
+import '../../data/rss/rss_media_source.dart';
 import 'subject_episodes_controller.dart';
 
 /// Finds every [MergedEpisode] across [allMerged]'s sources whose
@@ -30,9 +31,26 @@ List<MergedEpisode> matchEpisodeSources({
 
   final matches = <MergedEpisode>[];
   for (final episodes in bySource.values) {
-    if (ordinalIndex < episodes.length) {
+    // RSS/BT episode lists are keyed by parsed episode number, not by list
+    // position (a source may be missing an episode, or list them out of
+    // order relative to the Bangumi grid). ordinalIndex is 0-based; episode
+    // numbers parsed from release titles are 1-based, hence the +1.
+    final bySort = _findBySort(episodes, ordinalIndex + 1);
+    if (bySort != null) {
+      matches.add(bySort);
+    } else if (ordinalIndex < episodes.length) {
       matches.add(episodes[ordinalIndex]);
     }
   }
   return matches;
+}
+
+MergedEpisode? _findBySort(List<MergedEpisode> episodes, int wantedSort) {
+  for (final merged in episodes) {
+    final episode = merged.episode;
+    if (episode is RssEpisode && episode.episodeNumber == wantedSort) {
+      return merged;
+    }
+  }
+  return null;
 }
