@@ -33,12 +33,6 @@ part of 'media_registry.dart';
 /// than left broken for users. [DilidiliMediaSource]/[DilidiliApi] remain
 /// intact and can be re-added to this list if the issue is resolved.
 ///
-/// TODO(mikan): [RssMediaSource] (id `mikan`) is temporarily *not*
-/// registered here while a proxy-configuration issue is being debugged
-/// (proxy settings sometimes fail to take effect until re-saved). This is
-/// a temporary diagnostic disable to isolate whether the other sources
-/// load correctly on their own -- re-add the `RssMediaSource(...)` entry
-/// below once the proxy issue is resolved.
 
 @ProviderFor(mediaSources)
 final mediaSourcesProvider = MediaSourcesProvider._();
@@ -68,12 +62,6 @@ final mediaSourcesProvider = MediaSourcesProvider._();
 /// than left broken for users. [DilidiliMediaSource]/[DilidiliApi] remain
 /// intact and can be re-added to this list if the issue is resolved.
 ///
-/// TODO(mikan): [RssMediaSource] (id `mikan`) is temporarily *not*
-/// registered here while a proxy-configuration issue is being debugged
-/// (proxy settings sometimes fail to take effect until re-saved). This is
-/// a temporary diagnostic disable to isolate whether the other sources
-/// load correctly on their own -- re-add the `RssMediaSource(...)` entry
-/// below once the proxy issue is resolved.
 
 final class MediaSourcesProvider
     extends
@@ -108,12 +96,6 @@ final class MediaSourcesProvider
   /// than left broken for users. [DilidiliMediaSource]/[DilidiliApi] remain
   /// intact and can be re-added to this list if the issue is resolved.
   ///
-  /// TODO(mikan): [RssMediaSource] (id `mikan`) is temporarily *not*
-  /// registered here while a proxy-configuration issue is being debugged
-  /// (proxy settings sometimes fail to take effect until re-saved). This is
-  /// a temporary diagnostic disable to isolate whether the other sources
-  /// load correctly on their own -- re-add the `RssMediaSource(...)` entry
-  /// below once the proxy issue is resolved.
   MediaSourcesProvider._()
     : super(
         from: null,
@@ -148,4 +130,4 @@ final class MediaSourcesProvider
   }
 }
 
-String _$mediaSourcesHash() => r'a15f28a1f1f895df925612007045152dd395a1c3';
+String _$mediaSourcesHash() => r'aec5eb1692ed88bb44c4b9c52ce30c9f8ddef5ff';

@@ -47,7 +47,7 @@ final class Anime1DioProvider extends $FunctionalProvider<Dio, Dio, Dio>
   }
 }
 
-String _$anime1DioHash() => r'f8056f30282b85b588be54b8f63aebd509243a08';
+String _$anime1DioHash() => r'4285ab03126f3769d3d12470e717ccae4ae4f25f';
 
 @ProviderFor(anime1Api)
 final anime1ApiProvider = Anime1ApiProvider._();

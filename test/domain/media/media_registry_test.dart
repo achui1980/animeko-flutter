@@ -273,11 +273,11 @@ void main() {
   });
 
   test('mediaSourcesProvider returns the registered sources '
-      '(yinghua, dilidili, and mikan are temporarily disabled -- see '
+      '(yinghua and dilidili are intentionally disabled -- see '
       'mediaSources doc comment)', () {
     final container = ProviderContainer();
     addTearDown(container.dispose);
     final sources = container.read(mediaSourcesProvider);
-    expect(sources.map((s) => s.id), ['anime1', 'xifan']);
+    expect(sources.map((s) => s.id), ['anime1', 'xifan', 'mikan']);
   });
 }

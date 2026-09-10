@@ -5,9 +5,8 @@ import '../../data/anime1/anime1_api.dart';
 import '../../data/anime1/anime1_models.dart';
 import '../../data/dilidili/dilidili_api.dart';
 import '../../data/dilidili/dilidili_models.dart';
-// TODO(mikan): re-add once the proxy-config issue is resolved (see below).
-// import '../../data/rss/rss_media_source.dart';
-// import '../../data/torrent/rqbit_engine.dart';
+import '../../data/rss/rss_media_source.dart';
+import '../../data/torrent/rqbit_engine.dart';
 import '../../data/xifan/xifan_api.dart';
 import '../../data/xifan/xifan_models.dart';
 import '../../data/yinghua/yinghua_api.dart';
@@ -144,14 +143,13 @@ class DilidiliMediaSource implements MediaSource {
 /// than left broken for users. [DilidiliMediaSource]/[DilidiliApi] remain
 /// intact and can be re-added to this list if the issue is resolved.
 ///
-/// TODO(mikan): [RssMediaSource] (id `mikan`) is temporarily *not*
-/// registered here while a proxy-configuration issue is being debugged
-/// (proxy settings sometimes fail to take effect until re-saved). This is
-/// a temporary diagnostic disable to isolate whether the other sources
-/// load correctly on their own -- re-add the `RssMediaSource(...)` entry
-/// below once the proxy issue is resolved.
 @riverpod
 List<MediaSource> mediaSources(Ref ref) => [
   Anime1MediaSource(ref.watch(anime1ApiProvider)),
   XifanMediaSource(ref.watch(xifanApiProvider)),
+  RssMediaSource(
+    mikanRssSourceConfig,
+    ref.watch(mikanRssDioProvider),
+    ref.watch(rqbitEngineProvider),
+  ),
 ];

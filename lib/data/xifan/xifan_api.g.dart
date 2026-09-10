@@ -47,7 +47,7 @@ final class XifanDioProvider extends $FunctionalProvider<Dio, Dio, Dio>
   }
 }
 
-String _$xifanDioHash() => r'148740d5dc63ff270a2d9e7a7f1193e9cc21df31';
+String _$xifanDioHash() => r'57d40f44379e555454ff9c8b794e9ee5d6121b91';
 
 @ProviderFor(xifanApi)
 final xifanApiProvider = XifanApiProvider._();
