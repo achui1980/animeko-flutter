@@ -32,7 +32,7 @@ class ParsedTitle {
   final List<String> subtitleLanguages;
 }
 
-const _resolutionNumbers = {360, 480, 848, 1080, 1440, 1920, 2160};
+const _resolutionNumbers = {360, 480, 720, 848, 1080, 1440, 1920, 2160};
 
 final _bracketPattern = RegExp(r'\[(.+?)\]|【(.+?)】');
 final _rangeWordPattern =
@@ -66,7 +66,7 @@ ParsedTitle parseTitle(String rawTitle) {
     episodeRange ??= _tryParseEpisode(word);
     for (final entry in _languageKeywords.entries) {
       if (subtitleLanguages.contains(entry.key)) continue;
-      if (entry.value.any((kw) => word.contains(kw))) {
+      if (entry.value.any((kw) => _matchesLanguageKeyword(word, kw))) {
         subtitleLanguages.add(entry.key);
       }
     }
@@ -145,6 +145,25 @@ EpisodeRange? _tryParseEpisode(String rawWord) {
     }
   }
   return null;
+}
+
+/// Matches a subtitle-language keyword against a word.
+///
+/// Short, purely-alphanumeric keywords (e.g. "GB", "TC") are matched as
+/// whole words only, to avoid false positives against unrelated tokens
+/// that merely contain those letters (e.g. a file-size tag like "1.52GB",
+/// which would otherwise wrongly be tagged as Simplified Chinese).
+/// CJK keywords are matched as substrings, since CJK text has no
+/// comparable "word boundary" concept and multi-character CJK keywords
+/// are not prone to the same kind of accidental substring collision.
+bool _matchesLanguageKeyword(String word, String keyword) {
+  if (RegExp(r'^[A-Za-z0-9]+$').hasMatch(keyword)) {
+    return RegExp(
+      r'\b' + RegExp.escape(keyword) + r'\b',
+      caseSensitive: false,
+    ).hasMatch(word);
+  }
+  return word.contains(keyword);
 }
 
 String _extractAlliance(String rawTitle) {

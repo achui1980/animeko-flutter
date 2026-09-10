@@ -71,6 +71,27 @@ void main() {
       expect(parsed.episodeRange, isNull);
       expect(parsed.resolution, '1080P');
     });
+
+    test('does not mistake a file-size tag ending in GB for Simplified Chinese', () {
+      const title = '[Group][Show][10][1080P][1.52GB]';
+      final parsed = parseTitle(title);
+
+      expect(parsed.subtitleLanguages, isNot(contains('简体')));
+    });
+
+    test('does not mistake an unrelated word containing TC for Traditional Chinese', () {
+      const title = '[Group][Show][10][1080P][MATCH]';
+      final parsed = parseTitle(title);
+
+      expect(parsed.subtitleLanguages, isNot(contains('繁体')));
+    });
+
+    test('recognizes 720p as a resolution', () {
+      const title = '[Group][Show][10][720P]';
+      final parsed = parseTitle(title);
+
+      expect(parsed.resolution, '720P');
+    });
   });
 
   group('EpisodeRange', () {
