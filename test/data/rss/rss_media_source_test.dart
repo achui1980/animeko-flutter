@@ -40,57 +40,66 @@ void main() {
     expect(source.displayName, 'mikan');
   });
 
-  test('search fetches the templated URL and groups results by episode', () async {
-    when(
-      () => dio.get<String>(any()),
-    ).thenAnswer((_) async => _xmlResponse(xmlBody));
+  test(
+    'search fetches the templated URL and groups results by episode',
+    () async {
+      when(
+        () => dio.get<String>(any()),
+      ).thenAnswer((_) async => _xmlResponse(xmlBody));
 
-    final candidates = await source.search('魔法少女奈叶');
+      final candidates = await source.search('魔法少女奈叶');
 
-    expect(candidates, hasLength(1));
-    final candidate = candidates.single as RssSeriesCandidate;
-    expect(candidate.sourceId, 'mikan');
-    expect(candidate.groups.keys, containsAll([3, 7, 8, 9, 10]));
+      expect(candidates, hasLength(1));
+      final candidate = candidates.single as RssSeriesCandidate;
+      expect(candidate.sourceId, 'mikan');
+      expect(candidate.groups.keys, containsAll([3, 7, 8, 9, 10]));
 
-    final captured = verify(() => dio.get<String>(captureAny())).captured;
-    expect(
-      captured.single,
-      contains('searchstr=%E9%AD%94%E6%B3%95%E5%B0%91%E5%A5%B3'),
-    );
-  });
+      final captured = verify(() => dio.get<String>(captureAny())).captured;
+      expect(
+        captured.single,
+        contains('searchstr=%E9%AD%94%E6%B3%95%E5%B0%91%E5%A5%B3'),
+      );
+    },
+  );
 
-  test('listEpisodes converts cached groups synchronously, sorted ascending', () async {
-    when(
-      () => dio.get<String>(any()),
-    ).thenAnswer((_) async => _xmlResponse(xmlBody));
-    final candidates = await source.search('魔法少女奈叶');
-    clearInteractions(dio);
+  test(
+    'listEpisodes converts cached groups synchronously, sorted ascending',
+    () async {
+      when(
+        () => dio.get<String>(any()),
+      ).thenAnswer((_) async => _xmlResponse(xmlBody));
+      final candidates = await source.search('魔法少女奈叶');
+      clearInteractions(dio);
 
-    final episodes = await source.listEpisodes(candidates.single);
+      final episodes = await source.listEpisodes(candidates.single);
 
-    final numbers = episodes
-        .cast<RssEpisode>()
-        .map((e) => e.episodeNumber)
-        .toList();
-    expect(numbers, numbers.toList()..sort());
-    expect(numbers, containsAll([3, 7, 8, 9, 10]));
+      final numbers = episodes
+          .cast<RssEpisode>()
+          .map((e) => e.episodeNumber)
+          .toList();
+      expect(numbers, numbers.toList()..sort());
+      expect(numbers, containsAll([3, 7, 8, 9, 10]));
 
-    verifyNever(() => dio.get<String>(any()));
-  });
+      verifyNever(() => dio.get<String>(any()));
+    },
+  );
 
-  test('resolvePlayback maps every release to a TorrentPlaybackSource', () async {
-    when(
-      () => dio.get<String>(any()),
-    ).thenAnswer((_) async => _xmlResponse(xmlBody));
-    final candidates = await source.search('魔法少女奈叶');
-    final episodes = await source.listEpisodes(candidates.single);
-    final ep10 = episodes
-        .cast<RssEpisode>()
-        .firstWhere((e) => e.episodeNumber == 10);
+  test(
+    'resolvePlayback maps every release to a TorrentPlaybackSource',
+    () async {
+      when(
+        () => dio.get<String>(any()),
+      ).thenAnswer((_) async => _xmlResponse(xmlBody));
+      final candidates = await source.search('魔法少女奈叶');
+      final episodes = await source.listEpisodes(candidates.single);
+      final ep10 = episodes.cast<RssEpisode>().firstWhere(
+        (e) => e.episodeNumber == 10,
+      );
 
-    final playbackSources = await source.resolvePlayback(ep10);
+      final playbackSources = await source.resolvePlayback(ep10);
 
-    expect(playbackSources, isNotEmpty);
-    expect(playbackSources, everyElement(isA<TorrentPlaybackSource>()));
-  });
+      expect(playbackSources, isNotEmpty);
+      expect(playbackSources, everyElement(isA<TorrentPlaybackSource>()));
+    },
+  );
 }

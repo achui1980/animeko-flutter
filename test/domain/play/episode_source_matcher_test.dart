@@ -39,15 +39,21 @@ void main() {
       expect(result.map((e) => e.episode.title), ['B第2集']);
     });
 
-    test('returns an empty list when no source has an episode at that position', () {
-      final merged = [
-        const MergedEpisode(episode: _FakeEpisode('a', 'A第1集'), sourceId: 'a'),
-      ];
+    test(
+      'returns an empty list when no source has an episode at that position',
+      () {
+        final merged = [
+          const MergedEpisode(
+            episode: _FakeEpisode('a', 'A第1集'),
+            sourceId: 'a',
+          ),
+        ];
 
-      final result = matchEpisodeSources(ordinalIndex: 5, allMerged: merged);
+        final result = matchEpisodeSources(ordinalIndex: 5, allMerged: merged);
 
-      expect(result, isEmpty);
-    });
+        expect(result, isEmpty);
+      },
+    );
 
     test('returns an empty list for an empty input list', () {
       final result = matchEpisodeSources(ordinalIndex: 0, allMerged: const []);

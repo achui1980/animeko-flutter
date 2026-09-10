@@ -5,7 +5,8 @@ import 'package:animeko_flutter/data/torrent/rqbit_engine.dart';
 
 class MockDio extends Mock implements Dio {}
 
-Response<Map<String, dynamic>> _jsonResponse(Map<String, dynamic> body) => Response(
+Response<Map<String, dynamic>> _jsonResponse(Map<String, dynamic> body) =>
+    Response(
       data: body,
       requestOptions: RequestOptions(path: '/'),
       statusCode: 200,
@@ -21,16 +22,19 @@ void main() {
       expect(result.pickVideoFile(), 0);
     });
 
-    test('picks the largest file when there are multiple and no episodeInSet given', () {
-      const result = AddTorrentResult(
-        id: 0,
-        files: [
-          TorrentFileInfo(index: 0, name: 'sample.mp4', length: 10),
-          TorrentFileInfo(index: 1, name: 'episode.mp4', length: 1000),
-        ],
-      );
-      expect(result.pickVideoFile(), 1);
-    });
+    test(
+      'picks the largest file when there are multiple and no episodeInSet given',
+      () {
+        const result = AddTorrentResult(
+          id: 0,
+          files: [
+            TorrentFileInfo(index: 0, name: 'sample.mp4', length: 10),
+            TorrentFileInfo(index: 1, name: 'episode.mp4', length: 1000),
+          ],
+        );
+        expect(result.pickVideoFile(), 1);
+      },
+    );
   });
 
   group('RqbitEngine (Dio request construction)', () {
@@ -43,17 +47,18 @@ void main() {
     });
 
     test('addTorrent POSTs raw bytes to /torrents', () async {
-      when(() => dio.post<Map<String, dynamic>>(
-            any(),
-            data: any(named: 'data'),
-          )).thenAnswer((_) async => _jsonResponse({
-            'id': 0,
-            'details': {
-              'files': [
-                {'name': 'a.mp4', 'length': 100},
-              ],
-            },
-          }));
+      when(
+        () => dio.post<Map<String, dynamic>>(any(), data: any(named: 'data')),
+      ).thenAnswer(
+        (_) async => _jsonResponse({
+          'id': 0,
+          'details': {
+            'files': [
+              {'name': 'a.mp4', 'length': 100},
+            ],
+          },
+        }),
+      );
 
       final bytes = [1, 2, 3];
       final result = await engine.addTorrent(bytes);
@@ -62,10 +67,12 @@ void main() {
       expect(result.files.single.name, 'a.mp4');
       expect(result.files.single.length, 100);
 
-      final captured = verify(() => dio.post<Map<String, dynamic>>(
-            captureAny(),
-            data: captureAny(named: 'data'),
-          )).captured;
+      final captured = verify(
+        () => dio.post<Map<String, dynamic>>(
+          captureAny(),
+          data: captureAny(named: 'data'),
+        ),
+      ).captured;
       expect(captured[0], 'http://127.0.0.1:3030/torrents');
       expect(captured[1], bytes);
     });
@@ -76,29 +83,36 @@ void main() {
     });
 
     test('deleteTorrent POSTs to /torrents/{id}/delete', () async {
-      when(() => dio.post<dynamic>(any())).thenAnswer((_) async => _jsonResponse({}));
+      when(
+        () => dio.post<dynamic>(any()),
+      ).thenAnswer((_) async => _jsonResponse({}));
 
       await engine.deleteTorrent(7);
 
-      verify(() => dio.post<dynamic>('http://127.0.0.1:3030/torrents/7/delete')).called(1);
+      verify(
+        () => dio.post<dynamic>('http://127.0.0.1:3030/torrents/7/delete'),
+      ).called(1);
     });
 
-    test('deleteTorrent swallows DioException (cleanup failures are non-fatal)', () async {
-      when(() => dio.post<dynamic>(any())).thenThrow(
-        DioException(requestOptions: RequestOptions(path: '/')),
-      );
+    test(
+      'deleteTorrent swallows DioException (cleanup failures are non-fatal)',
+      () async {
+        when(
+          () => dio.post<dynamic>(any()),
+        ).thenThrow(DioException(requestOptions: RequestOptions(path: '/')));
 
-      // Should not throw.
-      await engine.deleteTorrent(7);
-    });
+        // Should not throw.
+        await engine.deleteTorrent(7);
+      },
+    );
 
-    test('deleteTorrent rethrows non-Dio exceptions instead of swallowing them', () async {
-      when(() => dio.post<dynamic>(any())).thenThrow(StateError('boom'));
+    test(
+      'deleteTorrent rethrows non-Dio exceptions instead of swallowing them',
+      () async {
+        when(() => dio.post<dynamic>(any())).thenThrow(StateError('boom'));
 
-      await expectLater(
-        engine.deleteTorrent(7),
-        throwsA(isA<StateError>()),
-      );
-    });
+        await expectLater(engine.deleteTorrent(7), throwsA(isA<StateError>()));
+      },
+    );
   });
 }

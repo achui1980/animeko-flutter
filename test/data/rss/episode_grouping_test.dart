@@ -3,10 +3,10 @@ import 'package:animeko_flutter/data/rss/rss_media_source.dart';
 import 'package:animeko_flutter/data/rss/rss_parser.dart';
 
 RssItem _item(String title) => RssItem(
-      title: title,
-      torrentUrl: 'https://mikan.tangbai.cc/Download/x/x.torrent',
-      contentLength: 100,
-    );
+  title: title,
+  torrentUrl: 'https://mikan.tangbai.cc/Download/x/x.torrent',
+  contentLength: 100,
+);
 
 void main() {
   group('groupByEpisode', () {
