@@ -36,7 +36,7 @@ class Anime1Episode implements MediaEpisode {
 }
 
 /// A resolved, playable video source for one episode.
-class Anime1PlaybackSource implements MediaPlaybackSource {
+class Anime1PlaybackSource extends MediaPlaybackSource {
   const Anime1PlaybackSource({required this.url, this.headers = const {}});
 
   /// Direct mp4/m3u8 URL.

@@ -28,6 +28,8 @@ abstract class MediaEpisode {
 
 /// A resolved, playable video source for one [MediaEpisode].
 abstract class MediaPlaybackSource {
+  const MediaPlaybackSource();
+
   /// Direct video URL (mp4/m3u8/etc).
   String get url;
 
@@ -35,6 +37,17 @@ abstract class MediaPlaybackSource {
   /// via media_kit's `Media(url, httpHeaders: ...)`). Empty when the
   /// source's CDN needs none.
   Map<String, String> get headers;
+
+  /// Returns the URL that should actually be handed to the player. HTTP
+  /// sources return [url] unchanged (the default implementation below). BT
+  /// sources override this to download the `.torrent`, hand it to the
+  /// torrent engine, and return the resulting local stream URL.
+  Future<String> prepare() async => url;
+
+  /// Called when playback of this source ends or a fallback switches away
+  /// from it, to release any resources (e.g. a downloading torrent). HTTP
+  /// sources need no cleanup, hence the no-op default.
+  Future<void> dispose() async {}
 }
 
 /// A single video-playback data source (e.g. anime1.me, 稀饭动漫). Each

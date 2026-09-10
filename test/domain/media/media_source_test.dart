@@ -17,7 +17,7 @@ class _FakeEpisode implements MediaEpisode {
   String get sourceId => 'fake';
 }
 
-class _FakePlaybackSource implements MediaPlaybackSource {
+class _FakePlaybackSource extends MediaPlaybackSource {
   const _FakePlaybackSource();
   @override
   String get url => 'https://example.com/video.mp4';
@@ -62,4 +62,14 @@ void main() {
       expect(playback.single.headers, isEmpty);
     },
   );
+
+  test('MediaPlaybackSource.prepare() defaults to returning url', () async {
+    const source = _FakePlaybackSource();
+    expect(await source.prepare(), 'https://example.com/video.mp4');
+  });
+
+  test('MediaPlaybackSource.dispose() defaults to a no-op', () async {
+    const source = _FakePlaybackSource();
+    await expectLater(source.dispose(), completes);
+  });
 }

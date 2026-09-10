@@ -15,7 +15,7 @@ class _FakeEpisode implements MediaEpisode {
   final String title;
 }
 
-class _FakePlaybackSource implements MediaPlaybackSource {
+class _FakePlaybackSource extends MediaPlaybackSource {
   const _FakePlaybackSource(this.url);
   @override
   final String url;

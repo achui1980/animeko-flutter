@@ -41,7 +41,7 @@ class YinghuaEpisode implements MediaEpisode {
 /// `.m3u8` URL, so no decrypt step is needed. A `Referer` header is sent
 /// defensively in case the CDN enforces hotlink protection (not
 /// confirmed either way live).
-class YinghuaPlaybackSource implements MediaPlaybackSource {
+class YinghuaPlaybackSource extends MediaPlaybackSource {
   const YinghuaPlaybackSource({required this.url, this.headers = const {}});
 
   @override

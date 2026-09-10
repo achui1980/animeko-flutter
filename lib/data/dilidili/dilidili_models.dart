@@ -36,7 +36,7 @@ class DilidiliEpisode implements MediaEpisode {
 /// confirmed live (2026-09-05), no decrypt step needed. A `Referer`
 /// header is sent defensively in case the CDN enforces hotlink
 /// protection (not confirmed either way live).
-class DilidiliPlaybackSource implements MediaPlaybackSource {
+class DilidiliPlaybackSource extends MediaPlaybackSource {
   const DilidiliPlaybackSource({required this.url, this.headers = const {}});
 
   @override

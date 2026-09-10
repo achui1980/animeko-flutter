@@ -39,7 +39,7 @@ class XifanEpisode implements MediaEpisode {
 /// and needs zero headers -- verified live (2026-09-01) via a plain,
 /// header-less range request that returned `206 Partial Content` with
 /// real MP4 bytes.
-class XifanPlaybackSource implements MediaPlaybackSource {
+class XifanPlaybackSource extends MediaPlaybackSource {
   const XifanPlaybackSource({required this.url, this.headers = const {}});
 
   @override
