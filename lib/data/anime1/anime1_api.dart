@@ -84,7 +84,9 @@ class Anime1Api {
         episodes.add(Anime1Episode(title: title, pageUrl: href));
       }
 
-      nextPageUrl = document.querySelector('a.next.page-numbers')?.attributes['href'];
+      nextPageUrl = document
+          .querySelector('a.next.page-numbers')
+          ?.attributes['href'];
       pagesFetched++;
     }
 
@@ -119,7 +121,9 @@ class Anime1Api {
       options: Options(responseType: ResponseType.plain),
     );
     final document = html_parser.parse(pageResponse.data ?? '');
-    final apireq = document.querySelector('[data-apireq]')?.attributes['data-apireq'];
+    final apireq = document
+        .querySelector('[data-apireq]')
+        ?.attributes['data-apireq'];
     if (apireq == null || apireq.isEmpty) {
       throw const FormatException(
         'anime1.me episode page has no data-apireq attribute',
@@ -149,12 +153,21 @@ class Anime1Api {
   }
 }
 
+const _anime1ConnectTimeout = Duration(seconds: 15);
+const _anime1ReceiveTimeout = Duration(seconds: 15);
+
 @riverpod
 Dio anime1Dio(Ref ref) {
   // anime1.me's only anti-hotlinking check is the Referer header -- see
   // the design doc's "背景与范围" section. No auth, no other headers
   // needed.
-  final dio = Dio(BaseOptions(headers: {'Referer': 'https://anime1.me'}));
+  final dio = Dio(
+    BaseOptions(
+      headers: {'Referer': 'https://anime1.me'},
+      connectTimeout: _anime1ConnectTimeout,
+      receiveTimeout: _anime1ReceiveTimeout,
+    ),
+  );
   configureProxy(dio, ref);
   return dio;
 }

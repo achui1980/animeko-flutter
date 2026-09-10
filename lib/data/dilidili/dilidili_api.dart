@@ -139,9 +139,18 @@ class DilidiliApi {
   }
 }
 
+const _dilidiliConnectTimeout = Duration(seconds: 15);
+const _dilidiliReceiveTimeout = Duration(seconds: 15);
+
 @riverpod
 Dio dilidiliDio(Ref ref) {
-  final dio = Dio(BaseOptions(headers: {'User-Agent': 'Mozilla/5.0'}));
+  final dio = Dio(
+    BaseOptions(
+      headers: {'User-Agent': 'Mozilla/5.0'},
+      connectTimeout: _dilidiliConnectTimeout,
+      receiveTimeout: _dilidiliReceiveTimeout,
+    ),
+  );
   configureProxy(dio, ref);
   return dio;
 }

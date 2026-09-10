@@ -148,9 +148,18 @@ class YinghuaApi {
   }
 }
 
+const _yinghuaConnectTimeout = Duration(seconds: 15);
+const _yinghuaReceiveTimeout = Duration(seconds: 15);
+
 @riverpod
 Dio yinghuaDio(Ref ref) {
-  final dio = Dio(BaseOptions(headers: {'User-Agent': 'Mozilla/5.0'}));
+  final dio = Dio(
+    BaseOptions(
+      headers: {'User-Agent': 'Mozilla/5.0'},
+      connectTimeout: _yinghuaConnectTimeout,
+      receiveTimeout: _yinghuaReceiveTimeout,
+    ),
+  );
   configureProxy(dio, ref);
   return dio;
 }

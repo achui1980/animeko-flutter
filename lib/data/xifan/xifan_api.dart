@@ -153,9 +153,18 @@ class XifanApi {
   }
 }
 
+const _xifanConnectTimeout = Duration(seconds: 15);
+const _xifanReceiveTimeout = Duration(seconds: 15);
+
 @riverpod
 Dio xifanDio(Ref ref) {
-  final dio = Dio(BaseOptions(headers: {'User-Agent': 'Mozilla/5.0'}));
+  final dio = Dio(
+    BaseOptions(
+      headers: {'User-Agent': 'Mozilla/5.0'},
+      connectTimeout: _xifanConnectTimeout,
+      receiveTimeout: _xifanReceiveTimeout,
+    ),
+  );
   configureProxy(dio, ref);
   return dio;
 }
