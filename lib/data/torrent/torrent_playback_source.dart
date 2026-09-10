@@ -8,6 +8,15 @@ import 'rqbit_engine.dart';
 /// `.torrent` file's raw bytes, hands them to the rqbit sidecar, and returns
 /// its local HTTP stream URL. [dispose] tells the engine to forget the
 /// torrent and delete its downloaded files (v1 scope: no retained cache).
+///
+/// Both [prepare] and [dispose] are safe to call more than once:
+/// - Calling [prepare] again after it has already succeeded returns the
+///   cached stream URL instead of adding a second torrent to the engine
+///   (which would otherwise leak the first one, since only the most recent
+///   `_torrentId` would remain reachable for cleanup).
+/// - Calling [dispose] again after it has already run (or before [prepare]
+///   ever completed) is a no-op; it never issues a second
+///   `engine.deleteTorrent` call for the same id.
 class TorrentPlaybackSource extends MediaPlaybackSource {
   TorrentPlaybackSource({
     required this.release,
@@ -38,6 +47,10 @@ class TorrentPlaybackSource extends MediaPlaybackSource {
 
   @override
   Future<String> prepare() async {
+    final alreadyPrepared = _preparedUrl;
+    if (alreadyPrepared != null) {
+      return alreadyPrepared;
+    }
     await engine.ensureStarted();
     final response = await _dio.get<List<int>>(
       release.item.torrentUrl,
@@ -54,6 +67,7 @@ class TorrentPlaybackSource extends MediaPlaybackSource {
   Future<void> dispose() async {
     final id = _torrentId;
     if (id != null) {
+      _torrentId = null;
       await engine.deleteTorrent(id);
     }
   }

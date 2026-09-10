@@ -86,6 +86,51 @@ void main() {
     verifyNever(() => engine.deleteTorrent(any()));
   });
 
+  test('dispose() is idempotent: calling it twice only deletes once', () async {
+    when(() => dio.get<List<int>>(
+          any(),
+          options: any(named: 'options'),
+        )).thenAnswer((_) async => _bytesResponse([1]));
+    when(() => engine.addTorrent(any())).thenAnswer(
+      (_) async => const AddTorrentResult(
+        id: 9,
+        files: [TorrentFileInfo(index: 0, name: 'a.mp4', length: 1)],
+      ),
+    );
+    when(() => engine.streamUrl(9, fileIndex: 0)).thenReturn('http://x/stream/0');
+    when(() => engine.deleteTorrent(9)).thenAnswer((_) async {});
+
+    final source = TorrentPlaybackSource(release: release, engine: engine, dio: dio);
+    await source.prepare();
+    await source.dispose();
+    await source.dispose();
+
+    verify(() => engine.deleteTorrent(9)).called(1);
+  });
+
+  test('prepare() is reentrant-safe: calling it twice reuses the cached '
+      'result instead of adding a second torrent', () async {
+    when(() => dio.get<List<int>>(
+          any(),
+          options: any(named: 'options'),
+        )).thenAnswer((_) async => _bytesResponse([1]));
+    when(() => engine.addTorrent(any())).thenAnswer(
+      (_) async => const AddTorrentResult(
+        id: 9,
+        files: [TorrentFileInfo(index: 0, name: 'a.mp4', length: 1)],
+      ),
+    );
+    when(() => engine.streamUrl(9, fileIndex: 0)).thenReturn('http://x/stream/0');
+
+    final source = TorrentPlaybackSource(release: release, engine: engine, dio: dio);
+    final first = await source.prepare();
+    final second = await source.prepare();
+
+    expect(first, 'http://x/stream/0');
+    expect(second, 'http://x/stream/0');
+    verify(() => engine.addTorrent(any())).called(1);
+  });
+
   test('prepare() propagates errors from the engine', () async {
     when(() => dio.get<List<int>>(
           any(),
