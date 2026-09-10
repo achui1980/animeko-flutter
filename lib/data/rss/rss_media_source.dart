@@ -151,11 +151,12 @@ class RssMediaSource implements MediaSource {
     MediaEpisode episode,
   ) async {
     final rssEpisode = episode as RssEpisode;
-    final sortedReleases = [...rssEpisode.releases]..sort((a, b) {
-      final resA = a.parsed.resolution ?? '';
-      final resB = b.parsed.resolution ?? '';
-      return resB.compareTo(resA);
-    });
+    final sortedReleases = [...rssEpisode.releases]
+      ..sort((a, b) {
+        final resA = a.parsed.resolution ?? '';
+        final resB = b.parsed.resolution ?? '';
+        return resB.compareTo(resA);
+      });
 
     return [
       for (final release in sortedReleases)
@@ -164,9 +165,26 @@ class RssMediaSource implements MediaSource {
   }
 }
 
+/// Bounded so a single unreachable/hanging Mikan mirror (e.g. a
+/// misconfigured proxy that accepts the connection but never completes
+/// the TLS handshake) fails within a fixed time instead of blocking
+/// [SubjectEpisodesController]'s `Future.wait` forever -- every other
+/// registered [MediaSource] is queried concurrently and a single slow
+/// source must not stall the whole episode list (see the per-source
+/// try/catch in `_fetchFromSource`, which only helps once this call
+/// actually throws).
+const _mikanConnectTimeout = Duration(seconds: 10);
+const _mikanReceiveTimeout = Duration(seconds: 10);
+
 @riverpod
 Dio mikanRssDio(Ref ref) {
-  final dio = Dio(BaseOptions(headers: {'User-Agent': 'Mozilla/5.0'}));
+  final dio = Dio(
+    BaseOptions(
+      headers: {'User-Agent': 'Mozilla/5.0'},
+      connectTimeout: _mikanConnectTimeout,
+      receiveTimeout: _mikanReceiveTimeout,
+    ),
+  );
   configureProxy(dio, ref);
   return dio;
 }
