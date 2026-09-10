@@ -37,14 +37,19 @@ List<RssItem> parseRssFeed(String xmlBody) {
       }
 
       final torrentElement = itemElement.getElement('torrent');
-      final pubDateStr = torrentElement?.getElement('pubDate')?.innerText.trim();
+      final pubDateStr = torrentElement
+          ?.getElement('pubDate')
+          ?.innerText
+          .trim();
 
-      items.add(RssItem(
-        title: title,
-        torrentUrl: torrentUrl,
-        contentLength: int.parse(lengthStr),
-        pubDate: pubDateStr != null ? DateTime.tryParse(pubDateStr) : null,
-      ));
+      items.add(
+        RssItem(
+          title: title,
+          torrentUrl: torrentUrl,
+          contentLength: int.parse(lengthStr),
+          pubDate: pubDateStr != null ? DateTime.tryParse(pubDateStr) : null,
+        ),
+      );
     } catch (_) {
       continue;
     }

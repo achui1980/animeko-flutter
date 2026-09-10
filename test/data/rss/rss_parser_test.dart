@@ -7,7 +7,9 @@ void main() {
   late String xmlBody;
 
   setUpAll(() {
-    xmlBody = File('test/fixtures/mikan_rss_search_sample.xml').readAsStringSync();
+    xmlBody = File(
+      'test/fixtures/mikan_rss_search_sample.xml',
+    ).readAsStringSync();
   });
 
   group('parseRssFeed', () {
