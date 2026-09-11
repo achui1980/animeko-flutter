@@ -22,6 +22,7 @@ import '../../domain/settings/proxy_settings_controller.dart';
 import '../common/error_retry_view.dart';
 import '../home/trending_carousel.dart' show isDesktopPlatform;
 import '../subject/episode_source_grid.dart';
+import 'line_switch_sheet.dart';
 import 'player_bottom_bar.dart';
 import 'player_top_bar.dart';
 
@@ -588,6 +589,46 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     if (mounted) _hasAdvancedToNextEpisode = false;
   }
 
+  /// Manually switches to a different playback candidate at [newIndex]
+  /// (e.g. a different BT release/subtitle group, or a different CDN
+  /// line), preserving the current in-memory playback position. Disposes
+  /// the previously-open candidate first, matching the fire-and-forget
+  /// `unawaited(dispose())` pattern used by the automatic fallback paths
+  /// above and by `_retry()`.
+  Future<void> _switchToCandidate(int newIndex) async {
+    final candidates = _candidates;
+    if (candidates == null || newIndex == _candidateIndex) return;
+    final capturedPosition = _player.state.position;
+    final previous = candidates[_candidateIndex];
+    unawaited(previous.dispose());
+    _candidateIndex = newIndex;
+    await _openCandidate(candidates[newIndex]);
+    // `_openCandidate` -> `_maybeResumePosition()` seeks to the
+    // last *persisted* (SharedPreferences) position, not the in-memory
+    // position at the moment of switching -- overwrite it with the
+    // captured value so manual line switches preserve exactly where
+    // playback was, matching mainstream video players' behavior.
+    await _player.seek(capturedPosition);
+  }
+
+  void _showLineSwitchSheet() {
+    final candidates = _candidates;
+    if (candidates == null) return;
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) => LineSwitchSheet(
+        candidates: candidates,
+        currentIndex: _candidateIndex,
+        onSelect: (index) {
+          Navigator.pop(sheetContext);
+          _switchToCandidate(index).catchError((Object e) {
+            if (mounted) setState(() => _playbackError = e.toString());
+          });
+        },
+      ),
+    );
+  }
+
   /// Falls back to the next candidate (or surfaces an error) when
   /// buffering has been stuck for [_bufferTimeoutTimer]'s duration with
   /// no progress -- e.g. a `TorrentPlaybackSource` stalled with no
@@ -846,6 +887,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                                               )
                                               .setPlaybackSpeed(value);
                                         },
+                                        onLineSwitch:
+                                            (_candidates?.length ?? 0) > 1
+                                            ? _showLineSwitchSheet
+                                            : null,
                                         onDrawerToggle: _toggleDrawer,
                                         onFullscreenToggle: _toggleFullscreen,
                                         isFullscreen: isFullscreen(context),
