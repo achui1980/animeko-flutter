@@ -28,8 +28,13 @@ class RssSourceConfig {
 
 const mikanRssSourceConfig = RssSourceConfig(
   name: 'mikan',
-  searchUrl: 'https://mikan.tangbai.cc/RSS/Search?searchstr={keyword}',
-  iconUrl: 'https://mikan.tangbai.cc/favicon.ico',
+  // mikanani.me is Mikan's official domain. An earlier revision pointed at
+  // the `mikan.tangbai.cc` mirror, which turned out to be unreachable from
+  // some networks (it never responds, unlike a clean DNS/TLS failure). The
+  // official domain uses the exact same `/RSS/Search?searchstr=` endpoint
+  // and RSS/torrent XML shape, so this is a drop-in swap.
+  searchUrl: 'https://mikanani.me/RSS/Search?searchstr={keyword}',
+  iconUrl: 'https://mikanani.me/favicon.ico',
 );
 
 /// One parsed BT release: the raw RSS item plus its parsed title metadata.
