@@ -203,7 +203,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     // working for all other network calls. Fix: forward the same proxy
     // URL to libmpv via its `http-proxy` property, which ffmpeg's HTTP
     // protocol layer honors for all subsequent network I/O.
-    unawaited(_configureProxy());
+    //
+    // This is now done per-candidate in `_openCandidate` (right before
+    // `_player.open`) rather than once here, because a BT candidate's
+    // URL is a loopback address (`http://127.0.0.1:<port>/...`, served
+    // locally by the rqbit sidecar) and must NEVER be routed through
+    // the configured proxy -- most HTTP proxies refuse to forward
+    // requests to loopback/private addresses at all (SSRF protection),
+    // so doing so turns a perfectly healthy local stream into another
+    // "Failed to open ..." error. Setting `http-proxy` globally once
+    // here can't distinguish between a remote-CDN candidate (needs the
+    // proxy) and a BT candidate (must bypass it), so the decision has
+    // to be made per-URL, at open time.
     // We show our own HUD for volume/brightness swipes (see
     // `_AdjustmentHud`), so suppress each platform's native
     // volume-changed overlay to avoid a duplicate indicator.
@@ -230,13 +241,34 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     }
   }
 
-  Future<void> _configureProxy() async {
+  /// Forwards the app's configured proxy to libmpv's `http-proxy`
+  /// property, *unless* [forUrl] is a loopback address (`127.0.0.1`,
+  /// `::1`, or `localhost`) -- e.g. a BT candidate's local rqbit stream
+  /// URL. Loopback traffic must never be routed through the proxy: most
+  /// proxies refuse to forward requests to loopback/private addresses,
+  /// which would turn a healthy local stream into a "Failed to open"
+  /// error. When [forUrl] is loopback, any previously-set proxy is
+  /// explicitly cleared (empty string) so a prior remote candidate's
+  /// proxy setting can't leak into this one.
+  Future<void> _configureProxy(String forUrl) async {
+    final platform = _player.platform;
+    if (platform is! NativePlayer) return;
+    if (_isLoopbackUrl(forUrl)) {
+      await platform.setProperty('http-proxy', '');
+      return;
+    }
     final proxyUrl = await ref.read(proxySettingsControllerProvider.future);
     if (proxyUrl == null || proxyUrl.isEmpty) return;
-    final platform = _player.platform;
-    if (platform is NativePlayer) {
-      await platform.setProperty('http-proxy', proxyUrl);
-    }
+    await platform.setProperty('http-proxy', proxyUrl);
+  }
+
+  /// Whether [url]'s host is a loopback address. Used to detect BT
+  /// candidates (served locally by the rqbit sidecar at
+  /// `http://127.0.0.1:<port>/...`) so their traffic can bypass the
+  /// configured proxy -- see `_configureProxy`.
+  bool _isLoopbackUrl(String url) {
+    final host = Uri.tryParse(url)?.host;
+    return host == '127.0.0.1' || host == '::1' || host == 'localhost';
   }
 
   Future<void> _savePosition() async {
@@ -548,6 +580,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     // overlay would incorrectly disappear.
     if (mounted) setState(() => _isBuffering = true);
     final playableUrl = await source.prepare();
+    await _configureProxy(playableUrl);
     await _player.open(Media(playableUrl, httpHeaders: source.headers));
     final speed = await ref.read(playbackSpeedControllerProvider.future);
     await _player.setRate(speed);
