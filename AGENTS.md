@@ -14,6 +14,7 @@ for the full architecture rationale if a task touches app-wide structure.
 
 ```bash
 flutter pub get              # install deps (run after pulling or editing pubspec.yaml)
+flutter run -d macos         # launch the app locally (entry: lib/main.dart re-exports lib/app/main.dart)
 flutter test                 # full suite: ~359 tests, ~20s
 flutter test test/path/to/foo_test.dart   # single file
 flutter test --plain-name "some test name"  # single test by name
@@ -21,10 +22,28 @@ flutter analyze              # static analysis; must be clean of errors (infos a
 dart format lib test         # formatting
 dart run build_runner build --delete-conflicting-outputs   # regenerate *.g.dart (see below)
 dart run build_runner watch --delete-conflicting-outputs   # codegen watch mode while iterating
+./scripts/build_macos.sh     # pub get + codegen + release .app
+./tools/build_dmg.sh         # the above + DMG via create-dmg
 ```
 
-No CI workflow exists yet in this repo — `flutter analyze` + `flutter test` are the
-only gates; run both before considering work done.
+`flutter analyze` + `flutter test` are the gates — run both before considering work
+done. `.github/workflows/release.yml` only builds/publishes release artifacts (on `v*`
+tags or manual dispatch); it does not check PRs, so nothing catches a regression for you.
+
+## External tools (Homebrew) — not in pubspec
+
+`flutter pub get` does not get you a runnable app:
+
+- `brew install cocoapods` — `flutter run/build macos` needs `pod` to resolve plugin pods.
+- `brew install rqbit` — `lib/data/torrent/rqbit_engine.dart` spawns `rqbit` as a sidecar
+  process resolved from `PATH` (`_rqbitBinaryPath()` is still a TODO placeholder returning
+  the bare name). Without it the app runs fine but every BT/magnet media source fails;
+  non-BT sources are unaffected. macOS App Sandbox is deliberately off so this
+  `Process.start` is allowed, and rqbit's loopback traffic bypasses the app proxy.
+- `brew install create-dmg` — only `tools/build_dmg.sh` and the release workflow need it.
+
+media_kit's libmpv arrives through the `media_kit_libs_video` pod — there is no
+`brew install mpv` step.
 
 ## Codegen — you WILL need this
 
