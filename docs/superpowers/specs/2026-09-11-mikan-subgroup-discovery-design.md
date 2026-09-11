@@ -91,10 +91,17 @@ Mikan 的搜索是**按空格分词后 AND 匹配种子标题子串**，因此�
 
 1. 生成候选关键词，按序尝试，第一个返回卡片的即停：
    1. `nameCn` 在首个 `～` / `~` / `（` / `(` 处截断并 trim
-   2. `nameJp`（Bangumi `name`）同样截断
+   2. `nameJp`（日文原名）同样截断
    3. `nameCn` 原文
+
+   `RssMediaSource.search` 只拿到 `title`（即 nameCn），日文原名从本地 Drift `Subjects` 表
+   （`lib/data/local_database.dart:15-18`，含 `name` 与 `nameCn`）按 subjectId 读取；
+   表里没有该条目时跳过第 2 个候选，不额外发请求。
 2. `GET /Home/Search?searchstr=<候选>`，用 `package:html` 解析出 `(mikanBangumiId, mikanTitle)` 列表。
-3. 按 `titleSimilarity(mikanTitle, nameCn)`（复用 `lib/domain/media/title_matcher.dart`）降序排序。
+3. 按标题相似度降序排序。`lib/domain/media/title_matcher.dart` 目前只暴露
+   `matchBest<T extends MediaCandidate>`，无法直接用于 `(id, title)` 对，
+   因此把私有的 `_similarity`（`:263`）提取为公开的 `double titleSimilarity(String a, String b)`
+   并让 `matchBest` 继续调用它——不改变现有匹配行为。
 4. 对前 3 名依次 `GET /Home/Bangumi/<id>`，校验页面内是否存在 `bgm.tv/subject/<subjectId>` 反链。
    第一个通过的即为结果。
 5. 全部落空 → 返回 `null`。
