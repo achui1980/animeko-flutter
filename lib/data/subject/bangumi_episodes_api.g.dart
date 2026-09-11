@@ -49,7 +49,7 @@ final class BangumiEpisodesDioProvider
 }
 
 String _$bangumiEpisodesDioHash() =>
-    r'e3bafb5f45a08aab0d4da9e65c893d16d9c3d3c5';
+    r'e0b7e2eaa5c8bd6f0d03972c4b601478e651f30d';
 
 @ProviderFor(bangumiEpisodesApi)
 final bangumiEpisodesApiProvider = BangumiEpisodesApiProvider._();

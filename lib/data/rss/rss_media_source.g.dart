@@ -47,4 +47,4 @@ final class MikanRssDioProvider extends $FunctionalProvider<Dio, Dio, Dio>
   }
 }
 
-String _$mikanRssDioHash() => r'81347d9dee5d549e736a03181cd776c6b4e4e73f';
+String _$mikanRssDioHash() => r'26282b11d744b4d53c7d4f56ab07c4f60d0ad0f2';

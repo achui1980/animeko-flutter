@@ -2,7 +2,6 @@
 import 'package:dio/dio.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../settings/proxy_dio_config.dart';
 import 'bangumi_episode_models.dart';
 
 part 'bangumi_episodes_api.g.dart';
@@ -49,7 +48,6 @@ Dio bangumiEpisodesDio(Ref ref) {
       receiveTimeout: _receiveTimeout,
     ),
   );
-  configureProxy(dio, ref);
   return dio;
 }
 

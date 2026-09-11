@@ -47,7 +47,7 @@ final class DilidiliDioProvider extends $FunctionalProvider<Dio, Dio, Dio>
   }
 }
 
-String _$dilidiliDioHash() => r'e3d37a111442a6154b40895a1d543bf8585ec711';
+String _$dilidiliDioHash() => r'c3d65d175b753987ba44a3bff0c61a02a766a590';
 
 @ProviderFor(dilidiliApi)
 final dilidiliApiProvider = DilidiliApiProvider._();

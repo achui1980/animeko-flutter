@@ -34,7 +34,7 @@ final class ProxySettingsControllerProvider
 }
 
 String _$proxySettingsControllerHash() =>
-    r'b7ec08ceacde25b58ed1972ee6d349bab18d1d13';
+    r'60c99731203349fb5cf6330eb6709ccd1c65e2c4';
 
 abstract class _$ProxySettingsController extends $AsyncNotifier<String?> {
   FutureOr<String?> build();

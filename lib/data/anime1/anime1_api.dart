@@ -4,7 +4,6 @@ import 'package:html/parser.dart' as html_parser;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'anime1_models.dart';
-import '../settings/proxy_dio_config.dart';
 
 part 'anime1_api.g.dart';
 
@@ -168,7 +167,6 @@ Dio anime1Dio(Ref ref) {
       receiveTimeout: _anime1ReceiveTimeout,
     ),
   );
-  configureProxy(dio, ref);
   return dio;
 }
 

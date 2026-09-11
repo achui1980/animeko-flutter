@@ -5,7 +5,6 @@ import 'package:html/parser.dart' as html_parser;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'yinghua_models.dart';
-import '../settings/proxy_dio_config.dart';
 
 part 'yinghua_api.g.dart';
 
@@ -160,7 +159,6 @@ Dio yinghuaDio(Ref ref) {
       receiveTimeout: _yinghuaReceiveTimeout,
     ),
   );
-  configureProxy(dio, ref);
   return dio;
 }
 

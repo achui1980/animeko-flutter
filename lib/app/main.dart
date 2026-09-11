@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
 
+import '../data/settings/proxy_dio_config.dart';
 import '../domain/auth/auth_controller.dart';
 import '../domain/settings/dynamic_color_controller.dart';
 import '../domain/settings/proxy_settings_controller.dart';
@@ -25,19 +26,26 @@ Future<void> main() async {
   MediaKit.ensureInitialized();
 
   final container = ProviderContainer();
-  await container.read(authControllerProvider.notifier).restoreSession();
 
-  // Must resolve before runApp() so that the very first HTTP request made
-  // by any data-source Dio (which all read this provider's .value inside
-  // their findProxy closure -- see configureProxy() in
-  // lib/data/settings/proxy_dio_config.dart) sees the persisted proxy
-  // setting instead of AsyncLoading's null. Without this, the first
-  // connection to a given host gets decided as DIRECT while the setting
-  // is still loading from disk, and dart:io's HttpClient keeps that
-  // decision for the lifetime of the (possibly reused/keep-alive)
-  // connection -- surfacing as "the proxy I configured doesn't seem to
-  // take effect until I clear and re-save it".
+  // Must resolve before anything makes an HTTP request so that the very
+  // first connection sees the persisted proxy setting instead of
+  // AsyncLoading's null. Without this, that first connection gets decided as
+  // DIRECT while the setting is still loading from disk, and dart:io's
+  // HttpClient keeps that decision for the lifetime of the (possibly
+  // reused/keep-alive) connection -- surfacing as "the proxy I configured
+  // doesn't seem to take effect until I clear and re-save it".
   await container.read(proxySettingsControllerProvider.future);
+
+  // Routes *all* of this process's HTTP through the configured proxy, since
+  // dart:io's `HttpClient()` constructor delegates to HttpOverrides.current:
+  // every Dio, the un-intercepted rawAniDio() used for token refreshes, and
+  // Flutter's shared image client behind Image.network/NetworkImage. Requests
+  // to loopback (the rqbit sidecar and the local stream URLs it serves) stay
+  // direct -- see decideProxy(). Installed before restoreSession() below
+  // because that can hit the network to refresh the session.
+  installProxyHttpOverrides(container);
+
+  await container.read(authControllerProvider.notifier).restoreSession();
 
   runApp(
     UncontrolledProviderScope(

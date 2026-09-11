@@ -32,6 +32,18 @@ String? validateProxyUrl(String input) {
 class ProxySettingsController extends _$ProxySettingsController {
   @override
   Future<String?> build() async {
+    // The process-wide HttpOverrides installed in main() reads this provider
+    // *synchronously* from inside findProxy and takes `.value` (see
+    // ProxyHttpOverrides in lib/data/settings/proxy_dio_config.dart), which
+    // is null while this async build() is in flight. Without keepAlive, this
+    // (autoDispose) provider is torn down as soon as nothing is actively
+    // listening -- including right after main()'s pre-warm read, since `read`
+    // closes its subscription immediately. Each later findProxy read would
+    // then re-mount a fresh AsyncLoading element, see null, and silently
+    // decide DIRECT -- so the persisted proxy appeared to be forgotten on
+    // every app start until the settings screen (which does `watch` it) was
+    // opened and the value re-saved.
+    ref.keepAlive();
     final storage = await ref.watch(settingsStorageProvider.future);
     return storage.getProxyUrl();
   }

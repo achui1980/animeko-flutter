@@ -5,7 +5,6 @@ import 'package:html/parser.dart' as html_parser;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'dilidili_models.dart';
-import '../settings/proxy_dio_config.dart';
 
 part 'dilidili_api.g.dart';
 
@@ -151,7 +150,6 @@ Dio dilidiliDio(Ref ref) {
       receiveTimeout: _dilidiliReceiveTimeout,
     ),
   );
-  configureProxy(dio, ref);
   return dio;
 }
 

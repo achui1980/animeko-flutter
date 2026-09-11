@@ -47,7 +47,7 @@ final class YinghuaDioProvider extends $FunctionalProvider<Dio, Dio, Dio>
   }
 }
 
-String _$yinghuaDioHash() => r'94ddd59b65a754f876be06cac4aa5fe30c028897';
+String _$yinghuaDioHash() => r'21f7083875fea257b7d193f4da8657b493d18d44';
 
 @ProviderFor(yinghuaApi)
 final yinghuaApiProvider = YinghuaApiProvider._();

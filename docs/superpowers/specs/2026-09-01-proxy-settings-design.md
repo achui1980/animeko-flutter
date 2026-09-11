@@ -200,3 +200,35 @@ GoRoute(
 - 代理认证（用户名/密码）
 - 代理连通性测试/健康检查
 - 系统代理自动检测
+
+## 修订记录
+
+### 2026-09-11：改为进程级 `HttpOverrides`
+
+原设计为「每个 `Dio` 在 provider 构造时调用 `configureProxy(dio, ref)`，在其
+`IOHttpClientAdapter.createHttpClient` 里安装 `findProxy` 闭包」。该方案存在两个
+无法在原架构内修掉的问题：
+
+1. `findProxy` 闭包捕获的是**该 dio provider 自己的 `Ref`**。所有 dio provider 都是
+   autoDispose，一旦 `Dio` 实例比它的 provider element 活得更久（例如
+   `TorrentPlaybackSource` 仍持有 `mikanRssDio`），闭包里的 `ref.read` 会抛
+   `UnmountedRefException`，从 dart:io 深处冒出来，表现为一个无从解释的连接失败。
+2. 覆盖不全：`rawAniDio()`（`SessionRefresher` 用来刷新 token，故意绕过
+   `AuthInterceptor`）和 Flutter 自己的 `Image.network`/`NetworkImage` 共享
+   `HttpClient`（所有封面图）都不经过 `configureProxy`，因此永远直连。
+
+现方案：`lib/data/settings/proxy_dio_config.dart` 提供 `ProxyHttpOverrides`，由
+`main()` 通过 `installProxyHttpOverrides(container)` 安装为 `HttpOverrides.global`。
+`HttpClient()` 这个 factory 构造函数本身就会委托给 `HttpOverrides.current`，因此
+一处安装即覆盖全进程：所有 `Dio`（默认 `IOHttpClientAdapter` 用的就是裸
+`HttpClient()`）、`rawAniDio()`、以及 Flutter 的图片客户端。原来 8 处
+`configureProxy(dio, ref)` 调用全部删除，代理逻辑不再捕获任何 `Ref`。
+
+配套改动：`decideProxy` 增加可选的 `requestUri` 参数，对 loopback 目标
+（`localhost` / `127.0.0.0/8` / `::1`）一律返回 `DIRECT`——rqbit sidecar 的 HTTP API
+和它提供给播放器的本地流地址都在 `127.0.0.1`，走外部代理会直接打断播放。
+`installProxyHttpOverrides` 必须在 `restoreSession()` 之前调用（后者可能发起网络
+请求），且其读取的 `proxySettingsControllerProvider` 必须是 `keepAlive` 的。
+
+libmpv 仍不受 `HttpOverrides` 影响，继续由 `PlayerScreen._configureProxy` 通过
+`http-proxy` 属性单独设置；rqbit 的 BT 流量是原生进程，同样不受影响。

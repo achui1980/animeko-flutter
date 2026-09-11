@@ -47,24 +47,24 @@ final class XifanDioProvider extends $FunctionalProvider<Dio, Dio, Dio>
   }
 }
 
-String _$xifanDioHash() => r'57d40f44379e555454ff9c8b794e9ee5d6121b91';
+String _$xifanDioHash() => r'3763e9cb680a4b307523738877c2124fd4f38c55';
 
-/// Dio for 稀饭动漫's newer Supabase-backed search API
-/// (`next.xifanacg.com`), used only as a fallback when the primary
-/// dm1.xfdm.pro HTML search misses -- see [XifanApi.search].
+/// Dio for 稀饭动漫's Supabase-backed API (`next.xifanacg.com`) --
+/// PRIMARY backend for [XifanApi.search]/[XifanApi.listEpisodes]/
+/// [XifanApi.resolvePlaybackUrl] as of 2026-09-10 (see [XifanBackend]).
 
 @ProviderFor(xifanSupabaseDio)
 final xifanSupabaseDioProvider = XifanSupabaseDioProvider._();
 
-/// Dio for 稀饭动漫's newer Supabase-backed search API
-/// (`next.xifanacg.com`), used only as a fallback when the primary
-/// dm1.xfdm.pro HTML search misses -- see [XifanApi.search].
+/// Dio for 稀饭动漫's Supabase-backed API (`next.xifanacg.com`) --
+/// PRIMARY backend for [XifanApi.search]/[XifanApi.listEpisodes]/
+/// [XifanApi.resolvePlaybackUrl] as of 2026-09-10 (see [XifanBackend]).
 
 final class XifanSupabaseDioProvider extends $FunctionalProvider<Dio, Dio, Dio>
     with $Provider<Dio> {
-  /// Dio for 稀饭动漫's newer Supabase-backed search API
-  /// (`next.xifanacg.com`), used only as a fallback when the primary
-  /// dm1.xfdm.pro HTML search misses -- see [XifanApi.search].
+  /// Dio for 稀饭动漫's Supabase-backed API (`next.xifanacg.com`) --
+  /// PRIMARY backend for [XifanApi.search]/[XifanApi.listEpisodes]/
+  /// [XifanApi.resolvePlaybackUrl] as of 2026-09-10 (see [XifanBackend]).
   XifanSupabaseDioProvider._()
     : super(
         from: null,
@@ -98,7 +98,7 @@ final class XifanSupabaseDioProvider extends $FunctionalProvider<Dio, Dio, Dio>
   }
 }
 
-String _$xifanSupabaseDioHash() => r'41f58d0a325ce1f1e51188a09b36e154d5505bca';
+String _$xifanSupabaseDioHash() => r'4f413384d396ba49b3c5ebfec4b373788b46194c';
 
 @ProviderFor(xifanApi)
 final xifanApiProvider = XifanApiProvider._();

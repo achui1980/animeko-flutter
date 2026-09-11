@@ -64,7 +64,7 @@ final class MyCollectionsControllerProvider
 }
 
 String _$myCollectionsControllerHash() =>
-    r'244515b9a5896be7ee02f30d7975d8e92535ce0f';
+    r'f56c9c4d405dc1db6615e8c0ceb8e2b2b6f199a2';
 
 /// Backs the "My Collection" library page (Task 11), one instance per
 /// segmented-control tab. `type: null` fetches all 5 states -- the UI

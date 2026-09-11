@@ -5,7 +5,6 @@ import 'package:html/parser.dart' as html_parser;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'xifan_models.dart';
-import '../settings/proxy_dio_config.dart';
 
 part 'xifan_api.g.dart';
 
@@ -366,7 +365,6 @@ Dio xifanDio(Ref ref) {
       receiveTimeout: _xifanReceiveTimeout,
     ),
   );
-  configureProxy(dio, ref);
   return dio;
 }
 
@@ -395,7 +393,6 @@ Dio xifanSupabaseDio(Ref ref) {
       receiveTimeout: _xifanSupabaseReceiveTimeout,
     ),
   );
-  configureProxy(dio, ref);
   return dio;
 }
 

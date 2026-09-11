@@ -3,7 +3,6 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../domain/media/media_source.dart';
 import '../../domain/media/title_parser.dart';
-import '../settings/proxy_dio_config.dart';
 import '../torrent/rqbit_engine.dart';
 import '../torrent/torrent_playback_source.dart';
 import 'rss_parser.dart';
@@ -195,6 +194,5 @@ Dio mikanRssDio(Ref ref) {
       receiveTimeout: _mikanReceiveTimeout,
     ),
   );
-  configureProxy(dio, ref);
   return dio;
 }
