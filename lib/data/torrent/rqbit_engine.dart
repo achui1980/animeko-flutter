@@ -63,6 +63,19 @@ class RqbitEngine {
       [
         '--http-api-listen-addr',
         '127.0.0.1:0',
+        // rqbit's `--listen-port 0` does NOT mean "pick a random port" for
+        // the `server` subcommand -- it falls back to the hardcoded
+        // default of 4240 regardless (verified empirically: two instances
+        // both passed `--listen-port 0` and the second still failed with
+        // "Address already in use" on 4240). So we reserve an actual free
+        // ephemeral port ourselves and pass its number explicitly. This
+        // avoids collisions with a leftover rqbit process from a previous
+        // run (e.g. after a force-quit that skipped shutdown()), another
+        // app using rqbit, etc. -- which otherwise makes rqbit exit before
+        // ever printing "started HTTP API", and _readAssignedPort() throw
+        // "Bad state: No element" on the exhausted stdout stream.
+        '--listen-port',
+        '${await _reserveEphemeralPort()}',
         '--disable-upnp-port-forward',
         '--disable-dht-persistence',
         'server',
@@ -162,12 +175,42 @@ class RqbitEngine {
     return dir.path;
   }
 
+  /// Binds an ephemeral socket to let the OS pick a free TCP port, reads
+  /// back its number, then closes it immediately so rqbit can bind the
+  /// same port for BT peer connections. Small TOCTOU race (another process
+  /// could grab the port in between), but far safer than a hardcoded port.
+  Future<int> _reserveEphemeralPort() async {
+    final socket = await ServerSocket.bind(InternetAddress.anyIPv4, 0);
+    final port = socket.port;
+    await socket.close();
+    return port;
+  }
+
   Future<int> _readAssignedPort(Process process) async {
-    final firstLine = await process.stdout
+    final stderrLines = <String>[];
+    final stderrSubscription = process.stderr
         .transform(const SystemEncoding().decoder)
-        .firstWhere((line) => line.contains('started HTTP API'));
-    final match = RegExp(r':(\d+)$').firstMatch(firstLine.trim());
-    return int.parse(match!.group(1)!);
+        .listen(stderrLines.add);
+    try {
+      final firstLine = await process.stdout
+          .transform(const SystemEncoding().decoder)
+          .firstWhere((line) => line.contains('started HTTP API'));
+      final match = RegExp(r':(\d+)$').firstMatch(firstLine.trim());
+      return int.parse(match!.group(1)!);
+    } on StateError {
+      // stdout ended without ever printing the expected line -- rqbit
+      // exited early (e.g. a port conflict, missing binary permissions,
+      // corrupt download dir). Surface *why* instead of the bare
+      // "Bad state: No element" from the exhausted stream.
+      final exitCode = await process.exitCode;
+      final stderrText = stderrLines.join().trim();
+      throw StateError(
+        'rqbit exited with code $exitCode before printing "started HTTP '
+        'API"${stderrText.isEmpty ? '' : ': $stderrText'}',
+      );
+    } finally {
+      await stderrSubscription.cancel();
+    }
   }
 }
 
