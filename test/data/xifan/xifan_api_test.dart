@@ -1,4 +1,5 @@
 import 'package:animeko_flutter/data/xifan/xifan_api.dart';
+import 'package:animeko_flutter/data/xifan/xifan_models.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -25,7 +26,9 @@ void main() {
     );
   }
 
-  Response<List<dynamic>> supabaseResponse(List<Map<String, dynamic>> rows) {
+  Response<List<dynamic>> supabaseSearchResponse(
+    List<Map<String, dynamic>> rows,
+  ) {
     return Response(
       data: rows,
       requestOptions: RequestOptions(path: '/'),
@@ -33,7 +36,75 @@ void main() {
     );
   }
 
-  group('search', () {
+  Response<Map<String, dynamic>> supabasePlaybackResponse(
+    Map<String, dynamic> body,
+  ) {
+    return Response(
+      data: body,
+      requestOptions: RequestOptions(path: '/'),
+      statusCode: 200,
+    );
+  }
+
+  void stubEmptyHtmlSearch() {
+    when(
+      () => dio.get<String>(
+        any(),
+        queryParameters: any(named: 'queryParameters'),
+        options: any(named: 'options'),
+      ),
+    ).thenAnswer(
+      (_) async => htmlResponse('<html><body>no results</body></html>'),
+    );
+  }
+
+  group('search (Supabase primary)', () {
+    test('returns Supabase results tagged backend=supabase, without touching '
+        'dm1.xfdm.pro at all', () async {
+      when(
+        () => supabaseDio.post<List<dynamic>>(
+          any(),
+          data: {'search_term': '穹庐下的魔女'},
+        ),
+      ).thenAnswer(
+        (_) async => supabaseSearchResponse([
+          {'id': 3384, 'title': '穹庐下的魔女'},
+        ]),
+      );
+
+      final results = await api.search('穹庐下的魔女');
+
+      expect(results, hasLength(1));
+      expect(results.single.id, 3384);
+      expect(results.single.title, '穹庐下的魔女');
+      expect(results.single.backend, XifanBackend.supabase);
+      verifyNever(
+        () => dio.get<String>(
+          any(),
+          queryParameters: any(named: 'queryParameters'),
+          options: any(named: 'options'),
+        ),
+      );
+    });
+
+    test('ignores rows missing a valid numeric id or string title', () async {
+      when(
+        () => supabaseDio.post<List<dynamic>>(any(), data: any(named: 'data')),
+      ).thenAnswer(
+        (_) async => supabaseSearchResponse([
+          {'id': 'not-an-int', 'title': '坏数据'},
+          {'id': 3384, 'title': '穹庐下的魔女'},
+        ]),
+      );
+
+      final results = await api.search('x');
+
+      expect(results, hasLength(1));
+      expect(results.single.id, 3384);
+    });
+  });
+
+  group('search (dm1.xfdm.pro fallback)', () {
     // Real dm1.xfdm.pro/anime.xifanacg.com search-result markup (captured
     // live, 2026-09-01): each result's title lives in a `.thumb-txt`
     // element and its detail-page link lives in a separate `.thumb-menu
@@ -51,7 +122,10 @@ void main() {
 </body></html>
 ''';
 
-    test('sends the title as the "wd" query param to dm1.xfdm.pro', () async {
+    test('falls back to dm1.xfdm.pro when Supabase throws', () async {
+      when(
+        () => supabaseDio.post<List<dynamic>>(any(), data: any(named: 'data')),
+      ).thenThrow(DioException(requestOptions: RequestOptions(path: '/rpc')));
       when(
         () => dio.get<String>(
           any(),
@@ -60,48 +134,39 @@ void main() {
         ),
       ).thenAnswer((_) async => htmlResponse(searchResultsHtml));
 
-      await api.search('鬼灭之刃');
+      final results = await api.search('鬼灭之刃');
 
-      verify(
+      expect(results, hasLength(2));
+      expect(results[0].id, 1001);
+      expect(results[0].title, '鬼灭之刃');
+      expect(results[0].backend, XifanBackend.htmlMirror);
+      expect(results[1].id, 1050);
+      expect(results[1].title, '鬼灭之刃 无限城篇');
+    });
+
+    test('falls back to dm1.xfdm.pro when Supabase returns nothing', () async {
+      when(
+        () => supabaseDio.post<List<dynamic>>(any(), data: any(named: 'data')),
+      ).thenAnswer((_) async => supabaseSearchResponse(const []));
+      when(
         () => dio.get<String>(
           'https://dm1.xfdm.pro/search.html',
           queryParameters: {'wd': '鬼灭之刃'},
           options: any(named: 'options'),
         ),
-      ).called(1);
+      ).thenAnswer((_) async => htmlResponse(searchResultsHtml));
+
+      final results = await api.search('鬼灭之刃');
+
+      expect(results, hasLength(2));
     });
 
-    test(
-      'pairs each .thumb-txt title with its matching .thumb-menu > a link',
-      () async {
-        when(
-          () => dio.get<String>(
-            any(),
-            queryParameters: any(named: 'queryParameters'),
-            options: any(named: 'options'),
-          ),
-        ).thenAnswer((_) async => htmlResponse(searchResultsHtml));
-
-        final results = await api.search('鬼灭之刃');
-
-        expect(results, hasLength(2));
-        expect(results[0].id, 1001);
-        expect(results[0].title, '鬼灭之刃');
-        expect(results[1].id, 1050);
-        expect(results[1].title, '鬼灭之刃 无限城篇');
-      },
-    );
-
-    test('returns an empty list when there are no results', () async {
+    test('returns an empty list when both Supabase and dm1.xfdm.pro have '
+        'nothing', () async {
       when(
-        () => dio.get<String>(
-          any(),
-          queryParameters: any(named: 'queryParameters'),
-          options: any(named: 'options'),
-        ),
-      ).thenAnswer(
-        (_) async => htmlResponse('<html><body>no results</body></html>'),
-      );
+        () => supabaseDio.post<List<dynamic>>(any(), data: any(named: 'data')),
+      ).thenAnswer((_) async => supabaseSearchResponse(const []));
+      stubEmptyHtmlSearch();
 
       final results = await api.search('nonexistent');
 
@@ -109,6 +174,9 @@ void main() {
     });
 
     test('skips a link whose href has no numeric bangumi ID', () async {
+      when(
+        () => supabaseDio.post<List<dynamic>>(any(), data: any(named: 'data')),
+      ).thenAnswer((_) async => supabaseSearchResponse(const []));
       when(
         () => dio.get<String>(
           any(),
@@ -130,180 +198,103 @@ void main() {
     });
   });
 
-  group('search Supabase fallback', () {
-    const emptyHtml = '<html><body>no results</body></html>';
-    const searchResultsHtml = '''
-<html><body>
-  <div class="thumb-content"><div class="thumb-txt cor4 hide">穹庐下的魔女</div></div>
-  <div class="thumb-menu"><a target="_self" href="/bangumi/3384.html" class="button cr3">播放正片</a></div>
-</body></html>
-''';
+  group('listEpisodes (Supabase backend)', () {
+    const bangumi = XifanBangumi(
+      id: 3416,
+      title: '恶女不才',
+      backend: XifanBackend.supabase,
+    );
+
+    // Simplified real RSC payload shape (reverse-engineered 2026-09-10):
+    // the code only regex-matches this literal field sequence, it never
+    // parses the surrounding RSC stream as JSON. The same episode object
+    // can legitimately appear more than once in the raw stream (React
+    // Server Components re-serialize shared references), so results
+    // must be de-duplicated by id.
+    const rscBody =
+        '{"id":122517,"kind":"main","title":"第01集","available_at":null,'
+        '"release_date":null,"episode_number":1,"stale_update_eligible_at":null}'
+        '{"id":123603,"kind":"main","title":"第02集","available_at":null,'
+        '"release_date":null,"episode_number":2,"stale_update_eligible_at":null}'
+        '{"id":122517,"kind":"main","title":"第01集","available_at":null,'
+        '"release_date":null,"episode_number":1,"stale_update_eligible_at":null}';
 
     test(
-      'does not call the Supabase API when the HTML search already has results',
+      'sends an RSC request to next.xifanacg.com and parses+dedupes episodes',
       () async {
         when(
-          () => dio.get<String>(
-            any(),
-            queryParameters: any(named: 'queryParameters'),
+          () => supabaseDio.get<String>(
+            'https://next.xifanacg.com/anime/3416',
             options: any(named: 'options'),
           ),
-        ).thenAnswer((_) async => htmlResponse(searchResultsHtml));
+        ).thenAnswer((_) async => htmlResponse(rscBody));
 
-        final results = await api.search('穹庐下的魔女');
+        final episodes = await api.listEpisodes(bangumi);
 
-        expect(results, hasLength(1));
-        verifyNever(
-          () =>
-              supabaseDio.post<List<dynamic>>(any(), data: any(named: 'data')),
-        );
+        expect(episodes, hasLength(2));
+        expect(episodes[0].title, '第01集');
+        expect(episodes[0].backend, XifanBackend.supabase);
+        expect(episodes[0].supabaseEpisodeId, 122517);
+        expect(episodes[0].watchPageUrls, isEmpty);
+        expect(episodes[1].title, '第02集');
+        expect(episodes[1].supabaseEpisodeId, 123603);
       },
     );
 
-    test('falls back to Supabase and retries the HTML search with the '
-        'canonical title when the HTML search throws', () async {
+    test('sends the RSC request header', () async {
       when(
-        () => dio.get<String>(
-          'https://dm1.xfdm.pro/search.html',
-          queryParameters: {'wd': '天幕的魔法使'},
-          options: any(named: 'options'),
-        ),
-      ).thenThrow(
-        DioException(requestOptions: RequestOptions(path: '/search.html')),
-      );
-      when(
-        () => supabaseDio.post<List<dynamic>>(
+        () => supabaseDio.get<String>(any(), options: any(named: 'options')),
+      ).thenAnswer((_) async => htmlResponse(rscBody));
+
+      await api.listEpisodes(bangumi);
+
+      final captured = verify(
+        () => supabaseDio.get<String>(
           any(),
-          data: {'search_term': '天幕的魔法使'},
+          options: captureAny(named: 'options'),
         ),
-      ).thenAnswer(
-        (_) async => supabaseResponse([
-          {'id': 3384, 'title': '穹庐下的魔女'},
-        ]),
-      );
-      when(
-        () => dio.get<String>(
-          'https://dm1.xfdm.pro/search.html',
-          queryParameters: {'wd': '穹庐下的魔女'},
-          options: any(named: 'options'),
-        ),
-      ).thenAnswer((_) async => htmlResponse(searchResultsHtml));
-
-      final results = await api.search('天幕的魔法使');
-
-      expect(results, hasLength(1));
-      expect(results.single.id, 3384);
-      expect(results.single.title, '穹庐下的魔女');
+      ).captured;
+      final options = captured.single as Options;
+      expect(options.headers?['RSC'], '1');
     });
 
-    test('falls back to Supabase and retries the HTML search when the HTML '
-        'search returns no results', () async {
+    test('sorts episodes ascending by episode_number regardless of stream '
+        'order', () async {
+      const outOfOrderBody =
+          '{"id":2,"kind":"main","title":"第02集","episode_number":2}'
+          '{"id":1,"kind":"main","title":"第01集","episode_number":1}';
       when(
-        () => dio.get<String>(
-          'https://dm1.xfdm.pro/search.html',
-          queryParameters: {'wd': '天幕的魔法使'},
-          options: any(named: 'options'),
-        ),
-      ).thenAnswer((_) async => htmlResponse(emptyHtml));
-      when(
-        () => supabaseDio.post<List<dynamic>>(
-          any(),
-          data: {'search_term': '天幕的魔法使'},
-        ),
-      ).thenAnswer(
-        (_) async => supabaseResponse([
-          {'id': 3384, 'title': '穹庐下的魔女'},
-        ]),
-      );
-      when(
-        () => dio.get<String>(
-          'https://dm1.xfdm.pro/search.html',
-          queryParameters: {'wd': '穹庐下的魔女'},
-          options: any(named: 'options'),
-        ),
-      ).thenAnswer((_) async => htmlResponse(searchResultsHtml));
+        () => supabaseDio.get<String>(any(), options: any(named: 'options')),
+      ).thenAnswer((_) async => htmlResponse(outOfOrderBody));
 
-      final results = await api.search('天幕的魔法使');
+      final episodes = await api.listEpisodes(bangumi);
 
-      expect(results, hasLength(1));
-      expect(results.single.title, '穹庐下的魔女');
+      expect(episodes.map((e) => e.supabaseEpisodeId), [1, 2]);
     });
 
-    test('returns an empty list when both the HTML search and the Supabase '
-        'fallback have nothing', () async {
+    test('returns an empty list when there is no episode data', () async {
       when(
-        () => dio.get<String>(
-          any(),
-          queryParameters: any(named: 'queryParameters'),
-          options: any(named: 'options'),
-        ),
-      ).thenAnswer((_) async => htmlResponse(emptyHtml));
-      when(
-        () => supabaseDio.post<List<dynamic>>(any(), data: any(named: 'data')),
-      ).thenAnswer((_) async => supabaseResponse(const []));
+        () => supabaseDio.get<String>(any(), options: any(named: 'options')),
+      ).thenAnswer((_) async => htmlResponse('no episodes here'));
 
-      final results = await api.search('nonexistent');
+      final episodes = await api.listEpisodes(bangumi);
 
-      expect(results, isEmpty);
-    });
-
-    test('returns an empty list (rather than throwing) when the Supabase '
-        'fallback itself fails', () async {
-      when(
-        () => dio.get<String>(
-          any(),
-          queryParameters: any(named: 'queryParameters'),
-          options: any(named: 'options'),
-        ),
-      ).thenAnswer((_) async => htmlResponse(emptyHtml));
-      when(
-        () => supabaseDio.post<List<dynamic>>(any(), data: any(named: 'data')),
-      ).thenThrow(DioException(requestOptions: RequestOptions(path: '/rpc')));
-
-      final results = await api.search('nonexistent');
-
-      expect(results, isEmpty);
-    });
-
-    test('does not retry the HTML search when Supabase returns the same '
-        'title (avoids an infinite/duplicate request)', () async {
-      when(
-        () => dio.get<String>(
-          any(),
-          queryParameters: any(named: 'queryParameters'),
-          options: any(named: 'options'),
-        ),
-      ).thenAnswer((_) async => htmlResponse(emptyHtml));
-      when(
-        () => supabaseDio.post<List<dynamic>>(
-          any(),
-          data: {'search_term': '穹庐下的魔女'},
-        ),
-      ).thenAnswer(
-        (_) async => supabaseResponse([
-          {'id': 3384, 'title': '穹庐下的魔女'},
-        ]),
-      );
-
-      final results = await api.search('穹庐下的魔女');
-
-      expect(results, isEmpty);
-      verify(
-        () => dio.get<String>(
-          any(),
-          queryParameters: any(named: 'queryParameters'),
-          options: any(named: 'options'),
-        ),
-      ).called(1);
+      expect(episodes, isEmpty);
     });
   });
 
-  group('listEpisodes', () {
+  group('listEpisodes (dm1.xfdm.pro backend)', () {
+    const bangumi = XifanBangumi(
+      id: 1001,
+      title: 'x',
+      backend: XifanBackend.htmlMirror,
+    );
+
     // Real bangumi detail-page markup (captured live, 2026-09-01): a
     // bangumi page can offer several lines (e.g. "稀饭新番主线-1"/"-2",
     // "稀饭备用-1"), each its own `<ul class="anthology-list-play">`
     // sibling under `.anthology-list-box`, with its own separate episode
-    // list. Episodes with the same title across lists are merged into
+    // list. Episodes with the same title across lines are merged into
     // one XifanEpisode with an ordered list of URLs (first-seen line
     // first); 第01集 and 第02集 both appear in line-1 and line-2, so both
     // merge to two URLs each.
@@ -330,7 +321,7 @@ void main() {
         () => dio.get<String>(any(), options: any(named: 'options')),
       ).thenAnswer((_) async => htmlResponse('<html><body></body></html>'));
 
-      await api.listEpisodes(1001);
+      await api.listEpisodes(bangumi);
 
       verify(
         () => dio.get<String>(
@@ -347,13 +338,14 @@ void main() {
           () => dio.get<String>(any(), options: any(named: 'options')),
         ).thenAnswer((_) async => htmlResponse(detailPageHtml));
 
-        final episodes = await api.listEpisodes(1001);
+        final episodes = await api.listEpisodes(bangumi);
 
         expect(episodes, hasLength(2));
 
         // 第01集 exists in both line-1 and line-2: merged into one episode
         // with both URLs, first-seen line (line-1) first.
         expect(episodes[0].title, '第01集');
+        expect(episodes[0].backend, XifanBackend.htmlMirror);
         expect(episodes[0].watchPageUrls, [
           'https://dm1.xfdm.pro/watch/1001/1/1.html',
           'https://dm1.xfdm.pro/watch/1001/2/1.html',
@@ -389,7 +381,7 @@ void main() {
 '''),
         );
 
-        final episodes = await api.listEpisodes(1001);
+        final episodes = await api.listEpisodes(bangumi);
 
         expect(episodes, hasLength(2));
         expect(episodes[0].title, '第01集');
@@ -409,20 +401,110 @@ void main() {
     test(
       'returns an empty list when the page has no anthology-list-play',
       () async {
+        const emptyBangumi = XifanBangumi(
+          id: 9999,
+          title: 'x',
+          backend: XifanBackend.htmlMirror,
+        );
         when(
           () => dio.get<String>(any(), options: any(named: 'options')),
         ).thenAnswer(
           (_) async => htmlResponse('<html><body>no episodes</body></html>'),
         );
 
-        final episodes = await api.listEpisodes(9999);
+        final episodes = await api.listEpisodes(emptyBangumi);
 
         expect(episodes, isEmpty);
       },
     );
   });
 
-  group('resolvePlaybackUrl', () {
+  group('resolvePlaybackUrl (Supabase backend)', () {
+    const episode = XifanEpisode(
+      title: '第01集',
+      backend: XifanBackend.supabase,
+      supabaseEpisodeId: 122517,
+    );
+
+    test('POSTs {action: fallback, episode_id} and collects every '
+        'candidates[].url', () async {
+      when(
+        () => supabaseDio.post<Map<String, dynamic>>(
+          any(),
+          data: {'action': 'fallback', 'episode_id': 122517},
+        ),
+      ).thenAnswer(
+        (_) async => supabasePlaybackResponse({
+          'ok': true,
+          'url': 'https://apn.moedot.net/d/wo/2607/RE12.mp4',
+          'candidates': [
+            {
+              'source_id': 4,
+              'source_code': 'xfxf1',
+              'url': 'https://apn.moedot.net/d/wo/2607/RE12.mp4',
+            },
+            {
+              'source_id': 1,
+              'source_code': 'AL',
+              'url': 'https://play.xfvod.pro:8088/temp/2607/RE12.mp4',
+            },
+            {
+              'source_id': 2,
+              'source_code': 'CS',
+              'url': 'https://dl.playxf.top/新番/2607/12/RE12.m3u8',
+            },
+          ],
+        }),
+      );
+
+      final sources = await api.resolvePlaybackUrl(episode);
+
+      expect(sources, hasLength(3));
+      expect(sources[0].url, 'https://apn.moedot.net/d/wo/2607/RE12.mp4');
+      expect(sources[1].url, 'https://play.xfvod.pro:8088/temp/2607/RE12.mp4');
+      expect(sources[2].url, 'https://dl.playxf.top/新番/2607/12/RE12.m3u8');
+      expect(sources.every((s) => s.headers.isEmpty), isTrue);
+    });
+
+    test('skips a candidate missing a url', () async {
+      when(
+        () => supabaseDio.post<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+        ),
+      ).thenAnswer(
+        (_) async => supabasePlaybackResponse({
+          'candidates': [
+            {'source_id': 1},
+            {'source_id': 2, 'url': 'https://example.com/ok.mp4'},
+          ],
+        }),
+      );
+
+      final sources = await api.resolvePlaybackUrl(episode);
+
+      expect(sources, hasLength(1));
+      expect(sources.single.url, 'https://example.com/ok.mp4');
+    });
+
+    test(
+      'throws FormatException when there are no usable candidates',
+      () async {
+        when(
+          () => supabaseDio.post<Map<String, dynamic>>(
+            any(),
+            data: any(named: 'data'),
+          ),
+        ).thenAnswer(
+          (_) async => supabasePlaybackResponse({'candidates': <dynamic>[]}),
+        );
+
+        expect(() => api.resolvePlaybackUrl(episode), throwsFormatException);
+      },
+    );
+  });
+
+  group('resolvePlaybackUrl (dm1.xfdm.pro backend)', () {
     // Real watch-page script content (captured live, 2026-09-01),
     // simplified: `player_aaaa` is a JSON-like object containing a
     // *nested* `vod_data` object -- extraction must brace-balance, not
@@ -439,6 +521,12 @@ var player_aaaa={"flag":"play","encrypt":$encrypt,"trysee":0,"points":0,
 </body></html>
 ''';
 
+    XifanEpisode htmlEpisode(List<String> urls) => XifanEpisode(
+      title: '第01集',
+      backend: XifanBackend.htmlMirror,
+      watchPageUrls: urls,
+    );
+
     test('encrypt=0 (or "0"): uses the url as-is', () async {
       when(
         () => dio.get<String>(any(), options: any(named: 'options')),
@@ -448,9 +536,9 @@ var player_aaaa={"flag":"play","encrypt":$encrypt,"trysee":0,"points":0,
         ),
       );
 
-      final sources = await api.resolvePlaybackUrl([
-        'https://dm1.xfdm.pro/watch/1001/1/1.html',
-      ]);
+      final sources = await api.resolvePlaybackUrl(
+        htmlEpisode(['https://dm1.xfdm.pro/watch/1001/1/1.html']),
+      );
 
       expect(sources, hasLength(1));
       expect(sources.single.url, 'https://apn.moedot.net/d/wo/1/a.mp4');
@@ -466,9 +554,9 @@ var player_aaaa={"flag":"play","encrypt":$encrypt,"trysee":0,"points":0,
         ),
       );
 
-      final sources = await api.resolvePlaybackUrl([
-        'https://dm1.xfdm.pro/watch/1001/1/1.html',
-      ]);
+      final sources = await api.resolvePlaybackUrl(
+        htmlEpisode(['https://dm1.xfdm.pro/watch/1001/1/1.html']),
+      );
 
       expect(sources, hasLength(1));
       expect(sources.single.url, 'https://example.com/video.mp4');
@@ -483,9 +571,9 @@ var player_aaaa={"flag":"play","encrypt":$encrypt,"trysee":0,"points":0,
         ),
       );
 
-      final sources = await api.resolvePlaybackUrl([
-        'https://dm1.xfdm.pro/watch/1001/1/1.html',
-      ]);
+      final sources = await api.resolvePlaybackUrl(
+        htmlEpisode(['https://dm1.xfdm.pro/watch/1001/1/1.html']),
+      );
 
       expect(sources, hasLength(1));
       expect(sources.single.url, 'https://example.com/video.mp4');
@@ -501,9 +589,9 @@ var player_aaaa={"flag":"play","encrypt":$encrypt,"trysee":0,"points":0,
         );
 
         expect(
-          () => api.resolvePlaybackUrl([
-            'https://dm1.xfdm.pro/watch/1001/1/1.html',
-          ]),
+          () => api.resolvePlaybackUrl(
+            htmlEpisode(['https://dm1.xfdm.pro/watch/1001/1/1.html']),
+          ),
           throwsFormatException,
         );
       },
@@ -523,9 +611,9 @@ var player_aaaa={"flag":"play","encrypt":0,"vod_data":{"vod_name":"x"}}
         );
 
         expect(
-          () => api.resolvePlaybackUrl([
-            'https://dm1.xfdm.pro/watch/1001/1/1.html',
-          ]),
+          () => api.resolvePlaybackUrl(
+            htmlEpisode(['https://dm1.xfdm.pro/watch/1001/1/1.html']),
+          ),
           throwsFormatException,
         );
       },
@@ -550,7 +638,9 @@ var player_aaaa={"flag":"play","encrypt":0,"vod_data":{"vod_name":"x"}}
           ),
         );
 
-        final sources = await api.resolvePlaybackUrl([primaryUrl, fallbackUrl]);
+        final sources = await api.resolvePlaybackUrl(
+          htmlEpisode([primaryUrl, fallbackUrl]),
+        );
 
         expect(sources, hasLength(1));
         expect(sources.single.url, 'https://example.com/fallback.mp4');
@@ -572,7 +662,7 @@ var player_aaaa={"flag":"play","encrypt":0,"vod_data":{"vod_name":"x"}}
         );
 
         expect(
-          () => api.resolvePlaybackUrl([primaryUrl, fallbackUrl]),
+          () => api.resolvePlaybackUrl(htmlEpisode([primaryUrl, fallbackUrl])),
           throwsFormatException,
         );
       },

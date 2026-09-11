@@ -91,49 +91,55 @@ void main() {
     });
 
     test('search delegates to XifanApi.search', () async {
-      when(
-        () => api.search('鬼灭之刃'),
-      ).thenAnswer((_) async => [const XifanBangumi(id: 1001, title: '鬼灭之刃')]);
+      when(() => api.search('鬼灭之刃')).thenAnswer(
+        (_) async => [
+          const XifanBangumi(
+            id: 1001,
+            title: '鬼灭之刃',
+            backend: XifanBackend.htmlMirror,
+          ),
+        ],
+      );
       final result = await source.search('鬼灭之刃');
       expect(result, hasLength(1));
     });
 
     test(
-      "listEpisodes delegates to listEpisodes using the candidate's id",
+      'listEpisodes delegates to listEpisodes using the full candidate',
       () async {
-        when(() => api.listEpisodes(1001)).thenAnswer(
+        const bangumi = XifanBangumi(
+          id: 1001,
+          title: 'x',
+          backend: XifanBackend.htmlMirror,
+        );
+        when(() => api.listEpisodes(bangumi)).thenAnswer(
           (_) async => [
             const XifanEpisode(
               title: '第01集',
+              backend: XifanBackend.htmlMirror,
               watchPageUrls: ['https://dm1.xfdm.pro/watch/1001/1/1.html'],
             ),
           ],
         );
-        final result = await source.listEpisodes(
-          const XifanBangumi(id: 1001, title: 'x'),
-        );
+        final result = await source.listEpisodes(bangumi);
         expect(result, hasLength(1));
       },
     );
 
     test(
-      "resolvePlayback delegates to resolvePlaybackUrl using the episode's watchPageUrls",
+      "resolvePlayback delegates to resolvePlaybackUrl using the full episode",
       () async {
-        when(
-          () => api.resolvePlaybackUrl([
-            'https://dm1.xfdm.pro/watch/1001/1/1.html',
-          ]),
-        ).thenAnswer(
+        const episode = XifanEpisode(
+          title: '第01集',
+          backend: XifanBackend.htmlMirror,
+          watchPageUrls: ['https://dm1.xfdm.pro/watch/1001/1/1.html'],
+        );
+        when(() => api.resolvePlaybackUrl(episode)).thenAnswer(
           (_) async => const [
             XifanPlaybackSource(url: 'https://apn.moedot.net/d/wo/1/a.mp4'),
           ],
         );
-        final result = await source.resolvePlayback(
-          const XifanEpisode(
-            title: '第01集',
-            watchPageUrls: ['https://dm1.xfdm.pro/watch/1001/1/1.html'],
-          ),
-        );
+        final result = await source.resolvePlayback(episode);
         expect(result, hasLength(1));
         expect(result.single.url, 'https://apn.moedot.net/d/wo/1/a.mp4');
       },
