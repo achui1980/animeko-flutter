@@ -38,6 +38,13 @@ abstract class MediaPlaybackSource {
   /// source's CDN needs none.
   Map<String, String> get headers;
 
+  /// Display text for a manual line/release picker (see the player's
+  /// line-switch button). Returns null when this source has no
+  /// descriptive metadata, in which case the UI falls back to a
+  /// 1-indexed "线路 N" label based on the candidate's position in the
+  /// list returned by [MediaSource.resolvePlayback].
+  String? get label => null;
+
   /// Returns the URL that should actually be handed to the player. HTTP
   /// sources return [url] unchanged (the default implementation below). BT
   /// sources override this to download the `.torrent`, hand it to the

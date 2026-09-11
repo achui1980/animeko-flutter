@@ -72,4 +72,9 @@ void main() {
     const source = _FakePlaybackSource();
     await expectLater(source.dispose(), completes);
   });
+
+  test('MediaPlaybackSource.label defaults to null', () async {
+    const source = _FakePlaybackSource();
+    expect(source.label, isNull);
+  });
 }
