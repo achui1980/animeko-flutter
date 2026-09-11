@@ -18,11 +18,8 @@ import 'rqbit_engine.dart';
 ///   ever completed) is a no-op; it never issues a second
 ///   `engine.deleteTorrent` call for the same id.
 class TorrentPlaybackSource extends MediaPlaybackSource {
-  TorrentPlaybackSource({
-    required this.release,
-    required this.engine,
-    Dio? dio,
-  }) : _dio = dio ?? Dio();
+  TorrentPlaybackSource({required this.release, required this.engine, Dio? dio})
+    : _dio = dio ?? Dio();
 
   final RssRelease release;
   final RqbitEngine engine;
@@ -44,6 +41,18 @@ class TorrentPlaybackSource extends MediaPlaybackSource {
 
   @override
   Map<String, String> get headers => const {};
+
+  @override
+  String? get label {
+    final parsed = release.parsed;
+    final parts = <String>[
+      if (parsed.alliance.isNotEmpty) parsed.alliance,
+      if (parsed.resolution != null) parsed.resolution!,
+      if (parsed.subtitleLanguages.isNotEmpty)
+        parsed.subtitleLanguages.join('/'),
+    ];
+    return parts.isEmpty ? null : parts.join(' ');
+  }
 
   @override
   Future<String> prepare() async {

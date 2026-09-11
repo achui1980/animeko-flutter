@@ -188,4 +188,47 @@ void main() {
     );
     expect(source.headers, isEmpty);
   });
+
+  group('label', () {
+    TorrentPlaybackSource sourceFor(String rawTitle) => TorrentPlaybackSource(
+      release: RssRelease(
+        item: RssItem(
+          title: rawTitle,
+          torrentUrl: 'https://mikan.tangbai.cc/Download/x/x.torrent',
+          contentLength: 1000,
+        ),
+        parsed: parseTitle(rawTitle),
+      ),
+      engine: MockRqbitEngine(),
+      dio: MockDio(),
+    );
+
+    test(
+      'joins alliance, resolution, and subtitle languages when all present',
+      () {
+        final source = sourceFor('[绿茶字幕组][Show][10][1080P][简体]');
+        expect(source.label, '绿茶字幕组 1080P 简体');
+      },
+    );
+
+    test('omits the alliance segment when the title has no brackets', () {
+      final source = sourceFor('Show 10 1080P 简体');
+      expect(source.label, '1080P 简体');
+    });
+
+    test('omits the resolution segment when unparseable', () {
+      final source = sourceFor('[绿茶字幕组][Show][10][简体]');
+      expect(source.label, '绿茶字幕组 简体');
+    });
+
+    test('omits the languages segment when no language keywords match', () {
+      final source = sourceFor('[绿茶字幕组][Show][10][1080P]');
+      expect(source.label, '绿茶字幕组 1080P');
+    });
+
+    test('is null when nothing parseable is present', () {
+      final source = sourceFor('Show 10');
+      expect(source.label, isNull);
+    });
+  });
 }
