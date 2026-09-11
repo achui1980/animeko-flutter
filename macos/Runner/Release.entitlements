@@ -2,12 +2,17 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>com.apple.security.app-sandbox</key>
-	<true/>
 	<!--
-	Required for all outbound HTTP; see DebugProfile.entitlements.
+	App Sandbox is disabled: see DebugProfile.entitlements for the full
+	rationale (the Mikan BT source's rqbit sidecar process can't be
+	exec()'d under App Sandbox, and this app was never intended for Mac
+	App Store distribution).
 	-->
+	<key>com.apple.security.app-sandbox</key>
+	<false/>
 	<key>com.apple.security.network.client</key>
+	<true/>
+	<key>com.apple.security.network.server</key>
 	<true/>
 </dict>
 </plist>

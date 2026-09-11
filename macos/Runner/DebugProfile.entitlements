@@ -2,15 +2,21 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!--
+	App Sandbox is disabled: the Mikan BT source spawns an external `rqbit`
+	sidecar process (see lib/data/torrent/rqbit_engine.dart) via
+	Process.start(). Under App Sandbox, exec() of any binary outside the
+	app bundle (e.g. a Homebrew-installed tool on PATH) is denied at the
+	syscall level with "Operation not permitted" (errno 1), regardless of
+	entitlements -- there is no public entitlement that allows spawning
+	arbitrary external executables while keeping the sandbox on. This app
+	was never intended for Mac App Store distribution, so sandboxing was
+	never a hard requirement; it was only ever the Flutter template default.
+	-->
 	<key>com.apple.security.app-sandbox</key>
-	<true/>
+	<false/>
 	<key>com.apple.security.cs.allow-jit</key>
 	<true/>
-	<!--
-	Required for all outbound HTTP: the Flutter macOS template ships only
-	network.server, so without this every request to api.animeko.org fails
-	with "Operation not permitted" (errno 1) under the sandbox.
-	-->
 	<key>com.apple.security.network.client</key>
 	<true/>
 	<key>com.apple.security.network.server</key>
