@@ -35,8 +35,9 @@ void main() {
     };
 
     test('GETs /v1/me', () async {
-      when(() => dio.get<Map<String, dynamic>>(any()))
-          .thenAnswer((_) async => jsonResponse(selfJson));
+      when(
+        () => dio.get<Map<String, dynamic>>(any()),
+      ).thenAnswer((_) async => jsonResponse(selfJson));
 
       await api.getSelf();
 
@@ -44,8 +45,9 @@ void main() {
     });
 
     test('parses the response into a SelfUser', () async {
-      when(() => dio.get<Map<String, dynamic>>(any()))
-          .thenAnswer((_) async => jsonResponse(selfJson));
+      when(
+        () => dio.get<Map<String, dynamic>>(any()),
+      ).thenAnswer((_) async => jsonResponse(selfJson));
 
       final user = await api.getSelf();
 

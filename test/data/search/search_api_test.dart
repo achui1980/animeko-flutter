@@ -34,12 +34,14 @@ void main() {
 
     await api.search(keywords: 'frieren');
 
-    final captured = verify(
-      () => dio.get<Map<String, dynamic>>(
-        '/v2/subjects/search',
-        queryParameters: captureAny(named: 'queryParameters'),
-      ),
-    ).captured.single as Map<String, dynamic>;
+    final captured =
+        verify(
+              () => dio.get<Map<String, dynamic>>(
+                '/v2/subjects/search',
+                queryParameters: captureAny(named: 'queryParameters'),
+              ),
+            ).captured.single
+            as Map<String, dynamic>;
 
     expect(captured['q'], 'frieren');
     expect(captured.containsKey('tags'), isFalse);
@@ -60,12 +62,14 @@ void main() {
       sortBy: SearchSortBy.rankAsc,
     );
 
-    final captured = verify(
-      () => dio.get<Map<String, dynamic>>(
-        '/v2/subjects/search',
-        queryParameters: captureAny(named: 'queryParameters'),
-      ),
-    ).captured.single as Map<String, dynamic>;
+    final captured =
+        verify(
+              () => dio.get<Map<String, dynamic>>(
+                '/v2/subjects/search',
+                queryParameters: captureAny(named: 'queryParameters'),
+              ),
+            ).captured.single
+            as Map<String, dynamic>;
 
     expect(captured['tags'], 'Fantasy,Drama');
     expect(captured['sortBy'], 'rankAsc');
@@ -81,12 +85,14 @@ void main() {
 
     await api.search(keywords: 'frieren', tags: const []);
 
-    final captured = verify(
-      () => dio.get<Map<String, dynamic>>(
-        '/v2/subjects/search',
-        queryParameters: captureAny(named: 'queryParameters'),
-      ),
-    ).captured.single as Map<String, dynamic>;
+    final captured =
+        verify(
+              () => dio.get<Map<String, dynamic>>(
+                '/v2/subjects/search',
+                queryParameters: captureAny(named: 'queryParameters'),
+              ),
+            ).captured.single
+            as Map<String, dynamic>;
 
     expect(captured.containsKey('tags'), isFalse);
   });

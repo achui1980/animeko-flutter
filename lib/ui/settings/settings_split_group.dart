@@ -11,7 +11,11 @@ import 'package:flutter/material.dart';
 /// replacement for the plain-`Card` `_SettingsGroup` previously used on
 /// [SettingsScreen].
 class SettingsSplitGroup extends StatelessWidget {
-  const SettingsSplitGroup({super.key, required this.title, required this.children});
+  const SettingsSplitGroup({
+    super.key,
+    required this.title,
+    required this.children,
+  });
 
   final String title;
   final List<Widget> children;
@@ -29,7 +33,9 @@ class SettingsSplitGroup extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
           child: Text(
             title,
-            style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.primary),
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: theme.colorScheme.primary,
+            ),
           ),
         ),
         for (var i = 0; i < children.length; i++)

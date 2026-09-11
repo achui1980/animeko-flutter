@@ -7,7 +7,11 @@ import 'package:flutter/material.dart';
 /// `Anime1NotFoundException` gets its own non-retryable empty state
 /// instead, rendered inline by the screen that catches it.
 class ErrorRetryView extends StatelessWidget {
-  const ErrorRetryView({super.key, required this.message, required this.onRetry});
+  const ErrorRetryView({
+    super.key,
+    required this.message,
+    required this.onRetry,
+  });
 
   final String message;
   final VoidCallback onRetry;

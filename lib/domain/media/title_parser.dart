@@ -1,8 +1,6 @@
 /// A parsed episode number or inclusive range, e.g. "10" or "07-10".
 class EpisodeRange {
-  const EpisodeRange.single(int value)
-      : start = value,
-        end = value;
+  const EpisodeRange.single(int value) : start = value, end = value;
 
   const EpisodeRange.range(this.start, this.end);
 
@@ -11,7 +9,8 @@ class EpisodeRange {
 
   bool contains(int value) => value >= start && value <= end;
 
-  Iterable<int> expand() => List<int>.generate(end - start + 1, (i) => start + i);
+  Iterable<int> expand() =>
+      List<int>.generate(end - start + 1, (i) => start + i);
 
   @override
   String toString() => start == end ? '$start' : '$start-$end';
@@ -35,8 +34,7 @@ class ParsedTitle {
 const _resolutionNumbers = {360, 480, 720, 848, 1080, 1440, 1920, 2160};
 
 final _bracketPattern = RegExp(r'\[(.+?)\]|【(.+?)】');
-final _rangeWordPattern =
-    RegExp(r'^(\d{1,4})\s*[-~～]{1,2}\s*(\d{1,4})$');
+final _rangeWordPattern = RegExp(r'^(\d{1,4})\s*[-~～]{1,2}\s*(\d{1,4})$');
 final _singleEpisodeWordPattern = RegExp(r'^\d{1,4}$');
 final _resolutionXPattern = RegExp(r'(\d{3,4})[xX](\d{3,4})');
 final _resolutionPPattern = RegExp(r'(\d{3,4})[Pp]\b');

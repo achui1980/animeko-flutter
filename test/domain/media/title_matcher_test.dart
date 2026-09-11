@@ -47,31 +47,19 @@ void main() {
       expect(result, exact);
     });
 
-    test(
-      'matches a Simplified-Chinese subject name against anime1.me\'s '
-      'Traditional-Chinese title even when word order differs and the '
-      'subject name carries extra subtitle text',
-      () {
-        const target = Anime1Category(id: 1948, title: '我是不才惡女');
-        final result = matchBest(
-          [target],
-          '恶女不才，请多关照 〇雏宫蝶鼠换身传〇',
-        );
-        expect(result, target);
-      },
-    );
+    test('matches a Simplified-Chinese subject name against anime1.me\'s '
+        'Traditional-Chinese title even when word order differs and the '
+        'subject name carries extra subtitle text', () {
+      const target = Anime1Category(id: 1948, title: '我是不才惡女');
+      final result = matchBest([target], '恶女不才，请多关照 〇雏宫蝶鼠换身传〇');
+      expect(result, target);
+    });
 
-    test(
-      'matches a reordered core title separated from an unrelated, '
-      'much longer subtitle by a delimiter',
-      () {
-        const target = Anime1Category(id: 1, title: '太喜泼');
-        final result = matchBest(
-          [target],
-          '泼喜太，某个不相关的很长副标题内容',
-        );
-        expect(result, target);
-      },
-    );
+    test('matches a reordered core title separated from an unrelated, '
+        'much longer subtitle by a delimiter', () {
+      const target = Anime1Category(id: 1, title: '太喜泼');
+      final result = matchBest([target], '泼喜太，某个不相关的很长副标题内容');
+      expect(result, target);
+    });
   });
 }

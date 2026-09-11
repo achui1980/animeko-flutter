@@ -40,21 +40,30 @@ void main() {
       'score': '8.4',
       'rank': 12,
       'collectionType': 'DOING',
-      'selfRating': {'score': 0, 'tags': <String>[], 'isPrivate': false, 'comment': null},
+      'selfRating': {
+        'score': 0,
+        'tags': <String>[],
+        'isPrivate': false,
+        'comment': null,
+      },
     };
 
     test('GETs the exact subject-detail path', () async {
-      when(() => dio.get<Map<String, dynamic>>(any()))
-          .thenAnswer((_) async => jsonResponse(detailJson));
+      when(
+        () => dio.get<Map<String, dynamic>>(any()),
+      ).thenAnswer((_) async => jsonResponse(detailJson));
 
       await api.getSubject(400602);
 
-      verify(() => dio.get<Map<String, dynamic>>('/v2/subjects/400602')).called(1);
+      verify(
+        () => dio.get<Map<String, dynamic>>('/v2/subjects/400602'),
+      ).called(1);
     });
 
     test('parses the response into a SubjectDetail', () async {
-      when(() => dio.get<Map<String, dynamic>>(any()))
-          .thenAnswer((_) async => jsonResponse(detailJson));
+      when(
+        () => dio.get<Map<String, dynamic>>(any()),
+      ).thenAnswer((_) async => jsonResponse(detailJson));
 
       final detail = await api.getSubject(400602);
 
@@ -66,50 +75,86 @@ void main() {
 
   group('updateCollection', () {
     test('PATCHes only collectionType when selfRating is omitted', () async {
-      when(() => dio.patch<void>(any(), data: any(named: 'data')))
-          .thenAnswer((_) async => Response(requestOptions: RequestOptions(path: '/'), statusCode: 200));
+      when(() => dio.patch<void>(any(), data: any(named: 'data'))).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: '/'),
+          statusCode: 200,
+        ),
+      );
 
       await api.updateCollection(400602, collectionType: CollectionType.doing);
 
-      verify(() => dio.patch<void>(
-            '/v2/subjects/400602',
-            data: {'collectionType': 'DOING'},
-          )).called(1);
+      verify(
+        () => dio.patch<void>(
+          '/v2/subjects/400602',
+          data: {'collectionType': 'DOING'},
+        ),
+      ).called(1);
     });
 
     test('PATCHes only selfRating when collectionType is omitted', () async {
-      when(() => dio.patch<void>(any(), data: any(named: 'data')))
-          .thenAnswer((_) async => Response(requestOptions: RequestOptions(path: '/'), statusCode: 200));
+      when(() => dio.patch<void>(any(), data: any(named: 'data'))).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: '/'),
+          statusCode: 200,
+        ),
+      );
 
-      const rating = SelfRating(score: 8, tags: [], isPrivate: false, comment: '好看');
+      const rating = SelfRating(
+        score: 8,
+        tags: [],
+        isPrivate: false,
+        comment: '好看',
+      );
 
       await api.updateCollection(400602, selfRating: rating);
 
-      verify(() => dio.patch<void>(
-            '/v2/subjects/400602',
-            data: {'selfRating': rating.toJson()},
-          )).called(1);
+      verify(
+        () => dio.patch<void>(
+          '/v2/subjects/400602',
+          data: {'selfRating': rating.toJson()},
+        ),
+      ).called(1);
     });
 
     test('PATCHes both fields together when both are given', () async {
-      when(() => dio.patch<void>(any(), data: any(named: 'data')))
-          .thenAnswer((_) async => Response(requestOptions: RequestOptions(path: '/'), statusCode: 200));
+      when(() => dio.patch<void>(any(), data: any(named: 'data'))).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: '/'),
+          statusCode: 200,
+        ),
+      );
 
-      const rating = SelfRating(score: 9, tags: [], isPrivate: true, comment: null);
+      const rating = SelfRating(
+        score: 9,
+        tags: [],
+        isPrivate: true,
+        comment: null,
+      );
 
-      await api.updateCollection(400602, collectionType: CollectionType.done, selfRating: rating);
+      await api.updateCollection(
+        400602,
+        collectionType: CollectionType.done,
+        selfRating: rating,
+      );
 
-      verify(() => dio.patch<void>(
-            '/v2/subjects/400602',
-            data: {'collectionType': 'DONE', 'selfRating': rating.toJson()},
-          )).called(1);
+      verify(
+        () => dio.patch<void>(
+          '/v2/subjects/400602',
+          data: {'collectionType': 'DONE', 'selfRating': rating.toJson()},
+        ),
+      ).called(1);
     });
   });
 
   group('deleteCollection', () {
     test('DELETEs the exact subject path', () async {
-      when(() => dio.delete<void>(any()))
-          .thenAnswer((_) async => Response(requestOptions: RequestOptions(path: '/'), statusCode: 200));
+      when(() => dio.delete<void>(any())).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: '/'),
+          statusCode: 200,
+        ),
+      );
 
       await api.deleteCollection(400602);
 
@@ -119,25 +164,50 @@ void main() {
 
   group('getCharacters', () {
     test('GETs with withActors=true query param', () async {
-      when(() => dio.get<Map<String, dynamic>>(any(), queryParameters: any(named: 'queryParameters')))
-          .thenAnswer((_) async => jsonResponse({'items': <Map<String, dynamic>>[]}));
+      when(
+        () => dio.get<Map<String, dynamic>>(
+          any(),
+          queryParameters: any(named: 'queryParameters'),
+        ),
+      ).thenAnswer(
+        (_) async => jsonResponse({'items': <Map<String, dynamic>>[]}),
+      );
 
       await api.getCharacters(400602);
 
-      verify(() => dio.get<Map<String, dynamic>>(
-            '/v2/subjects/400602/characters',
-            queryParameters: {'withActors': true},
-          )).called(1);
+      verify(
+        () => dio.get<Map<String, dynamic>>(
+          '/v2/subjects/400602/characters',
+          queryParameters: {'withActors': true},
+        ),
+      ).called(1);
     });
 
     test('parses a list of related characters', () async {
-      when(() => dio.get<Map<String, dynamic>>(any(), queryParameters: any(named: 'queryParameters')))
-          .thenAnswer((_) async => jsonResponse({
-                'items': [
-                  {'index': 0, 'character': {'name': '芙莉莲', 'imageUrl': 'https://example.com/f.jpg'}, 'role': 1},
-                  {'index': 1, 'character': {'name': '费伦', 'imageUrl': null}, 'role': 2},
-                ],
-              }));
+      when(
+        () => dio.get<Map<String, dynamic>>(
+          any(),
+          queryParameters: any(named: 'queryParameters'),
+        ),
+      ).thenAnswer(
+        (_) async => jsonResponse({
+          'items': [
+            {
+              'index': 0,
+              'character': {
+                'name': '芙莉莲',
+                'imageUrl': 'https://example.com/f.jpg',
+              },
+              'role': 1,
+            },
+            {
+              'index': 1,
+              'character': {'name': '费伦', 'imageUrl': null},
+              'role': 2,
+            },
+          ],
+        }),
+      );
 
       final characters = await api.getCharacters(400602);
 
@@ -147,8 +217,14 @@ void main() {
     });
 
     test('returns an empty list when the response has no items', () async {
-      when(() => dio.get<Map<String, dynamic>>(any(), queryParameters: any(named: 'queryParameters')))
-          .thenAnswer((_) async => jsonResponse({'items': <Map<String, dynamic>>[]}));
+      when(
+        () => dio.get<Map<String, dynamic>>(
+          any(),
+          queryParameters: any(named: 'queryParameters'),
+        ),
+      ).thenAnswer(
+        (_) async => jsonResponse({'items': <Map<String, dynamic>>[]}),
+      );
 
       expect(await api.getCharacters(400602), isEmpty);
     });
@@ -156,21 +232,29 @@ void main() {
 
   group('getStaff', () {
     test('GETs the exact staff path', () async {
-      when(() => dio.get<Map<String, dynamic>>(any()))
-          .thenAnswer((_) async => jsonResponse({'items': <Map<String, dynamic>>[]}));
+      when(() => dio.get<Map<String, dynamic>>(any())).thenAnswer(
+        (_) async => jsonResponse({'items': <Map<String, dynamic>>[]}),
+      );
 
       await api.getStaff(400602);
 
-      verify(() => dio.get<Map<String, dynamic>>('/v2/subjects/400602/staff')).called(1);
+      verify(
+        () => dio.get<Map<String, dynamic>>('/v2/subjects/400602/staff'),
+      ).called(1);
     });
 
     test('parses a list of staff members', () async {
-      when(() => dio.get<Map<String, dynamic>>(any()))
-          .thenAnswer((_) async => jsonResponse({
-                'items': [
-                  {'name': '渡边步', 'imageUrl': 'https://example.com/s.jpg', 'role': '导演'},
-                ],
-              }));
+      when(() => dio.get<Map<String, dynamic>>(any())).thenAnswer(
+        (_) async => jsonResponse({
+          'items': [
+            {
+              'name': '渡边步',
+              'imageUrl': 'https://example.com/s.jpg',
+              'role': '导演',
+            },
+          ],
+        }),
+      );
 
       final staff = await api.getStaff(400602);
 
@@ -181,38 +265,74 @@ void main() {
   });
 
   group('getMyCollections', () {
-    test('GETs with type/offset/limit query params when type is given', () async {
-      when(() => dio.get<Map<String, dynamic>>(any(), queryParameters: any(named: 'queryParameters')))
-          .thenAnswer((_) async => jsonResponse({'items': <Map<String, dynamic>>[], 'total': 0}));
+    test(
+      'GETs with type/offset/limit query params when type is given',
+      () async {
+        when(
+          () => dio.get<Map<String, dynamic>>(
+            any(),
+            queryParameters: any(named: 'queryParameters'),
+          ),
+        ).thenAnswer(
+          (_) async =>
+              jsonResponse({'items': <Map<String, dynamic>>[], 'total': 0}),
+        );
 
-      await api.getMyCollections(type: CollectionType.doing, offset: 20, limit: 20);
+        await api.getMyCollections(
+          type: CollectionType.doing,
+          offset: 20,
+          limit: 20,
+        );
 
-      verify(() => dio.get<Map<String, dynamic>>(
+        verify(
+          () => dio.get<Map<String, dynamic>>(
             '/v2/subjects/list',
             queryParameters: {'type': 'DOING', 'offset': 20, 'limit': 20},
-          )).called(1);
-    });
+          ),
+        ).called(1);
+      },
+    );
 
     test('omits the type query param when type is null', () async {
-      when(() => dio.get<Map<String, dynamic>>(any(), queryParameters: any(named: 'queryParameters')))
-          .thenAnswer((_) async => jsonResponse({'items': <Map<String, dynamic>>[], 'total': 0}));
+      when(
+        () => dio.get<Map<String, dynamic>>(
+          any(),
+          queryParameters: any(named: 'queryParameters'),
+        ),
+      ).thenAnswer(
+        (_) async =>
+            jsonResponse({'items': <Map<String, dynamic>>[], 'total': 0}),
+      );
 
       await api.getMyCollections(offset: 0, limit: 20);
 
-      verify(() => dio.get<Map<String, dynamic>>(
-            '/v2/subjects/list',
-            queryParameters: {'offset': 0, 'limit': 20},
-          )).called(1);
+      verify(
+        () => dio.get<Map<String, dynamic>>(
+          '/v2/subjects/list',
+          queryParameters: {'offset': 0, 'limit': 20},
+        ),
+      ).called(1);
     });
 
     test('parses a paginated response', () async {
-      when(() => dio.get<Map<String, dynamic>>(any(), queryParameters: any(named: 'queryParameters')))
-          .thenAnswer((_) async => jsonResponse({
-                'items': [
-                  {'subjectId': 1, 'name': 'A', 'nameCn': 'A-cn', 'collectionType': 'DOING'},
-                ],
-                'total': 1,
-              }));
+      when(
+        () => dio.get<Map<String, dynamic>>(
+          any(),
+          queryParameters: any(named: 'queryParameters'),
+        ),
+      ).thenAnswer(
+        (_) async => jsonResponse({
+          'items': [
+            {
+              'subjectId': 1,
+              'name': 'A',
+              'nameCn': 'A-cn',
+              'collectionType': 'DOING',
+            },
+          ],
+          'total': 1,
+        }),
+      );
 
       final page = await api.getMyCollections(offset: 0, limit: 20);
 

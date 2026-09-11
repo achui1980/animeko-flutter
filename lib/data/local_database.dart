@@ -76,7 +76,13 @@ class SubjectImageCache extends Table {
 }
 
 @DriftDatabase(
-  tables: [Subjects, Episodes, SubjectCollections, SearchHistory, SubjectImageCache],
+  tables: [
+    Subjects,
+    Episodes,
+    SubjectCollections,
+    SearchHistory,
+    SubjectImageCache,
+  ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
@@ -91,15 +97,15 @@ class AppDatabase extends _$AppDatabase {
   /// of throwing.
   @override
   MigrationStrategy get migration => MigrationStrategy(
-        onUpgrade: (m, from, to) async {
-          if (from < 2) {
-            await m.createTable(subjectImageCache);
-          }
-        },
-        beforeOpen: (details) async {
-          await customStatement('PRAGMA foreign_keys = ON');
-        },
-      );
+    onUpgrade: (m, from, to) async {
+      if (from < 2) {
+        await m.createTable(subjectImageCache);
+      }
+    },
+    beforeOpen: (details) async {
+      await customStatement('PRAGMA foreign_keys = ON');
+    },
+  );
 
   static QueryExecutor _openConnection() {
     return LazyDatabase(() async {

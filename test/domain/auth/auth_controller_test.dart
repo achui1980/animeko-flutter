@@ -36,7 +36,11 @@ void main() {
     registerFallbackValue(
       const StoredSession(
         userId: '',
-        tokens: AniTokens(accessToken: '', refreshToken: '', expiresAtMillis: 0),
+        tokens: AniTokens(
+          accessToken: '',
+          refreshToken: '',
+          expiresAtMillis: 0,
+        ),
       ),
     );
   });
@@ -190,94 +194,131 @@ void main() {
     expect(container.read(authControllerProvider), isA<AuthUnauthenticated>());
   });
 
-  test('restoreSession authenticates immediately for an unexpired token', () async {
-    when(() => storage.readSession()).thenAnswer(
-      (_) async => StoredSession(
-        userId: 'user-3',
-        tokens: AniTokens(
-          accessToken: 'a',
-          refreshToken: 'r',
-          expiresAtMillis: DateTime.now().millisecondsSinceEpoch + const Duration(days: 1).inMilliseconds,
+  test(
+    'restoreSession authenticates immediately for an unexpired token',
+    () async {
+      when(() => storage.readSession()).thenAnswer(
+        (_) async => StoredSession(
+          userId: 'user-3',
+          tokens: AniTokens(
+            accessToken: 'a',
+            refreshToken: 'r',
+            expiresAtMillis:
+                DateTime.now().millisecondsSinceEpoch +
+                const Duration(days: 1).inMilliseconds,
+          ),
         ),
-      ),
-    );
+      );
 
-    final notifier = container.read(authControllerProvider.notifier);
-    await notifier.restoreSession();
+      final notifier = container.read(authControllerProvider.notifier);
+      await notifier.restoreSession();
 
-    final state = container.read(authControllerProvider);
-    expect(state, isA<AuthAuthenticated>());
-    expect((state as AuthAuthenticated).userId, 'user-3');
-    verifyNever(() => refresher.refresh(any()));
-  });
+      final state = container.read(authControllerProvider);
+      expect(state, isA<AuthAuthenticated>());
+      expect((state as AuthAuthenticated).userId, 'user-3');
+      verifyNever(() => refresher.refresh(any()));
+    },
+  );
 
-  test('restoreSession refreshes an expired token and authenticates on success', () async {
-    when(() => storage.readSession()).thenAnswer(
-      (_) async => const StoredSession(
-        userId: 'user-4',
-        tokens: AniTokens(accessToken: 'stale', refreshToken: 'r', expiresAtMillis: 1),
-      ),
-    );
-    when(() => refresher.refresh('r')).thenAnswer(
-      (_) async => const RefreshSuccess(
-        StoredSession(
+  test(
+    'restoreSession refreshes an expired token and authenticates on success',
+    () async {
+      when(() => storage.readSession()).thenAnswer(
+        (_) async => const StoredSession(
           userId: 'user-4',
-          tokens: AniTokens(accessToken: 'fresh', refreshToken: 'r2', expiresAtMillis: 999999999999),
+          tokens: AniTokens(
+            accessToken: 'stale',
+            refreshToken: 'r',
+            expiresAtMillis: 1,
+          ),
         ),
-      ),
-    );
-
-    final notifier = container.read(authControllerProvider.notifier);
-    await notifier.restoreSession();
-
-    final state = container.read(authControllerProvider);
-    expect(state, isA<AuthAuthenticated>());
-    expect((state as AuthAuthenticated).userId, 'user-4');
-  });
-
-  test('restoreSession refreshes a token inside the 5-minute safety margin', () async {
-    when(() => storage.readSession()).thenAnswer(
-      (_) async => StoredSession(
-        userId: 'user-6',
-        tokens: AniTokens(
-          accessToken: 'stale',
-          refreshToken: 'r',
-          expiresAtMillis: DateTime.now().millisecondsSinceEpoch + const Duration(minutes: 3).inMilliseconds,
+      );
+      when(() => refresher.refresh('r')).thenAnswer(
+        (_) async => const RefreshSuccess(
+          StoredSession(
+            userId: 'user-4',
+            tokens: AniTokens(
+              accessToken: 'fresh',
+              refreshToken: 'r2',
+              expiresAtMillis: 999999999999,
+            ),
+          ),
         ),
-      ),
-    );
-    when(() => refresher.refresh('r')).thenAnswer(
-      (_) async => const RefreshSuccess(
-        StoredSession(
+      );
+
+      final notifier = container.read(authControllerProvider.notifier);
+      await notifier.restoreSession();
+
+      final state = container.read(authControllerProvider);
+      expect(state, isA<AuthAuthenticated>());
+      expect((state as AuthAuthenticated).userId, 'user-4');
+    },
+  );
+
+  test(
+    'restoreSession refreshes a token inside the 5-minute safety margin',
+    () async {
+      when(() => storage.readSession()).thenAnswer(
+        (_) async => StoredSession(
           userId: 'user-6',
-          tokens: AniTokens(accessToken: 'fresh', refreshToken: 'r2', expiresAtMillis: 999999999999),
+          tokens: AniTokens(
+            accessToken: 'stale',
+            refreshToken: 'r',
+            expiresAtMillis:
+                DateTime.now().millisecondsSinceEpoch +
+                const Duration(minutes: 3).inMilliseconds,
+          ),
         ),
-      ),
-    );
+      );
+      when(() => refresher.refresh('r')).thenAnswer(
+        (_) async => const RefreshSuccess(
+          StoredSession(
+            userId: 'user-6',
+            tokens: AniTokens(
+              accessToken: 'fresh',
+              refreshToken: 'r2',
+              expiresAtMillis: 999999999999,
+            ),
+          ),
+        ),
+      );
 
-    final notifier = container.read(authControllerProvider.notifier);
-    await notifier.restoreSession();
+      final notifier = container.read(authControllerProvider.notifier);
+      await notifier.restoreSession();
 
-    verify(() => refresher.refresh('r')).called(1);
-    final state = container.read(authControllerProvider);
-    expect(state, isA<AuthAuthenticated>());
-    expect((state as AuthAuthenticated).userId, 'user-6');
-  });
+      verify(() => refresher.refresh('r')).called(1);
+      final state = container.read(authControllerProvider);
+      expect(state, isA<AuthAuthenticated>());
+      expect((state as AuthAuthenticated).userId, 'user-6');
+    },
+  );
 
-  test('restoreSession stays unauthenticated when refreshing an expired token fails', () async {
-    when(() => storage.readSession()).thenAnswer(
-      (_) async => const StoredSession(
-        userId: 'user-5',
-        tokens: AniTokens(accessToken: 'stale', refreshToken: 'r', expiresAtMillis: 1),
-      ),
-    );
-    when(() => refresher.refresh('r')).thenAnswer((_) async => const RefreshFailure(NetworkError()));
+  test(
+    'restoreSession stays unauthenticated when refreshing an expired token fails',
+    () async {
+      when(() => storage.readSession()).thenAnswer(
+        (_) async => const StoredSession(
+          userId: 'user-5',
+          tokens: AniTokens(
+            accessToken: 'stale',
+            refreshToken: 'r',
+            expiresAtMillis: 1,
+          ),
+        ),
+      );
+      when(
+        () => refresher.refresh('r'),
+      ).thenAnswer((_) async => const RefreshFailure(NetworkError()));
 
-    final notifier = container.read(authControllerProvider.notifier);
-    await notifier.restoreSession();
+      final notifier = container.read(authControllerProvider.notifier);
+      await notifier.restoreSession();
 
-    expect(container.read(authControllerProvider), isA<AuthUnauthenticated>());
-  });
+      expect(
+        container.read(authControllerProvider),
+        isA<AuthUnauthenticated>(),
+      );
+    },
+  );
 
   test(
     'restoreSession stays unauthenticated (and returns quickly) when refresh hangs '
@@ -286,7 +327,11 @@ void main() {
       when(() => storage.readSession()).thenAnswer(
         (_) async => const StoredSession(
           userId: 'user-7',
-          tokens: AniTokens(accessToken: 'stale', refreshToken: 'r', expiresAtMillis: 1),
+          tokens: AniTokens(
+            accessToken: 'stale',
+            refreshToken: 'r',
+            expiresAtMillis: 1,
+          ),
         ),
       );
       // Slower than the 3s startup timeout, but bounded so the test itself
@@ -297,7 +342,11 @@ void main() {
           () => const RefreshSuccess(
             StoredSession(
               userId: 'user-7',
-              tokens: AniTokens(accessToken: 'fresh', refreshToken: 'r2', expiresAtMillis: 999999999999),
+              tokens: AniTokens(
+                accessToken: 'fresh',
+                refreshToken: 'r2',
+                expiresAtMillis: 999999999999,
+              ),
             ),
           ),
         ),
@@ -311,7 +360,10 @@ void main() {
       // Proves the app-level timeout fired rather than the test just
       // eventually awaiting the mock's real 10s delayed result.
       expect(stopwatch.elapsed, lessThan(const Duration(seconds: 5)));
-      expect(container.read(authControllerProvider), isA<AuthUnauthenticated>());
+      expect(
+        container.read(authControllerProvider),
+        isA<AuthUnauthenticated>(),
+      );
     },
   );
 
@@ -323,7 +375,10 @@ void main() {
       await controller.signOut();
 
       verify(() => storage.clear()).called(1);
-      expect(container.read(authControllerProvider), const AuthUnauthenticated());
+      expect(
+        container.read(authControllerProvider),
+        const AuthUnauthenticated(),
+      );
     });
   });
 
@@ -331,12 +386,16 @@ void main() {
     test('returns true on RefreshSuccess without signing out', () async {
       final session = const StoredSession(
         userId: 'user-1',
-        tokens: AniTokens(accessToken: 'a', refreshToken: 'r', expiresAtMillis: 1),
+        tokens: AniTokens(
+          accessToken: 'a',
+          refreshToken: 'r',
+          expiresAtMillis: 1,
+        ),
       );
       when(() => storage.readSession()).thenAnswer((_) async => session);
-      when(() => refresher.refresh('r')).thenAnswer(
-        (_) async => RefreshSuccess(session),
-      );
+      when(
+        () => refresher.refresh('r'),
+      ).thenAnswer((_) async => RefreshSuccess(session));
 
       final result = await container
           .read(authControllerProvider.notifier)
@@ -346,42 +405,59 @@ void main() {
       verifyNever(() => storage.clear());
     });
 
-    test('signs out and returns false on RefreshFailure(AuthExpiredError)', () async {
-      final session = const StoredSession(
-        userId: 'user-1',
-        tokens: AniTokens(accessToken: 'a', refreshToken: 'r', expiresAtMillis: 1),
-      );
-      when(() => storage.readSession()).thenAnswer((_) async => session);
-      when(() => refresher.refresh('r')).thenAnswer(
-        (_) async => const RefreshFailure(AuthExpiredError()),
-      );
-      when(() => storage.clear()).thenAnswer((_) async {});
+    test(
+      'signs out and returns false on RefreshFailure(AuthExpiredError)',
+      () async {
+        final session = const StoredSession(
+          userId: 'user-1',
+          tokens: AniTokens(
+            accessToken: 'a',
+            refreshToken: 'r',
+            expiresAtMillis: 1,
+          ),
+        );
+        when(() => storage.readSession()).thenAnswer((_) async => session);
+        when(
+          () => refresher.refresh('r'),
+        ).thenAnswer((_) async => const RefreshFailure(AuthExpiredError()));
+        when(() => storage.clear()).thenAnswer((_) async {});
 
-      final controller = container.read(authControllerProvider.notifier);
-      final result = await controller.refreshSessionForInterceptor();
+        final controller = container.read(authControllerProvider.notifier);
+        final result = await controller.refreshSessionForInterceptor();
 
-      expect(result, isFalse);
-      verify(() => storage.clear()).called(1);
-      expect(container.read(authControllerProvider), const AuthUnauthenticated());
-    });
+        expect(result, isFalse);
+        verify(() => storage.clear()).called(1);
+        expect(
+          container.read(authControllerProvider),
+          const AuthUnauthenticated(),
+        );
+      },
+    );
 
-    test('returns false without signing out on RefreshFailure(NetworkError)', () async {
-      final session = const StoredSession(
-        userId: 'user-1',
-        tokens: AniTokens(accessToken: 'a', refreshToken: 'r', expiresAtMillis: 1),
-      );
-      when(() => storage.readSession()).thenAnswer((_) async => session);
-      when(() => refresher.refresh('r')).thenAnswer(
-        (_) async => const RefreshFailure(NetworkError()),
-      );
+    test(
+      'returns false without signing out on RefreshFailure(NetworkError)',
+      () async {
+        final session = const StoredSession(
+          userId: 'user-1',
+          tokens: AniTokens(
+            accessToken: 'a',
+            refreshToken: 'r',
+            expiresAtMillis: 1,
+          ),
+        );
+        when(() => storage.readSession()).thenAnswer((_) async => session);
+        when(
+          () => refresher.refresh('r'),
+        ).thenAnswer((_) async => const RefreshFailure(NetworkError()));
 
-      final result = await container
-          .read(authControllerProvider.notifier)
-          .refreshSessionForInterceptor();
+        final result = await container
+            .read(authControllerProvider.notifier)
+            .refreshSessionForInterceptor();
 
-      expect(result, isFalse);
-      verifyNever(() => storage.clear());
-    });
+        expect(result, isFalse);
+        verifyNever(() => storage.clear());
+      },
+    );
 
     test('returns false immediately when nothing is stored', () async {
       when(() => storage.readSession()).thenAnswer((_) async => null);

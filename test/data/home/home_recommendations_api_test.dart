@@ -34,21 +34,24 @@ void main() {
     api = HomeRecommendationsApi(dio);
   });
 
-  test('getRecommendations omits offset/limit query params when not given', () async {
-    when(
-      () => dio.get<Map<String, dynamic>>(
-        '/v2/home/recommendations',
-        queryParameters: {},
-      ),
-    ).thenAnswer((_) async => fixtureResponse());
+  test(
+    'getRecommendations omits offset/limit query params when not given',
+    () async {
+      when(
+        () => dio.get<Map<String, dynamic>>(
+          '/v2/home/recommendations',
+          queryParameters: {},
+        ),
+      ).thenAnswer((_) async => fixtureResponse());
 
-    final result = await api.getRecommendations();
+      final result = await api.getRecommendations();
 
-    expect(result.total, 1);
-    expect(result.items.single.subjectId, 7);
-    expect(result.items.single.subjectName, 'Test');
-    expect(result.items.single.subjectNameCn, '测试');
-  });
+      expect(result.total, 1);
+      expect(result.items.single.subjectId, 7);
+      expect(result.items.single.subjectName, 'Test');
+      expect(result.items.single.subjectNameCn, '测试');
+    },
+  );
 
   test('getRecommendations includes offset/limit when provided', () async {
     when(

@@ -32,7 +32,10 @@ class ScheduleScreen extends ConsumerWidget {
     final days = ref.watch(scheduleControllerProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Schedule'), actions: buildStandardActions(context)),
+      appBar: AppBar(
+        title: const Text('Schedule'),
+        actions: buildStandardActions(context),
+      ),
       body: days.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => ErrorRetryView(
@@ -57,12 +60,16 @@ class ScheduleScreen extends ConsumerWidget {
                       children: [
                         Text(
                           formatScheduleDate(day.date),
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
                         ),
-                        if (isToday) ...[const SizedBox(width: 8), const TagChip(label: '今天')],
+                        if (isToday) ...[
+                          const SizedBox(width: 8),
+                          const TagChip(label: '今天'),
+                        ],
                       ],
                     ),
                   ),

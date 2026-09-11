@@ -29,7 +29,9 @@ class _SubjectTagsRowState extends State<SubjectTagsRow> {
   Widget build(BuildContext context) {
     if (widget.tags.isEmpty) return const SizedBox.shrink();
     final overflowing = !_expanded && widget.tags.length > widget.maxVisible;
-    final visible = overflowing ? widget.tags.take(widget.maxVisible) : widget.tags;
+    final visible = overflowing
+        ? widget.tags.take(widget.maxVisible)
+        : widget.tags;
     return Wrap(
       spacing: 8,
       runSpacing: 8,
@@ -38,7 +40,9 @@ class _SubjectTagsRowState extends State<SubjectTagsRow> {
         if (overflowing)
           GestureDetector(
             onTap: () => setState(() => _expanded = true),
-            child: TagChip(label: '更多 +${widget.tags.length - widget.maxVisible}'),
+            child: TagChip(
+              label: '更多 +${widget.tags.length - widget.maxVisible}',
+            ),
           ),
       ],
     );

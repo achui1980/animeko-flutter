@@ -4,11 +4,15 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('SubjectBlurredHeader', () {
-    testWidgets('renders a blurred background and a sharp foreground cover', (tester) async {
+    testWidgets('renders a blurred background and a sharp foreground cover', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
-            body: SubjectBlurredHeader(imageUrl: 'https://example.com/cover.png'),
+            body: SubjectBlurredHeader(
+              imageUrl: 'https://example.com/cover.png',
+            ),
           ),
         ),
       );
@@ -24,7 +28,9 @@ void main() {
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
-            body: SubjectBlurredHeader(imageUrl: 'https://example.com/cover.png'),
+            body: SubjectBlurredHeader(
+              imageUrl: 'https://example.com/cover.png',
+            ),
           ),
         ),
       );
@@ -33,7 +39,9 @@ void main() {
       expect(size.height, SubjectBlurredHeader.height);
     });
 
-    testWidgets('renders the optional info slot next to the thumbnail', (tester) async {
+    testWidgets('renders the optional info slot next to the thumbnail', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(

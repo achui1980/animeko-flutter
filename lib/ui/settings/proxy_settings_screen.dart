@@ -12,7 +12,8 @@ class ProxySettingsScreen extends ConsumerStatefulWidget {
   const ProxySettingsScreen({super.key});
 
   @override
-  ConsumerState<ProxySettingsScreen> createState() => _ProxySettingsScreenState();
+  ConsumerState<ProxySettingsScreen> createState() =>
+      _ProxySettingsScreenState();
 }
 
 class _ProxySettingsScreenState extends ConsumerState<ProxySettingsScreen> {
@@ -38,11 +39,15 @@ class _ProxySettingsScreenState extends ConsumerState<ProxySettingsScreen> {
     if (trimmed.isEmpty) {
       await ref.read(proxySettingsControllerProvider.notifier).clearProxy();
     } else {
-      await ref.read(proxySettingsControllerProvider.notifier).setProxy(trimmed);
+      await ref
+          .read(proxySettingsControllerProvider.notifier)
+          .setProxy(trimmed);
     }
     if (mounted) setState(() => _errorText = null);
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已保存')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('已保存')));
     }
   }
 
@@ -51,7 +56,9 @@ class _ProxySettingsScreenState extends ConsumerState<ProxySettingsScreen> {
     await ref.read(proxySettingsControllerProvider.notifier).clearProxy();
     if (mounted) setState(() => _errorText = null);
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已清除代理')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('已清除代理')));
     }
   }
 

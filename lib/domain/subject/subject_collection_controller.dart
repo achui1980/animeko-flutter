@@ -14,16 +14,21 @@ part 'subject_collection_controller.g.dart';
 /// duplicate `getSubject` request) and then mutated locally as the user
 /// changes their collection status or rating.
 class SubjectCollectionState {
-  const SubjectCollectionState({required this.collectionType, required this.selfRating});
+  const SubjectCollectionState({
+    required this.collectionType,
+    required this.selfRating,
+  });
 
   final CollectionType? collectionType;
   final SelfRating selfRating;
 
-  SubjectCollectionState copyWith({CollectionType? collectionType, SelfRating? selfRating}) =>
-      SubjectCollectionState(
-        collectionType: collectionType ?? this.collectionType,
-        selfRating: selfRating ?? this.selfRating,
-      );
+  SubjectCollectionState copyWith({
+    CollectionType? collectionType,
+    SelfRating? selfRating,
+  }) => SubjectCollectionState(
+    collectionType: collectionType ?? this.collectionType,
+    selfRating: selfRating ?? this.selfRating,
+  );
 
   /// Distinct from [copyWith] -- passing `collectionType: null` there
   /// means "keep the current value" (a plain named param can't
@@ -37,8 +42,13 @@ class SubjectCollectionState {
 class SubjectCollectionController extends _$SubjectCollectionController {
   @override
   Future<SubjectCollectionState> build({required int subjectId}) async {
-    final detail = await ref.watch(subjectDetailControllerProvider(subjectId: subjectId).future);
-    return SubjectCollectionState(collectionType: detail.collectionType, selfRating: detail.selfRating);
+    final detail = await ref.watch(
+      subjectDetailControllerProvider(subjectId: subjectId).future,
+    );
+    return SubjectCollectionState(
+      collectionType: detail.collectionType,
+      selfRating: detail.selfRating,
+    );
   }
 
   /// Optimistically updates [state] to [type] before the `PATCH`
@@ -54,19 +64,26 @@ class SubjectCollectionController extends _$SubjectCollectionController {
   /// A failure to write the cache is swallowed -- it must never surface
   /// as a collection-update failure, since the remote update already
   /// succeeded by that point (design doc "风险与已知限制").
-  Future<void> setCollectionType(CollectionType type, {String? imageUrl}) async {
+  Future<void> setCollectionType(
+    CollectionType type, {
+    String? imageUrl,
+  }) async {
     final previous = state;
     final current = await future;
     state = AsyncData(current.copyWith(collectionType: type));
     try {
-      await ref.read(subjectApiProvider).updateCollection(subjectId, collectionType: type);
+      await ref
+          .read(subjectApiProvider)
+          .updateCollection(subjectId, collectionType: type);
     } catch (_) {
       state = previous;
       rethrow;
     }
     if (imageUrl != null) {
       try {
-        await ref.read(subjectImageCacheRepositoryProvider).save(subjectId, imageUrl);
+        await ref
+            .read(subjectImageCacheRepositoryProvider)
+            .save(subjectId, imageUrl);
       } catch (_) {
         // Best-effort local cache only -- never let this fail the
         // (already-succeeded) collection-status update.
@@ -99,7 +116,11 @@ class SubjectCollectionController extends _$SubjectCollectionController {
   /// whole `selfRating` object (replacing it wholesale server-side), so
   /// hardcoding an empty list here would silently wipe out tags set via
   /// another client.
-  Future<void> submitRating(int score, {String? comment, bool isPrivate = false}) async {
+  Future<void> submitRating(
+    int score, {
+    String? comment,
+    bool isPrivate = false,
+  }) async {
     if (score < 1 || score > 10) {
       throw ArgumentError.value(score, 'score', 'must be between 1 and 10');
     }
@@ -110,7 +131,9 @@ class SubjectCollectionController extends _$SubjectCollectionController {
       isPrivate: isPrivate,
       comment: comment,
     );
-    await ref.read(subjectApiProvider).updateCollection(subjectId, selfRating: rating);
+    await ref
+        .read(subjectApiProvider)
+        .updateCollection(subjectId, selfRating: rating);
     state = AsyncData(current.copyWith(selfRating: rating));
   }
 }

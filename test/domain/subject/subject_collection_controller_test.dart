@@ -11,7 +11,8 @@ import 'package:riverpod/riverpod.dart';
 
 class MockSubjectApi extends Mock implements SubjectApi {}
 
-class MockSubjectImageCacheRepository extends Mock implements SubjectImageCacheRepository {}
+class MockSubjectImageCacheRepository extends Mock
+    implements SubjectImageCacheRepository {}
 
 const _unratedSelfRating = SelfRating(score: 0, tags: [], isPrivate: false);
 
@@ -67,14 +68,17 @@ void main() {
   final provider = subjectCollectionControllerProvider(subjectId: 1);
 
   group('build', () {
-    test('reads the initial collectionType/selfRating from SubjectDetailController', () async {
-      when(() => api.getSubject(1)).thenAnswer((_) async => _detailCollected);
+    test(
+      'reads the initial collectionType/selfRating from SubjectDetailController',
+      () async {
+        when(() => api.getSubject(1)).thenAnswer((_) async => _detailCollected);
 
-      final result = await container.read(provider.future);
+        final result = await container.read(provider.future);
 
-      expect(result.collectionType, CollectionType.doing);
-      expect(result.selfRating.score, 0);
-    });
+        expect(result.collectionType, CollectionType.doing);
+        expect(result.selfRating.score, 0);
+      },
+    );
   });
 
   group('setCollectionType', () {
@@ -94,16 +98,22 @@ void main() {
       addTearDown(sub.close);
 
       final completer = Completer<void>();
-      when(() => api.updateCollection(1, collectionType: CollectionType.doing))
-          .thenAnswer((_) => completer.future);
+      when(
+        () => api.updateCollection(1, collectionType: CollectionType.doing),
+      ).thenAnswer((_) => completer.future);
 
-      final call = container.read(provider.notifier).setCollectionType(CollectionType.doing);
+      final call = container
+          .read(provider.notifier)
+          .setCollectionType(CollectionType.doing);
       // The optimistic `state = AsyncData(...)` assignment happens
       // synchronously before the `await api.updateCollection(...)` call --
       // give that a chance to run before asserting.
       await Future<void>.delayed(Duration.zero);
 
-      expect(container.read(provider).value!.collectionType, CollectionType.doing);
+      expect(
+        container.read(provider).value!.collectionType,
+        CollectionType.doing,
+      );
 
       completer.complete();
       await call;
@@ -113,11 +123,14 @@ void main() {
       when(() => api.getSubject(1)).thenAnswer((_) async => _detail);
       await container.read(provider.future);
 
-      when(() => api.updateCollection(1, collectionType: CollectionType.dropped))
-          .thenThrow(Exception('network error'));
+      when(
+        () => api.updateCollection(1, collectionType: CollectionType.dropped),
+      ).thenThrow(Exception('network error'));
 
       await expectLater(
-        container.read(provider.notifier).setCollectionType(CollectionType.dropped),
+        container
+            .read(provider.notifier)
+            .setCollectionType(CollectionType.dropped),
         throwsA(isA<Exception>()),
       );
 
@@ -126,79 +139,115 @@ void main() {
   });
 
   group('setCollectionType image cache', () {
-    test('saves the imageUrl to the local cache after a successful update', () async {
-      when(() => api.getSubject(1)).thenAnswer((_) async => _detail);
-      await container.read(provider.future);
+    test(
+      'saves the imageUrl to the local cache after a successful update',
+      () async {
+        when(() => api.getSubject(1)).thenAnswer((_) async => _detail);
+        await container.read(provider.future);
 
-      when(() => api.updateCollection(1, collectionType: CollectionType.doing))
-          .thenAnswer((_) async {});
-      when(() => imageCacheRepo.save(1, 'https://example.com/a.jpg'))
-          .thenAnswer((_) async {});
+        when(
+          () => api.updateCollection(1, collectionType: CollectionType.doing),
+        ).thenAnswer((_) async {});
+        when(
+          () => imageCacheRepo.save(1, 'https://example.com/a.jpg'),
+        ).thenAnswer((_) async {});
 
-      await container.read(provider.notifier).setCollectionType(
-            CollectionType.doing,
-            imageUrl: 'https://example.com/a.jpg',
-          );
+        await container
+            .read(provider.notifier)
+            .setCollectionType(
+              CollectionType.doing,
+              imageUrl: 'https://example.com/a.jpg',
+            );
 
-      verify(() => imageCacheRepo.save(1, 'https://example.com/a.jpg')).called(1);
-    });
+        verify(
+          () => imageCacheRepo.save(1, 'https://example.com/a.jpg'),
+        ).called(1);
+      },
+    );
 
-    test('does not touch the image cache when imageUrl is not provided', () async {
-      when(() => api.getSubject(1)).thenAnswer((_) async => _detail);
-      await container.read(provider.future);
+    test(
+      'does not touch the image cache when imageUrl is not provided',
+      () async {
+        when(() => api.getSubject(1)).thenAnswer((_) async => _detail);
+        await container.read(provider.future);
 
-      when(() => api.updateCollection(1, collectionType: CollectionType.doing))
-          .thenAnswer((_) async {});
+        when(
+          () => api.updateCollection(1, collectionType: CollectionType.doing),
+        ).thenAnswer((_) async {});
 
-      await container.read(provider.notifier).setCollectionType(CollectionType.doing);
+        await container
+            .read(provider.notifier)
+            .setCollectionType(CollectionType.doing);
 
-      verifyNever(() => imageCacheRepo.save(any(), any()));
-    });
+        verifyNever(() => imageCacheRepo.save(any(), any()));
+      },
+    );
 
-    test('does not fail setCollectionType when the image cache save throws', () async {
-      when(() => api.getSubject(1)).thenAnswer((_) async => _detail);
-      await container.read(provider.future);
+    test(
+      'does not fail setCollectionType when the image cache save throws',
+      () async {
+        when(() => api.getSubject(1)).thenAnswer((_) async => _detail);
+        await container.read(provider.future);
 
-      when(() => api.updateCollection(1, collectionType: CollectionType.doing))
-          .thenAnswer((_) async {});
-      when(() => imageCacheRepo.save(1, 'https://example.com/a.jpg'))
-          .thenThrow(Exception('disk full'));
+        when(
+          () => api.updateCollection(1, collectionType: CollectionType.doing),
+        ).thenAnswer((_) async {});
+        when(
+          () => imageCacheRepo.save(1, 'https://example.com/a.jpg'),
+        ).thenThrow(Exception('disk full'));
 
-      await container.read(provider.notifier).setCollectionType(
-            CollectionType.doing,
-            imageUrl: 'https://example.com/a.jpg',
-          );
+        await container
+            .read(provider.notifier)
+            .setCollectionType(
+              CollectionType.doing,
+              imageUrl: 'https://example.com/a.jpg',
+            );
 
-      expect(container.read(provider).value!.collectionType, CollectionType.doing);
-    });
+        expect(
+          container.read(provider).value!.collectionType,
+          CollectionType.doing,
+        );
+      },
+    );
   });
 
   group('removeFromCollection', () {
-    test('optimistically clears collectionType and calls deleteCollection', () async {
-      when(() => api.getSubject(1)).thenAnswer((_) async => _detailCollected);
-      await container.read(provider.future);
+    test(
+      'optimistically clears collectionType and calls deleteCollection',
+      () async {
+        when(() => api.getSubject(1)).thenAnswer((_) async => _detailCollected);
+        await container.read(provider.future);
 
-      when(() => api.deleteCollection(1)).thenAnswer((_) async {});
+        when(() => api.deleteCollection(1)).thenAnswer((_) async {});
 
-      await container.read(provider.notifier).removeFromCollection();
+        await container.read(provider.notifier).removeFromCollection();
 
-      expect(container.read(provider).value!.collectionType, isNull);
-      verify(() => api.deleteCollection(1)).called(1);
-    });
+        expect(container.read(provider).value!.collectionType, isNull);
+        verify(() => api.deleteCollection(1)).called(1);
+      },
+    );
 
-    test('rolls back to the previous collectionType when the DELETE fails', () async {
-      when(() => api.getSubject(1)).thenAnswer((_) async => _detailCollected);
-      await container.read(provider.future);
+    test(
+      'rolls back to the previous collectionType when the DELETE fails',
+      () async {
+        when(() => api.getSubject(1)).thenAnswer((_) async => _detailCollected);
+        await container.read(provider.future);
 
-      when(() => api.deleteCollection(1)).thenThrow(Exception('network error'));
+        when(
+          () => api.deleteCollection(1),
+        ).thenThrow(Exception('network error'));
 
-      await expectLater(
-        container.read(provider.notifier).removeFromCollection(),
-        throwsA(isA<Exception>()),
-      );
+        await expectLater(
+          container.read(provider.notifier).removeFromCollection(),
+          throwsA(isA<Exception>()),
+        );
 
-      expect(container.read(provider).value!.collectionType, CollectionType.doing);
-    });
+        expect(
+          container.read(provider).value!.collectionType,
+          CollectionType.doing,
+        );
+      },
+    );
   });
 
   group('submitRating', () {
@@ -206,17 +255,26 @@ void main() {
       when(() => api.getSubject(1)).thenAnswer((_) async => _detail);
       await container.read(provider.future);
 
-      await expectLater(container.read(provider.notifier).submitRating(0), throwsArgumentError);
-      await expectLater(container.read(provider.notifier).submitRating(11), throwsArgumentError);
-      verifyNever(() => api.updateCollection(any(), selfRating: any(named: 'selfRating')));
+      await expectLater(
+        container.read(provider.notifier).submitRating(0),
+        throwsArgumentError,
+      );
+      await expectLater(
+        container.read(provider.notifier).submitRating(11),
+        throwsArgumentError,
+      );
+      verifyNever(
+        () => api.updateCollection(any(), selfRating: any(named: 'selfRating')),
+      );
     });
 
     test('updates state only after the PATCH succeeds', () async {
       when(() => api.getSubject(1)).thenAnswer((_) async => _detail);
       await container.read(provider.future);
 
-      when(() => api.updateCollection(1, selfRating: any(named: 'selfRating')))
-          .thenAnswer((_) async {});
+      when(
+        () => api.updateCollection(1, selfRating: any(named: 'selfRating')),
+      ).thenAnswer((_) async {});
 
       await container.read(provider.notifier).submitRating(8, comment: '好看');
 
@@ -225,28 +283,34 @@ void main() {
       expect(result.selfRating.comment, '好看');
     });
 
-    test('preserves the existing non-empty tags instead of wiping them', () async {
-      when(() => api.getSubject(1)).thenAnswer((_) async => _detailWithTags);
-      await container.read(provider.future);
+    test(
+      'preserves the existing non-empty tags instead of wiping them',
+      () async {
+        when(() => api.getSubject(1)).thenAnswer((_) async => _detailWithTags);
+        await container.read(provider.future);
 
-      SelfRating? sentRating;
-      when(() => api.updateCollection(1, selfRating: any(named: 'selfRating'))).thenAnswer((invocation) async {
-        sentRating = invocation.namedArguments[#selfRating] as SelfRating;
-      });
+        SelfRating? sentRating;
+        when(
+          () => api.updateCollection(1, selfRating: any(named: 'selfRating')),
+        ).thenAnswer((invocation) async {
+          sentRating = invocation.namedArguments[#selfRating] as SelfRating;
+        });
 
-      await container.read(provider.notifier).submitRating(8, comment: '好看');
+        await container.read(provider.notifier).submitRating(8, comment: '好看');
 
-      expect(sentRating!.tags, ['神作', '完结撒花']);
-      final result = container.read(provider).value!;
-      expect(result.selfRating.tags, ['神作', '完结撒花']);
-    });
+        expect(sentRating!.tags, ['神作', '完结撒花']);
+        final result = container.read(provider).value!;
+        expect(result.selfRating.tags, ['神作', '完结撒花']);
+      },
+    );
 
     test('leaves state unchanged when the PATCH fails', () async {
       when(() => api.getSubject(1)).thenAnswer((_) async => _detail);
       await container.read(provider.future);
 
-      when(() => api.updateCollection(1, selfRating: any(named: 'selfRating')))
-          .thenThrow(Exception('network error'));
+      when(
+        () => api.updateCollection(1, selfRating: any(named: 'selfRating')),
+      ).thenThrow(Exception('network error'));
 
       await expectLater(
         container.read(provider.notifier).submitRating(8),

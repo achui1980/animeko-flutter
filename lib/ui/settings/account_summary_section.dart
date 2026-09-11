@@ -48,7 +48,10 @@ class AccountSummarySection extends ConsumerWidget {
           const SizedBox(height: 16),
           const Divider(),
           ListTile(
-            leading: Icon(Icons.logout, color: Theme.of(context).colorScheme.error),
+            leading: Icon(
+              Icons.logout,
+              color: Theme.of(context).colorScheme.error,
+            ),
             title: Text(
               '退出登录',
               style: TextStyle(color: Theme.of(context).colorScheme.error),

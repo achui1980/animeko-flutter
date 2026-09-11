@@ -53,10 +53,16 @@ class _MyCollectionScreenState extends ConsumerState<MyCollectionScreen> {
             padding: const EdgeInsets.all(8),
             child: SegmentedButton<CollectionType>(
               segments: CollectionType.values
-                  .map((type) => ButtonSegment(value: type, label: Text(_collectionLabels[type]!)))
+                  .map(
+                    (type) => ButtonSegment(
+                      value: type,
+                      label: Text(_collectionLabels[type]!),
+                    ),
+                  )
                   .toList(),
               selected: {_selected},
-              onSelectionChanged: (selection) => setState(() => _selected = selection.first),
+              onSelectionChanged: (selection) =>
+                  setState(() => _selected = selection.first),
             ),
           ),
           Expanded(
@@ -115,7 +121,9 @@ class _CollectionListState extends ConsumerState<_CollectionList> {
       _loadMoreFailed = false;
     });
     try {
-      await ref.read(myCollectionsControllerProvider(type: widget.type).notifier).loadMore();
+      await ref
+          .read(myCollectionsControllerProvider(type: widget.type).notifier)
+          .loadMore();
     } catch (_) {
       if (mounted) setState(() => _loadMoreFailed = true);
     } finally {
@@ -132,7 +140,9 @@ class _CollectionListState extends ConsumerState<_CollectionList> {
     return NotificationListener<ScrollEndNotification>(
       onNotification: (notification) {
         final metrics = notification.metrics;
-        if (widget.hasMore && !_loadingMore && metrics.pixels >= metrics.maxScrollExtent - 40) {
+        if (widget.hasMore &&
+            !_loadingMore &&
+            metrics.pixels >= metrics.maxScrollExtent - 40) {
           _loadMore();
         }
         return false;
@@ -143,7 +153,10 @@ class _CollectionListState extends ConsumerState<_CollectionList> {
           if (index == widget.subjects.length) {
             if (_loadMoreFailed) {
               return Center(
-                child: TextButton(onPressed: _loadMore, child: const Text('加载失败，点击重试')),
+                child: TextButton(
+                  onPressed: _loadMore,
+                  child: const Text('加载失败，点击重试'),
+                ),
               );
             }
             if (_loadingMore) {
@@ -167,7 +180,9 @@ class _CollectionListState extends ConsumerState<_CollectionList> {
                   imageUrl: card.imageUrl ?? '',
                   title: card.nameCn ?? card.name,
                   subtitle: _collectionLabels[widget.type] ?? '',
-                  onTap: widget.editMode ? null : () => openSubjectDetail(context, card),
+                  onTap: widget.editMode
+                      ? null
+                      : () => openSubjectDetail(context, card),
                 ),
                 if (widget.editMode)
                   Positioned(
@@ -213,7 +228,9 @@ class _StatusMenuButton extends ConsumerWidget {
           ..._collectionLabels.entries.map(
             (entry) => PopupMenuItem<String>(
               value: entry.key.name,
-              child: Text(entry.key == currentType ? '${entry.value} ✓' : entry.value),
+              child: Text(
+                entry.key == currentType ? '${entry.value} ✓' : entry.value,
+              ),
             ),
           ),
           const PopupMenuDivider(),

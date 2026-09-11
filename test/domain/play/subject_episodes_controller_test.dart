@@ -40,7 +40,9 @@ void main() {
       when(() => sourceA.id).thenReturn('a');
       when(() => sourceB.id).thenReturn('b');
       container = ProviderContainer(
-        overrides: [mediaSourcesProvider.overrideWithValue([sourceA, sourceB])],
+        overrides: [
+          mediaSourcesProvider.overrideWithValue([sourceA, sourceB]),
+        ],
         // See Task 7's precedent (Plan 1c) for why riverpod 3.x's default
         // retry must be disabled for tests that expect a thrown
         // exception to propagate immediately from a bare
@@ -51,53 +53,62 @@ void main() {
     });
 
     Future<List<MergedEpisode>> read() => container.read(
-          subjectEpisodesControllerProvider(subjectId: 1, subjectName: '目标番剧').future,
-        );
+      subjectEpisodesControllerProvider(
+        subjectId: 1,
+        subjectName: '目标番剧',
+      ).future,
+    );
 
     test('merges episodes from every source that finds a match', () async {
-      when(() => sourceA.search('目标番剧')).thenAnswer(
-        (_) async => [const _FakeCandidate('a', '目标番剧')],
-      );
-      when(() => sourceA.listEpisodes(any())).thenAnswer(
-        (_) async => [const _FakeEpisode('a', 'A的第1集')],
-      );
-      when(() => sourceB.search('目标番剧')).thenAnswer(
-        (_) async => [const _FakeCandidate('b', '目标番剧')],
-      );
-      when(() => sourceB.listEpisodes(any())).thenAnswer(
-        (_) async => [const _FakeEpisode('b', 'B的第1集')],
-      );
+      when(
+        () => sourceA.search('目标番剧'),
+      ).thenAnswer((_) async => [const _FakeCandidate('a', '目标番剧')]);
+      when(
+        () => sourceA.listEpisodes(any()),
+      ).thenAnswer((_) async => [const _FakeEpisode('a', 'A的第1集')]);
+      when(
+        () => sourceB.search('目标番剧'),
+      ).thenAnswer((_) async => [const _FakeCandidate('b', '目标番剧')]);
+      when(
+        () => sourceB.listEpisodes(any()),
+      ).thenAnswer((_) async => [const _FakeEpisode('b', 'B的第1集')]);
 
       final result = await read();
 
       expect(result.map((e) => e.sourceId), containsAll(['a', 'b']));
-      expect(result.map((e) => e.episode.title), containsAll(['A的第1集', 'B的第1集']));
+      expect(
+        result.map((e) => e.episode.title),
+        containsAll(['A的第1集', 'B的第1集']),
+      );
     });
 
-    test('silently ignores a source that finds no matching candidate', () async {
-      when(() => sourceA.search('目标番剧')).thenAnswer((_) async => []);
-      when(() => sourceB.search('目标番剧')).thenAnswer(
-        (_) async => [const _FakeCandidate('b', '目标番剧')],
-      );
-      when(() => sourceB.listEpisodes(any())).thenAnswer(
-        (_) async => [const _FakeEpisode('b', 'B的第1集')],
-      );
+    test(
+      'silently ignores a source that finds no matching candidate',
+      () async {
+        when(() => sourceA.search('目标番剧')).thenAnswer((_) async => []);
+        when(
+          () => sourceB.search('目标番剧'),
+        ).thenAnswer((_) async => [const _FakeCandidate('b', '目标番剧')]);
+        when(
+          () => sourceB.listEpisodes(any()),
+        ).thenAnswer((_) async => [const _FakeEpisode('b', 'B的第1集')]);
 
-      final result = await read();
+        final result = await read();
 
-      expect(result, hasLength(1));
-      expect(result.single.sourceId, 'b');
-      verifyNever(() => sourceA.listEpisodes(any()));
-    });
+        expect(result, hasLength(1));
+        expect(result.single.sourceId, 'b');
+        verifyNever(() => sourceA.listEpisodes(any()));
+      },
+    );
 
     test('silently ignores a source whose search throws', () async {
       when(() => sourceA.search('目标番剧')).thenThrow(Exception('network down'));
-      when(() => sourceB.search('目标番剧')).thenAnswer(
-        (_) async => [const _FakeCandidate('b', '目标番剧')],
-      );
-      when(() => sourceB.listEpisodes(any())).thenAnswer(
-        (_) async => [const _FakeEpisode('b', 'B的第1集')],
-      );
+      when(
+        () => sourceB.search('目标番剧'),
+      ).thenAnswer((_) async => [const _FakeCandidate('b', '目标番剧')]);
+      when(
+        () => sourceB.listEpisodes(any()),
+      ).thenAnswer((_) async => [const _FakeEpisode('b', 'B的第1集')]);
 
       final result = await read();
 
@@ -105,12 +116,15 @@ void main() {
       expect(result.single.sourceId, 'b');
     });
 
-    test('throws MediaNotFoundException when every source finds nothing', () async {
-      when(() => sourceA.search(any())).thenAnswer((_) async => []);
-      when(() => sourceB.search(any())).thenThrow(Exception('also down'));
+    test(
+      'throws MediaNotFoundException when every source finds nothing',
+      () async {
+        when(() => sourceA.search(any())).thenAnswer((_) async => []);
+        when(() => sourceB.search(any())).thenThrow(Exception('also down'));
 
-      await expectLater(read(), throwsA(isA<MediaNotFoundException>()));
-    });
+        await expectLater(read(), throwsA(isA<MediaNotFoundException>()));
+      },
+    );
 
     test('queries all sources concurrently, not sequentially', () async {
       final order = <String>[];

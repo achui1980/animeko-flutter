@@ -37,7 +37,8 @@ class SelfUser {
   final String? clientVersion;
   final String? bangumiUsername;
 
-  factory SelfUser.fromJson(Map<String, dynamic> json) => _$SelfUserFromJson(json);
+  factory SelfUser.fromJson(Map<String, dynamic> json) =>
+      _$SelfUserFromJson(json);
 
   Map<String, dynamic> toJson() => _$SelfUserToJson(this);
 }

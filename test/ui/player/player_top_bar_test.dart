@@ -4,9 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('shows the title and triggers callbacks on tap', (
-    tester,
-  ) async {
+  testWidgets('shows the title and triggers callbacks on tap', (tester) async {
     var backTapped = false;
     var screenshotTapped = false;
 
@@ -31,9 +29,7 @@ void main() {
     expect(screenshotTapped, isTrue);
   });
 
-  testWidgets('ellipsizes a long title instead of overflowing', (
-    tester,
-  ) async {
+  testWidgets('ellipsizes a long title instead of overflowing', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(

@@ -19,7 +19,9 @@ void main() {
     setUp(() {
       storage = MockSettingsStorage();
       container = ProviderContainer(
-        overrides: [settingsStorageProvider.overrideWith((ref) async => storage)],
+        overrides: [
+          settingsStorageProvider.overrideWith((ref) async => storage),
+        ],
       );
       addTearDown(container.dispose);
     });
@@ -30,11 +32,14 @@ void main() {
       expect(result, ThemeMode.dark);
     });
 
-    test('build defaults to ThemeMode.system when nothing is persisted', () async {
-      when(() => storage.getThemeMode()).thenReturn(null);
-      final result = await container.read(themeModeControllerProvider.future);
-      expect(result, ThemeMode.system);
-    });
+    test(
+      'build defaults to ThemeMode.system when nothing is persisted',
+      () async {
+        when(() => storage.getThemeMode()).thenReturn(null);
+        final result = await container.read(themeModeControllerProvider.future);
+        expect(result, ThemeMode.system);
+      },
+    );
 
     test('setThemeMode persists and updates state', () async {
       when(() => storage.getThemeMode()).thenReturn(null);

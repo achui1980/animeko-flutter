@@ -23,14 +23,17 @@ void main() {
       expect(result, {1: 'https://example.com/a.jpg'});
     });
 
-    test('upserts: a second save for the same subjectId overwrites the old value', () async {
-      await repository.save(1, 'https://example.com/old.jpg');
-      await repository.save(1, 'https://example.com/new.jpg');
+    test(
+      'upserts: a second save for the same subjectId overwrites the old value',
+      () async {
+        await repository.save(1, 'https://example.com/old.jpg');
+        await repository.save(1, 'https://example.com/new.jpg');
 
-      final result = await repository.getFor([1]);
+        final result = await repository.getFor([1]);
 
-      expect(result, {1: 'https://example.com/new.jpg'});
-    });
+        expect(result, {1: 'https://example.com/new.jpg'});
+      },
+    );
   });
 
   group('getFor', () {
@@ -48,10 +51,13 @@ void main() {
       expect(result, {1: 'https://example.com/a.jpg'});
     });
 
-    test('returns an empty map when none of the requested ids are cached', () async {
-      final result = await repository.getFor([99]);
+    test(
+      'returns an empty map when none of the requested ids are cached',
+      () async {
+        final result = await repository.getFor([99]);
 
-      expect(result, isEmpty);
-    });
+        expect(result, isEmpty);
+      },
+    );
   });
 }

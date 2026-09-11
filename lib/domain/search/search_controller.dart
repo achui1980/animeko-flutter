@@ -12,8 +12,7 @@ part 'search_controller.g.dart';
 /// Delay before firing a search after the last keystroke. Overridden to
 /// [Duration.zero] in tests so debounced searches run instantly.
 @riverpod
-Duration searchDebounceDuration(Ref ref) =>
-    const Duration(milliseconds: 400);
+Duration searchDebounceDuration(Ref ref) => const Duration(milliseconds: 400);
 
 @riverpod
 class SearchController extends _$SearchController {

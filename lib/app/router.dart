@@ -85,26 +85,48 @@ GoRouter appRouter(Ref ref) {
           );
         },
       ),
-      GoRoute(path: '/settings/proxy', builder: (context, state) => const ProxySettingsScreen()),
-      GoRoute(path: '/collection', builder: (context, state) => const MyCollectionScreen()),
+      GoRoute(
+        path: '/settings/proxy',
+        builder: (context, state) => const ProxySettingsScreen(),
+      ),
+      GoRoute(
+        path: '/collection',
+        builder: (context, state) => const MyCollectionScreen(),
+      ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
             MainShell(navigationShell: navigationShell),
         branches: [
           StatefulShellBranch(
-            routes: [GoRoute(path: '/home', builder: (context, state) => const HomeScreen())],
-          ),
-          StatefulShellBranch(
-            routes: [GoRoute(path: '/search', builder: (context, state) => const SearchScreen())],
-          ),
-          StatefulShellBranch(
             routes: [
-              GoRoute(path: '/schedule', builder: (context, state) => const ScheduleScreen()),
+              GoRoute(
+                path: '/home',
+                builder: (context, state) => const HomeScreen(),
+              ),
             ],
           ),
           StatefulShellBranch(
             routes: [
-              GoRoute(path: '/settings', builder: (context, state) => const SettingsScreen()),
+              GoRoute(
+                path: '/search',
+                builder: (context, state) => const SearchScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/schedule',
+                builder: (context, state) => const ScheduleScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/settings',
+                builder: (context, state) => const SettingsScreen(),
+              ),
             ],
           ),
         ],

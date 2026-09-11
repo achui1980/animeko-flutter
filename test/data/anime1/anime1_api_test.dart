@@ -53,7 +53,11 @@ void main() {
 
     test('sends the title as the "s" query param', () async {
       when(
-        () => dio.get<String>(any(), queryParameters: any(named: 'queryParameters'), options: any(named: 'options')),
+        () => dio.get<String>(
+          any(),
+          queryParameters: any(named: 'queryParameters'),
+          options: any(named: 'options'),
+        ),
       ).thenAnswer((_) async => htmlResponse(searchResultsHtml));
 
       await api.searchCategories('葬送的芙莉蓮');
@@ -67,45 +71,68 @@ void main() {
       ).called(1);
     });
 
-    test('extracts and dedupes rel="category tag" links, ignoring other links', () async {
-      when(
-        () => dio.get<String>(any(), queryParameters: any(named: 'queryParameters'), options: any(named: 'options')),
-      ).thenAnswer((_) async => htmlResponse(searchResultsHtml));
+    test(
+      'extracts and dedupes rel="category tag" links, ignoring other links',
+      () async {
+        when(
+          () => dio.get<String>(
+            any(),
+            queryParameters: any(named: 'queryParameters'),
+            options: any(named: 'options'),
+          ),
+        ).thenAnswer((_) async => htmlResponse(searchResultsHtml));
 
-      final categories = await api.searchCategories('葬送的芙莉蓮');
+        final categories = await api.searchCategories('葬送的芙莉蓮');
 
-      expect(categories, hasLength(1));
-      expect(categories.single.id, 87);
-      expect(categories.single.title, '葬送的芙莉蓮');
-    });
+        expect(categories, hasLength(1));
+        expect(categories.single.id, 87);
+        expect(categories.single.title, '葬送的芙莉蓮');
+      },
+    );
 
-    test('returns an empty list when there are no category-tag links', () async {
-      when(
-        () => dio.get<String>(any(), queryParameters: any(named: 'queryParameters'), options: any(named: 'options')),
-      ).thenAnswer((_) async => htmlResponse('<html><body>no results</body></html>'));
+    test(
+      'returns an empty list when there are no category-tag links',
+      () async {
+        when(
+          () => dio.get<String>(
+            any(),
+            queryParameters: any(named: 'queryParameters'),
+            options: any(named: 'options'),
+          ),
+        ).thenAnswer(
+          (_) async => htmlResponse('<html><body>no results</body></html>'),
+        );
 
-      final categories = await api.searchCategories('nonexistent');
+        final categories = await api.searchCategories('nonexistent');
 
-      expect(categories, isEmpty);
-    });
+        expect(categories, isEmpty);
+      },
+    );
 
-    test('skips a category-tag link whose enclosing article has no numeric category-N class', () async {
-      when(
-        () => dio.get<String>(any(), queryParameters: any(named: 'queryParameters'), options: any(named: 'options')),
-      ).thenAnswer(
-        (_) async => htmlResponse('''
+    test(
+      'skips a category-tag link whose enclosing article has no numeric category-N class',
+      () async {
+        when(
+          () => dio.get<String>(
+            any(),
+            queryParameters: any(named: 'queryParameters'),
+            options: any(named: 'options'),
+          ),
+        ).thenAnswer(
+          (_) async => htmlResponse('''
 <html><body>
   <article id="post-1" class="post-1 post type-post status-publish format-standard hentry">
     <footer><span class="cat-links"><a href="https://anime1.me/category/no-id-here" rel="category tag">缺少分類編號</a></span></footer>
   </article>
 </body></html>
 '''),
-      );
+        );
 
-      final categories = await api.searchCategories('anything');
+        final categories = await api.searchCategories('anything');
 
-      expect(categories, isEmpty);
-    });
+        expect(categories, isEmpty);
+      },
+    );
   });
 
   group('fetchCategoryEpisodes', () {
@@ -132,18 +159,23 @@ void main() {
       await api.fetchCategoryEpisodes(87);
 
       verify(
-        () => dio.get<String>('https://anime1.me/?cat=87', options: any(named: 'options')),
+        () => dio.get<String>(
+          'https://anime1.me/?cat=87',
+          options: any(named: 'options'),
+        ),
       ).called(1);
     });
 
     test('parses episode title and page URL from each article', () async {
       when(
         () => dio.get<String>(any(), options: any(named: 'options')),
-      ).thenAnswer((_) async => htmlResponse('''
+      ).thenAnswer(
+        (_) async => htmlResponse('''
 <html><body>
   <article><h2 class="entry-title"><a href="https://anime1.me/?p=1001">葬送的芙莉蓮 [12]</a></h2></article>
 </body></html>
-'''));
+'''),
+      );
 
       final episodes = await api.fetchCategoryEpisodes(87);
 
@@ -153,10 +185,18 @@ void main() {
     });
 
     test('follows pagination via "next page-numbers" links', () async {
-      when(() => dio.get<String>('https://anime1.me/?cat=87', options: any(named: 'options')))
-          .thenAnswer((_) async => htmlResponse(page1Html));
-      when(() => dio.get<String>('https://anime1.me/page/2/?cat=87', options: any(named: 'options')))
-          .thenAnswer((_) async => htmlResponse(page2Html));
+      when(
+        () => dio.get<String>(
+          'https://anime1.me/?cat=87',
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer((_) async => htmlResponse(page1Html));
+      when(
+        () => dio.get<String>(
+          'https://anime1.me/page/2/?cat=87',
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer((_) async => htmlResponse(page2Html));
 
       final episodes = await api.fetchCategoryEpisodes(87);
 
@@ -174,7 +214,9 @@ void main() {
 
       await api.fetchCategoryEpisodes(87);
 
-      verify(() => dio.get<String>(any(), options: any(named: 'options'))).called(1);
+      verify(
+        () => dio.get<String>(any(), options: any(named: 'options')),
+      ).called(1);
     });
   });
 
@@ -203,83 +245,112 @@ void main() {
       );
     }
 
-    test('extracts data-apireq, decodes it, and POSTs it as form field "d"', () async {
-      when(
-        () => dio.get<String>(any(), options: any(named: 'options')),
-      ).thenAnswer((_) async => htmlResponse(episodePageHtml));
-      when(
-        () => dio.post<Map<String, dynamic>>(
-          any(),
-          data: any(named: 'data'),
-          options: any(named: 'options'),
-        ),
-      ).thenAnswer((_) async => apiJsonResponse({
+    test(
+      'extracts data-apireq, decodes it, and POSTs it as form field "d"',
+      () async {
+        when(
+          () => dio.get<String>(any(), options: any(named: 'options')),
+        ).thenAnswer((_) async => htmlResponse(episodePageHtml));
+        when(
+          () => dio.post<Map<String, dynamic>>(
+            any(),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).thenAnswer(
+          (_) async => apiJsonResponse({
             's': [
-              {'src': 'https://video.example.com/720p.mp4', 'type': 'video/mp4'},
+              {
+                'src': 'https://video.example.com/720p.mp4',
+                'type': 'video/mp4',
+              },
             ],
-          }));
+          }),
+        );
 
-      await api.resolvePlaybackUrl('https://anime1.me/?p=1001');
+        await api.resolvePlaybackUrl('https://anime1.me/?p=1001');
 
-      verify(
-        () => dio.post<Map<String, dynamic>>(
-          'https://v.anime1.me/api',
-          data: {'d': '{"foo":"bar"}'},
-          options: any(named: 'options'),
-        ),
-      ).called(1);
-    });
+        verify(
+          () => dio.post<Map<String, dynamic>>(
+            'https://v.anime1.me/api',
+            data: {'d': '{"foo":"bar"}'},
+            options: any(named: 'options'),
+          ),
+        ).called(1);
+      },
+    );
 
-    test('returns the parsed Anime1PlaybackSource from the API response', () async {
-      when(
-        () => dio.get<String>(any(), options: any(named: 'options')),
-      ).thenAnswer((_) async => htmlResponse(episodePageHtml));
-      when(
-        () => dio.post<Map<String, dynamic>>(
-          any(),
-          data: any(named: 'data'),
-          options: any(named: 'options'),
-        ),
-      ).thenAnswer((_) async => apiJsonResponse({
+    test(
+      'returns the parsed Anime1PlaybackSource from the API response',
+      () async {
+        when(
+          () => dio.get<String>(any(), options: any(named: 'options')),
+        ).thenAnswer((_) async => htmlResponse(episodePageHtml));
+        when(
+          () => dio.post<Map<String, dynamic>>(
+            any(),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).thenAnswer(
+          (_) async => apiJsonResponse({
             's': [
-              {'src': 'https://video.example.com/720p.mp4', 'type': 'video/mp4'},
+              {
+                'src': 'https://video.example.com/720p.mp4',
+                'type': 'video/mp4',
+              },
             ],
-          }));
+          }),
+        );
 
-      final source = await api.resolvePlaybackUrl('https://anime1.me/?p=1001');
+        final source = await api.resolvePlaybackUrl(
+          'https://anime1.me/?p=1001',
+        );
 
-      expect(source.url, 'https://video.example.com/720p.mp4');
-    });
+        expect(source.url, 'https://video.example.com/720p.mp4');
+      },
+    );
 
-    test('throws FormatException when the page has no data-apireq attribute', () async {
-      when(
-        () => dio.get<String>(any(), options: any(named: 'options')),
-      ).thenAnswer((_) async => htmlResponse('<html><body>no video here</body></html>'));
+    test(
+      'throws FormatException when the page has no data-apireq attribute',
+      () async {
+        when(
+          () => dio.get<String>(any(), options: any(named: 'options')),
+        ).thenAnswer(
+          (_) async => htmlResponse('<html><body>no video here</body></html>'),
+        );
 
-      expect(
-        () => api.resolvePlaybackUrl('https://anime1.me/?p=1001'),
-        throwsFormatException,
-      );
-    });
+        expect(
+          () => api.resolvePlaybackUrl('https://anime1.me/?p=1001'),
+          throwsFormatException,
+        );
+      },
+    );
 
-    test('forwards the API response\'s Set-Cookie values as a Cookie header', () async {
-      // Verified against the live site (2026-09-01): the video CDN
-      // returns 403 without these access-token cookies, regardless of
-      // the Referer header. See Anime1Api.resolvePlaybackUrl's doc
-      // comment.
-      when(
-        () => dio.get<String>(any(), options: any(named: 'options')),
-      ).thenAnswer((_) async => htmlResponse(episodePageHtml));
-      when(
-        () => dio.post<Map<String, dynamic>>(
-          any(),
-          data: any(named: 'data'),
-          options: any(named: 'options'),
-        ),
-      ).thenAnswer((_) async => apiJsonResponse(
+    test(
+      'forwards the API response\'s Set-Cookie values as a Cookie header',
+      () async {
+        // Verified against the live site (2026-09-01): the video CDN
+        // returns 403 without these access-token cookies, regardless of
+        // the Referer header. See Anime1Api.resolvePlaybackUrl's doc
+        // comment.
+        when(
+          () => dio.get<String>(any(), options: any(named: 'options')),
+        ).thenAnswer((_) async => htmlResponse(episodePageHtml));
+        when(
+          () => dio.post<Map<String, dynamic>>(
+            any(),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).thenAnswer(
+          (_) async => apiJsonResponse(
             {
               's': [
-                {'src': 'https://video.example.com/720p.mp4', 'type': 'video/mp4'},
+                {
+                  'src': 'https://video.example.com/720p.mp4',
+                  'type': 'video/mp4',
+                },
               ],
             },
             setCookies: [
@@ -287,38 +358,52 @@ void main() {
               'p=eyJpc3MiOiJhbmltZTEubWUi; expires=Tue, 01 Sep 2026 18:49:36 GMT; path=/1468/8b.mp4; domain=.v.anime1.me; secure; HttpOnly',
               'h=SMz56lgMOr86XgcDjpQQ9Q; expires=Tue, 01 Sep 2026 18:49:36 GMT; path=/1468/8b.mp4; domain=.v.anime1.me; secure; HttpOnly',
             ],
-          ));
+          ),
+        );
 
-      final source = await api.resolvePlaybackUrl('https://anime1.me/?p=1001');
+        final source = await api.resolvePlaybackUrl(
+          'https://anime1.me/?p=1001',
+        );
 
-      expect(source.headers['Referer'], 'https://anime1.me');
-      expect(
-        source.headers['Cookie'],
-        'e=1788288576; p=eyJpc3MiOiJhbmltZTEubWUi; h=SMz56lgMOr86XgcDjpQQ9Q',
-      );
-    });
+        expect(source.headers['Referer'], 'https://anime1.me');
+        expect(
+          source.headers['Cookie'],
+          'e=1788288576; p=eyJpc3MiOiJhbmltZTEubWUi; h=SMz56lgMOr86XgcDjpQQ9Q',
+        );
+      },
+    );
 
-    test('omits the Cookie header when the API response has no Set-Cookie', () async {
-      when(
-        () => dio.get<String>(any(), options: any(named: 'options')),
-      ).thenAnswer((_) async => htmlResponse(episodePageHtml));
-      when(
-        () => dio.post<Map<String, dynamic>>(
-          any(),
-          data: any(named: 'data'),
-          options: any(named: 'options'),
-        ),
-      ).thenAnswer((_) async => apiJsonResponse({
+    test(
+      'omits the Cookie header when the API response has no Set-Cookie',
+      () async {
+        when(
+          () => dio.get<String>(any(), options: any(named: 'options')),
+        ).thenAnswer((_) async => htmlResponse(episodePageHtml));
+        when(
+          () => dio.post<Map<String, dynamic>>(
+            any(),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).thenAnswer(
+          (_) async => apiJsonResponse({
             's': [
-              {'src': 'https://video.example.com/720p.mp4', 'type': 'video/mp4'},
+              {
+                'src': 'https://video.example.com/720p.mp4',
+                'type': 'video/mp4',
+              },
             ],
-          }));
+          }),
+        );
 
-      final source = await api.resolvePlaybackUrl('https://anime1.me/?p=1001');
+        final source = await api.resolvePlaybackUrl(
+          'https://anime1.me/?p=1001',
+        );
 
-      expect(source.headers['Referer'], 'https://anime1.me');
-      expect(source.headers.containsKey('Cookie'), isFalse);
-    });
+        expect(source.headers['Referer'], 'https://anime1.me');
+        expect(source.headers.containsKey('Cookie'), isFalse);
+      },
+    );
   });
 
   test('anime1ApiProvider builds an Anime1Api backed by anime1DioProvider', () {

@@ -16,21 +16,26 @@ void main() {
     expect(find.text('还没有收藏任何番剧'), findsOneWidget);
   });
 
-  testWidgets('EmptyView defaults to Icons.inbox_outlined when no icon is given', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      const MaterialApp(home: Scaffold(body: EmptyView(message: '没有数据'))),
-    );
+  testWidgets(
+    'EmptyView defaults to Icons.inbox_outlined when no icon is given',
+    (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(body: EmptyView(message: '没有数据')),
+        ),
+      );
 
-    expect(find.byIcon(Icons.inbox_outlined), findsOneWidget);
-  });
+      expect(find.byIcon(Icons.inbox_outlined), findsOneWidget);
+    },
+  );
 
   testWidgets('EmptyView wraps the icon in a circular tonal badge', (
     tester,
   ) async {
     await tester.pumpWidget(
-      const MaterialApp(home: Scaffold(body: EmptyView(message: '没有数据'))),
+      const MaterialApp(
+        home: Scaffold(body: EmptyView(message: '没有数据')),
+      ),
     );
 
     final badge = tester.widget<Container>(

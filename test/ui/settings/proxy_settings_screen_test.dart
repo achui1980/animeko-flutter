@@ -32,7 +32,9 @@ Widget _wrap(ProxySettingsController fake) {
 }
 
 void main() {
-  testWidgets('shows the persisted proxy URL and saves a new one', (tester) async {
+  testWidgets('shows the persisted proxy URL and saves a new one', (
+    tester,
+  ) async {
     final fake = _FakeProxySettingsController('http://127.0.0.1:2222');
     await tester.pumpWidget(_wrap(fake));
     await tester.pumpAndSettle();

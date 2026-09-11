@@ -14,20 +14,26 @@ void main() {
     setUp(() {
       storage = MockSettingsStorage();
       container = ProviderContainer(
-        overrides: [settingsStorageProvider.overrideWith((ref) async => storage)],
+        overrides: [
+          settingsStorageProvider.overrideWith((ref) async => storage),
+        ],
       );
       addTearDown(container.dispose);
     });
 
     test('build reads the persisted value', () async {
       when(() => storage.getUseDynamicColor()).thenReturn(true);
-      final result = await container.read(dynamicColorControllerProvider.future);
+      final result = await container.read(
+        dynamicColorControllerProvider.future,
+      );
       expect(result, true);
     });
 
     test('build defaults to false when nothing is persisted', () async {
       when(() => storage.getUseDynamicColor()).thenReturn(false);
-      final result = await container.read(dynamicColorControllerProvider.future);
+      final result = await container.read(
+        dynamicColorControllerProvider.future,
+      );
       expect(result, false);
     });
 

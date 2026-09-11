@@ -6,7 +6,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('SubjectTagsRow', () {
-    testWidgets('renders a TagChip per tag with "name count" labels', (tester) async {
+    testWidgets('renders a TagChip per tag with "name count" labels', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
@@ -27,16 +29,22 @@ void main() {
 
     testWidgets('renders nothing when there are no tags', (tester) async {
       await tester.pumpWidget(
-        const MaterialApp(home: Scaffold(body: SubjectTagsRow(tags: []))),
+        const MaterialApp(
+          home: Scaffold(body: SubjectTagsRow(tags: [])),
+        ),
       );
 
       expect(find.byType(TagChip), findsNothing);
     });
 
-    testWidgets('caps visible tags at maxVisible and shows a 更多 chip', (tester) async {
+    testWidgets('caps visible tags at maxVisible and shows a 更多 chip', (
+      tester,
+    ) async {
       final tags = List.generate(5, (i) => SubjectTag(name: 'tag$i', count: i));
       await tester.pumpWidget(
-        MaterialApp(home: Scaffold(body: SubjectTagsRow(tags: tags, maxVisible: 3))),
+        MaterialApp(
+          home: Scaffold(body: SubjectTagsRow(tags: tags, maxVisible: 3)),
+        ),
       );
 
       expect(find.byType(TagChip), findsNWidgets(4)); // 3 visible + 1 "更多"
@@ -47,7 +55,9 @@ void main() {
     testWidgets('tapping 更多 reveals the remaining tags', (tester) async {
       final tags = List.generate(5, (i) => SubjectTag(name: 'tag$i', count: i));
       await tester.pumpWidget(
-        MaterialApp(home: Scaffold(body: SubjectTagsRow(tags: tags, maxVisible: 3))),
+        MaterialApp(
+          home: Scaffold(body: SubjectTagsRow(tags: tags, maxVisible: 3)),
+        ),
       );
 
       await tester.tap(find.text('更多 +2'));

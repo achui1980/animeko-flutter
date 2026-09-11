@@ -18,41 +18,57 @@ class _FakeScheduleController extends ScheduleController {
 
 Widget _wrap(List<ScheduleDay> days) {
   return ProviderScope(
-    overrides: [scheduleControllerProvider.overrideWith(() => _FakeScheduleController(days))],
+    overrides: [
+      scheduleControllerProvider.overrideWith(
+        () => _FakeScheduleController(days),
+      ),
+    ],
     child: const MaterialApp(home: ScheduleScreen()),
   );
 }
 
 void main() {
-  testWidgets('shows each day\'s subjects directly in a horizontal row, with no expand/collapse interaction', (
+  testWidgets(
+    'shows each day\'s subjects directly in a horizontal row, with no expand/collapse interaction',
+    (tester) async {
+      await tester.pumpWidget(
+        _wrap(const [
+          ScheduleDay(
+            date: '2024-01-01',
+            subjects: [
+              SubjectCard(
+                id: 1,
+                name: 'Foo',
+                imageUrl: 'https://example.com/1.png',
+              ),
+            ],
+          ),
+        ]),
+      );
+      await tester.pumpAndSettle();
+
+      // The item is already visible -- no tap/expand needed, and there must
+      // be no ExpansionTile left in the tree at all.
+      expect(find.byType(AnimeCoverCard), findsOneWidget);
+      expect(find.text('Foo'), findsOneWidget);
+      expect(find.byType(ExpansionTile), findsNothing);
+      expect(
+        tester.widget<ListView>(find.byType(ListView).last).scrollDirection,
+        Axis.horizontal,
+      );
+    },
+  );
+
+  testWidgets('formats the date header in a readable Chinese format', (
     tester,
   ) async {
     await tester.pumpWidget(
       _wrap(const [
+        // 2024-01-01 was a Monday.
         ScheduleDay(
           date: '2024-01-01',
-          subjects: [SubjectCard(id: 1, name: 'Foo', imageUrl: 'https://example.com/1.png')],
+          subjects: [SubjectCard(id: 1, name: 'Foo')],
         ),
-      ]),
-    );
-    await tester.pumpAndSettle();
-
-    // The item is already visible -- no tap/expand needed, and there must
-    // be no ExpansionTile left in the tree at all.
-    expect(find.byType(AnimeCoverCard), findsOneWidget);
-    expect(find.text('Foo'), findsOneWidget);
-    expect(find.byType(ExpansionTile), findsNothing);
-    expect(
-      tester.widget<ListView>(find.byType(ListView).last).scrollDirection,
-      Axis.horizontal,
-    );
-  });
-
-  testWidgets('formats the date header in a readable Chinese format', (tester) async {
-    await tester.pumpWidget(
-      _wrap(const [
-        // 2024-01-01 was a Monday.
-        ScheduleDay(date: '2024-01-01', subjects: [SubjectCard(id: 1, name: 'Foo')]),
       ]),
     );
     await tester.pumpAndSettle();
@@ -63,7 +79,12 @@ void main() {
   testWidgets('marks today\'s date with a 今天 tag', (tester) async {
     final today = todayDateString(DateTime.now());
     await tester.pumpWidget(
-      _wrap([ScheduleDay(date: today, subjects: const [SubjectCard(id: 1, name: 'Foo')])]),
+      _wrap([
+        ScheduleDay(
+          date: today,
+          subjects: const [SubjectCard(id: 1, name: 'Foo')],
+        ),
+      ]),
     );
     await tester.pumpAndSettle();
 
@@ -74,7 +95,10 @@ void main() {
   testWidgets('does not mark a non-today date with a 今天 tag', (tester) async {
     await tester.pumpWidget(
       _wrap(const [
-        ScheduleDay(date: '2000-01-01', subjects: [SubjectCard(id: 1, name: 'Foo')]),
+        ScheduleDay(
+          date: '2000-01-01',
+          subjects: [SubjectCard(id: 1, name: 'Foo')],
+        ),
       ]),
     );
     await tester.pumpAndSettle();

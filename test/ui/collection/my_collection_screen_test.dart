@@ -18,7 +18,8 @@ class _FakeMyCollectionsController extends MyCollectionsController {
   final MyCollectionsPage _page;
 
   @override
-  Future<MyCollectionsPage> build({required CollectionType? type}) async => _page;
+  Future<MyCollectionsPage> build({required CollectionType? type}) async =>
+      _page;
 }
 
 Widget _wrap(MyCollectionsPage page, {SubjectApi? subjectApi}) {
@@ -61,9 +62,13 @@ void main() {
       expect(find.byType(EmptyView), findsOneWidget);
     });
 
-    testWidgets('tapping the edit icon shows a status menu on each item', (tester) async {
+    testWidgets('tapping the edit icon shows a status menu on each item', (
+      tester,
+    ) async {
       const page = MyCollectionsPage(
-        items: [MyCollectionSubject(subjectId: 1, name: 'Foo', nameCn: 'Foo CN')],
+        items: [
+          MyCollectionSubject(subjectId: 1, name: 'Foo', nameCn: 'Foo CN'),
+        ],
         hasMore: false,
       );
 
@@ -78,13 +83,20 @@ void main() {
       expect(find.byType(PopupMenuButton<String>), findsOneWidget);
     });
 
-    testWidgets('selecting a new status in edit mode calls updateCollection', (tester) async {
+    testWidgets('selecting a new status in edit mode calls updateCollection', (
+      tester,
+    ) async {
       final api = MockSubjectApi();
       when(
-        () => api.updateCollection(any(), collectionType: any(named: 'collectionType')),
+        () => api.updateCollection(
+          any(),
+          collectionType: any(named: 'collectionType'),
+        ),
       ).thenAnswer((_) async {});
       const page = MyCollectionsPage(
-        items: [MyCollectionSubject(subjectId: 1, name: 'Foo', nameCn: 'Foo CN')],
+        items: [
+          MyCollectionSubject(subjectId: 1, name: 'Foo', nameCn: 'Foo CN'),
+        ],
         hasMore: false,
       );
 
@@ -97,14 +109,20 @@ void main() {
       await tester.tap(find.text('看过').last);
       await tester.pumpAndSettle();
 
-      verify(() => api.updateCollection(1, collectionType: CollectionType.done)).called(1);
+      verify(
+        () => api.updateCollection(1, collectionType: CollectionType.done),
+      ).called(1);
     });
 
-    testWidgets('selecting 移除收藏 in edit mode calls deleteCollection', (tester) async {
+    testWidgets('selecting 移除收藏 in edit mode calls deleteCollection', (
+      tester,
+    ) async {
       final api = MockSubjectApi();
       when(() => api.deleteCollection(any())).thenAnswer((_) async {});
       const page = MyCollectionsPage(
-        items: [MyCollectionSubject(subjectId: 1, name: 'Foo', nameCn: 'Foo CN')],
+        items: [
+          MyCollectionSubject(subjectId: 1, name: 'Foo', nameCn: 'Foo CN'),
+        ],
         hasMore: false,
       );
 

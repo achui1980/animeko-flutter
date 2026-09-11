@@ -17,7 +17,11 @@ class _FakeSearchController extends SearchController {
 
 Widget _wrap(Widget child, List<SubjectCard> results) {
   return ProviderScope(
-    overrides: [searchControllerProvider.overrideWith(() => _FakeSearchController(results))],
+    overrides: [
+      searchControllerProvider.overrideWith(
+        () => _FakeSearchController(results),
+      ),
+    ],
     child: MaterialApp(home: child),
   );
 }

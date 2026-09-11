@@ -19,7 +19,9 @@ class SubjectApi {
   /// collectionType/selfRating if authenticated (null-valued if not
   /// collected/rated).
   Future<SubjectDetail> getSubject(int subjectId) async {
-    final response = await _dio.get<Map<String, dynamic>>('/v2/subjects/$subjectId');
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/v2/subjects/$subjectId',
+    );
     return SubjectDetail.fromJson(response.data!);
   }
 
@@ -66,7 +68,9 @@ class SubjectApi {
   /// the plan's Global Constraints and `StaffMember`'s own doc comment
   /// in `subject_models.dart`).
   Future<List<StaffMember>> getStaff(int subjectId) async {
-    final response = await _dio.get<Map<String, dynamic>>('/v2/subjects/$subjectId/staff');
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/v2/subjects/$subjectId/staff',
+    );
     final items = response.data!['items'] as List<dynamic>;
     return items
         .map((e) => StaffMember.fromJson(e as Map<String, dynamic>))

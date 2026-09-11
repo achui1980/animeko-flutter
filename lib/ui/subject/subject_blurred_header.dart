@@ -40,7 +40,8 @@ class SubjectBlurredHeader extends StatelessWidget {
     // sigma 16-32 makes decoding at full resolution first pure waste.
     // `cacheWidth`/`cacheHeight` tell Flutter's image codec to decode at
     // this smaller size directly, rather than decode-full-then-downscale.
-    final cacheWidth = (mediaQuery.size.width * mediaQuery.devicePixelRatio * 0.5).round();
+    final cacheWidth =
+        (mediaQuery.size.width * mediaQuery.devicePixelRatio * 0.5).round();
     final cacheHeight = (height * mediaQuery.devicePixelRatio * 0.5).round();
 
     return SizedBox(
@@ -85,16 +86,24 @@ class SubjectBlurredHeader extends StatelessWidget {
                         child: Image.network(
                           imageUrl,
                           fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => Container(
-                            color: colorScheme.surfaceContainerHighest,
-                            child: const Icon(Icons.image_not_supported_outlined),
-                          ),
+                          errorBuilder: (context, error, stackTrace) =>
+                              Container(
+                                color: colorScheme.surfaceContainerHighest,
+                                child: const Icon(
+                                  Icons.image_not_supported_outlined,
+                                ),
+                              ),
                         ),
                       ),
                     ),
                   ),
                   if (info != null)
-                    Expanded(child: Padding(padding: const EdgeInsets.only(left: 12), child: info!)),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 12),
+                        child: info!,
+                      ),
+                    ),
                 ],
               ),
             ),

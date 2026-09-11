@@ -29,7 +29,12 @@ bool isDesktopPlatform() {
 /// Riverpod dependency, so it's independently testable (same pattern as
 /// Phase D's `SubjectBlurredHeader`/`SubjectTagsRow`).
 class TrendingCarousel extends StatefulWidget {
-  const TrendingCarousel({super.key, required this.cards, required this.onTap, this.controller});
+  const TrendingCarousel({
+    super.key,
+    required this.cards,
+    required this.onTap,
+    this.controller,
+  });
 
   final List<SubjectCard> cards;
   final void Function(SubjectCard card) onTap;
@@ -142,8 +147,9 @@ class _TrendingCarouselState extends State<TrendingCarousel> {
           Image.network(
             card.imageUrl ?? '',
             fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) =>
-                Container(color: Theme.of(context).colorScheme.surfaceContainerHighest),
+            errorBuilder: (context, error, stackTrace) => Container(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            ),
           ),
           Align(
             alignment: Alignment.bottomCenter,
@@ -177,7 +183,11 @@ class _TrendingCarouselState extends State<TrendingCarousel> {
 /// do -- matching the reference Animeko app's own desktop-only arrows on
 /// its horizontal lists.
 class _ArrowButton extends StatelessWidget {
-  const _ArrowButton({required this.icon, required this.tooltip, required this.onPressed});
+  const _ArrowButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
 
   final IconData icon;
   final String tooltip;

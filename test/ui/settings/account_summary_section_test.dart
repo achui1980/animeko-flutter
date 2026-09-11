@@ -38,7 +38,9 @@ Widget _wrap(_FakeAuthController fakeAuth) {
 }
 
 void main() {
-  testWidgets('shows the nickname and signs out after confirming', (tester) async {
+  testWidgets('shows the nickname and signs out after confirming', (
+    tester,
+  ) async {
     final fakeAuth = _FakeAuthController();
     await tester.pumpWidget(_wrap(fakeAuth));
     await tester.pumpAndSettle();
@@ -55,7 +57,9 @@ void main() {
     expect(fakeAuth.signOutCalled, isTrue);
   });
 
-  testWidgets('cancelling the sign-out dialog does not sign out', (tester) async {
+  testWidgets('cancelling the sign-out dialog does not sign out', (
+    tester,
+  ) async {
     final fakeAuth = _FakeAuthController();
     await tester.pumpWidget(_wrap(fakeAuth));
     await tester.pumpAndSettle();

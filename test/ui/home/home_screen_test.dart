@@ -13,7 +13,12 @@ class _FakeHomeRecommendationsController extends HomeRecommendationsController {
   Future<HomeRecommendationsPage> build() async {
     return const HomeRecommendationsPage(
       items: [
-        SubjectCard(id: 2, name: 'Bar', nameCn: 'Bar', imageUrl: 'https://example.com/2.png'),
+        SubjectCard(
+          id: 2,
+          name: 'Bar',
+          nameCn: 'Bar',
+          imageUrl: 'https://example.com/2.png',
+        ),
       ],
       hasMore: false,
     );
@@ -25,14 +30,20 @@ class _FakeHomeRecommendationsController extends HomeRecommendationsController {
 /// `hasMore: true` so a real bug -- e.g. the load-more scroll listener
 /// reacting to bubbled notifications from a nested scrollable such as
 /// `TrendingCarousel` -- would actually call [loadMore] if not fixed.
-class _RecordingHomeRecommendationsController extends HomeRecommendationsController {
+class _RecordingHomeRecommendationsController
+    extends HomeRecommendationsController {
   int loadMoreCallCount = 0;
 
   @override
   Future<HomeRecommendationsPage> build() async {
     return const HomeRecommendationsPage(
       items: [
-        SubjectCard(id: 2, name: 'Bar', nameCn: 'Bar', imageUrl: 'https://example.com/2.png'),
+        SubjectCard(
+          id: 2,
+          name: 'Bar',
+          nameCn: 'Bar',
+          imageUrl: 'https://example.com/2.png',
+        ),
       ],
       hasMore: true,
     );
@@ -49,7 +60,12 @@ Widget _wrap(Widget child) {
     overrides: [
       trendingProvider.overrideWith(
         (ref) async => const [
-          SubjectCard(id: 1, name: 'Foo', nameCn: 'Foo', imageUrl: 'https://example.com/1.png'),
+          SubjectCard(
+            id: 1,
+            name: 'Foo',
+            nameCn: 'Foo',
+            imageUrl: 'https://example.com/1.png',
+          ),
         ],
       ),
       homeRecommendationsControllerProvider.overrideWith(
@@ -65,20 +81,21 @@ void main() {
   // Timer.periodic that keeps scheduling frames every simulated 5
   // seconds for as long as the widget stays mounted, so pumpAndSettle()
   // would never see "no more frames scheduled".
-  testWidgets('shows the trending carousel and recommendations grid with Chinese titles', (
-    tester,
-  ) async {
-    await tester.pumpWidget(_wrap(const HomeScreen()));
-    await tester.pump();
-    await tester.pump();
+  testWidgets(
+    'shows the trending carousel and recommendations grid with Chinese titles',
+    (tester) async {
+      await tester.pumpWidget(_wrap(const HomeScreen()));
+      await tester.pump();
+      await tester.pump();
 
-    expect(find.text('最近热门'), findsOneWidget);
-    expect(find.text('为你推荐'), findsOneWidget);
-    expect(find.byType(TrendingCarousel), findsOneWidget);
-    expect(find.text('Foo'), findsOneWidget);
-    expect(find.byType(AnimeCoverCard), findsOneWidget);
-    expect(find.text('Bar'), findsOneWidget);
-  });
+      expect(find.text('最近热门'), findsOneWidget);
+      expect(find.text('为你推荐'), findsOneWidget);
+      expect(find.byType(TrendingCarousel), findsOneWidget);
+      expect(find.text('Foo'), findsOneWidget);
+      expect(find.byType(AnimeCoverCard), findsOneWidget);
+      expect(find.text('Bar'), findsOneWidget);
+    },
+  );
 
   testWidgets('AppBar shows the collection action', (tester) async {
     await tester.pumpWidget(_wrap(const HomeScreen()));
@@ -99,11 +116,23 @@ void main() {
           overrides: [
             trendingProvider.overrideWith(
               (ref) async => const [
-                SubjectCard(id: 1, name: 'Foo', nameCn: 'Foo', imageUrl: 'https://example.com/1.png'),
-                SubjectCard(id: 3, name: 'Baz', nameCn: 'Baz', imageUrl: 'https://example.com/3.png'),
+                SubjectCard(
+                  id: 1,
+                  name: 'Foo',
+                  nameCn: 'Foo',
+                  imageUrl: 'https://example.com/1.png',
+                ),
+                SubjectCard(
+                  id: 3,
+                  name: 'Baz',
+                  nameCn: 'Baz',
+                  imageUrl: 'https://example.com/3.png',
+                ),
               ],
             ),
-            homeRecommendationsControllerProvider.overrideWith(() => recController),
+            homeRecommendationsControllerProvider.overrideWith(
+              () => recController,
+            ),
           ],
           child: MaterialApp(home: const HomeScreen()),
         ),

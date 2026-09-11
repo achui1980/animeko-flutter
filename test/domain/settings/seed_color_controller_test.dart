@@ -20,7 +20,9 @@ void main() {
     setUp(() {
       storage = MockSettingsStorage();
       container = ProviderContainer(
-        overrides: [settingsStorageProvider.overrideWith((ref) async => storage)],
+        overrides: [
+          settingsStorageProvider.overrideWith((ref) async => storage),
+        ],
       );
       addTearDown(container.dispose);
     });
@@ -43,7 +45,9 @@ void main() {
       await container.read(seedColorControllerProvider.future);
 
       const chosen = Color(0xFF006A6A);
-      await container.read(seedColorControllerProvider.notifier).setSeedColor(chosen);
+      await container
+          .read(seedColorControllerProvider.notifier)
+          .setSeedColor(chosen);
 
       verify(() => storage.setSeedColorValue(chosen.toARGB32())).called(1);
       expect(container.read(seedColorControllerProvider).value, chosen);

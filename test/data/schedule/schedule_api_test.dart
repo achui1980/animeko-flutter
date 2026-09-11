@@ -23,23 +23,29 @@ void main() {
     );
   }
 
-  test('getLatestAiringSchedule sends today and timeZone as query params', () async {
-    when(
-      () => dio.get<Map<String, dynamic>>(
-        any(),
-        queryParameters: any(named: 'queryParameters'),
-      ),
-    ).thenAnswer((_) async => jsonResponse({'list': <dynamic>[]}));
+  test(
+    'getLatestAiringSchedule sends today and timeZone as query params',
+    () async {
+      when(
+        () => dio.get<Map<String, dynamic>>(
+          any(),
+          queryParameters: any(named: 'queryParameters'),
+        ),
+      ).thenAnswer((_) async => jsonResponse({'list': <dynamic>[]}));
 
-    await api.getLatestAiringSchedule(today: '2026-08-28', timeZone: '+08:00');
+      await api.getLatestAiringSchedule(
+        today: '2026-08-28',
+        timeZone: '+08:00',
+      );
 
-    verify(
-      () => dio.get<Map<String, dynamic>>(
-        '/v1/schedule/airing',
-        queryParameters: {'today': '2026-08-28', 'timeZone': '+08:00'},
-      ),
-    ).called(1);
-  });
+      verify(
+        () => dio.get<Map<String, dynamic>>(
+          '/v1/schedule/airing',
+          queryParameters: {'today': '2026-08-28', 'timeZone': '+08:00'},
+        ),
+      ).called(1);
+    },
+  );
 
   test('parses a date-grouped schedule with nested subject/episode', () async {
     when(

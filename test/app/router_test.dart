@@ -30,43 +30,44 @@ class _FakeProxySettingsController extends ProxySettingsController {
 }
 
 void main() {
-  testWidgets('unauthenticated user sees the login screen, authenticated user sees Home', (
-    tester,
-  ) async {
-    final fake = _FakeAuthController();
-    final container = ProviderContainer(
-      overrides: [authControllerProvider.overrideWith(() => fake)],
-    );
-    addTearDown(container.dispose);
+  testWidgets(
+    'unauthenticated user sees the login screen, authenticated user sees Home',
+    (tester) async {
+      final fake = _FakeAuthController();
+      final container = ProviderContainer(
+        overrides: [authControllerProvider.overrideWith(() => fake)],
+      );
+      addTearDown(container.dispose);
 
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: Consumer(
-          builder: (context, ref, _) =>
-              MaterialApp.router(routerConfig: ref.watch(appRouterProvider)),
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: Consumer(
+            builder: (context, ref, _) =>
+                MaterialApp.router(routerConfig: ref.watch(appRouterProvider)),
+          ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.text('Log in with Bangumi'), findsOneWidget);
+      expect(find.text('Log in with Bangumi'), findsOneWidget);
 
-    fake.state = const AuthAuthenticated('user-1');
-    // Not pumpAndSettle(): HomeScreen's trendingProvider and
-    // homeRecommendationsControllerProvider make real (un-mocked) network
-    // calls and stay in AsyncLoading, and TrendingCarousel's auto-advance
-    // Timer keeps scheduling a new animation frame every simulated 5
-    // seconds for as long as it's mounted -- pumpAndSettle() never sees
-    // "no more frames scheduled" and times out. A couple of bounded pumps
-    // is enough for the refreshListenable-triggered redirect and the
-    // route transition to complete.
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 1));
+      fake.state = const AuthAuthenticated('user-1');
+      // Not pumpAndSettle(): HomeScreen's trendingProvider and
+      // homeRecommendationsControllerProvider make real (un-mocked) network
+      // calls and stay in AsyncLoading, and TrendingCarousel's auto-advance
+      // Timer keeps scheduling a new animation frame every simulated 5
+      // seconds for as long as it's mounted -- pumpAndSettle() never sees
+      // "no more frames scheduled" and times out. A couple of bounded pumps
+      // is enough for the refreshListenable-triggered redirect and the
+      // route transition to complete.
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
 
-    expect(find.text('AniMeow'), findsOneWidget);
-    expect(find.text('Log in with Bangumi'), findsNothing);
-  });
+      expect(find.text('AniMeow'), findsOneWidget);
+      expect(find.text('Log in with Bangumi'), findsNothing);
+    },
+  );
 
   testWidgets(
     'play route without `extra` set renders a fallback instead of crashing',
@@ -108,12 +109,16 @@ void main() {
     },
   );
 
-  testWidgets('navigating to /settings/proxy renders ProxySettingsScreen', (tester) async {
+  testWidgets('navigating to /settings/proxy renders ProxySettingsScreen', (
+    tester,
+  ) async {
     final fake = _FakeAuthController();
     final container = ProviderContainer(
       overrides: [
         authControllerProvider.overrideWith(() => fake),
-        proxySettingsControllerProvider.overrideWith(() => _FakeProxySettingsController()),
+        proxySettingsControllerProvider.overrideWith(
+          () => _FakeProxySettingsController(),
+        ),
       ],
     );
     addTearDown(container.dispose);
@@ -145,54 +150,59 @@ void main() {
     expect(find.text('代理设置'), findsWidgets);
   });
 
-  testWidgets('the Settings tab is a 4th bottom-nav destination and renders SettingsScreen', (
-    tester,
-  ) async {
-    final fake = _FakeAuthController();
-    final container = ProviderContainer(
-      overrides: [
-        authControllerProvider.overrideWith(() => fake),
-        themeModeControllerProvider.overrideWith(() => _FakeThemeModeController()),
-        proxySettingsControllerProvider.overrideWith(() => _FakeProxySettingsController()),
-        selfUserProvider.overrideWith(
-          (ref) async => const SelfUser(
-            id: 'u1',
-            nickname: 'Alice',
-            hasPassword: true,
-            isBangumiSessionValid: true,
+  testWidgets(
+    'the Settings tab is a 4th bottom-nav destination and renders SettingsScreen',
+    (tester) async {
+      final fake = _FakeAuthController();
+      final container = ProviderContainer(
+        overrides: [
+          authControllerProvider.overrideWith(() => fake),
+          themeModeControllerProvider.overrideWith(
+            () => _FakeThemeModeController(),
+          ),
+          proxySettingsControllerProvider.overrideWith(
+            () => _FakeProxySettingsController(),
+          ),
+          selfUserProvider.overrideWith(
+            (ref) async => const SelfUser(
+              id: 'u1',
+              nickname: 'Alice',
+              hasPassword: true,
+              isBangumiSessionValid: true,
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      GoRouter? router;
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: Consumer(
+            builder: (context, ref, _) {
+              router = ref.watch(appRouterProvider);
+              return MaterialApp.router(routerConfig: router!);
+            },
           ),
         ),
-      ],
-    );
-    addTearDown(container.dispose);
+      );
+      await tester.pump();
+      fake.state = const AuthAuthenticated('user-1');
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
 
-    GoRouter? router;
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: Consumer(
-          builder: (context, ref, _) {
-            router = ref.watch(appRouterProvider);
-            return MaterialApp.router(routerConfig: router!);
-          },
-        ),
-      ),
-    );
-    await tester.pump();
-    fake.state = const AuthAuthenticated('user-1');
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 1));
+      // Navigate to the Settings tab by URL, same way the other shell
+      // branches (/home, /search, /schedule) are already reached elsewhere
+      // in this test file.
+      router!.go('/settings');
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
 
-    // Navigate to the Settings tab by URL, same way the other shell
-    // branches (/home, /search, /schedule) are already reached elsewhere
-    // in this test file.
-    router!.go('/settings');
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 1));
-
-    expect(find.byType(NavigationDestination), findsNWidgets(4));
-    final navBar = tester.widget<NavigationBar>(find.byType(NavigationBar));
-    expect(navBar.selectedIndex, 3);
-    expect(find.text('Alice'), findsOneWidget);
-  });
+      expect(find.byType(NavigationDestination), findsNWidgets(4));
+      final navBar = tester.widget<NavigationBar>(find.byType(NavigationBar));
+      expect(navBar.selectedIndex, 3);
+      expect(find.text('Alice'), findsOneWidget);
+    },
+  );
 }

@@ -33,7 +33,9 @@ void main() {
   });
 
   test('AppTheme.fromDynamicColorScheme uses the given ColorScheme as-is', () {
-    final colorScheme = ColorScheme.fromSeed(seedColor: const Color(0xFFFF0000));
+    final colorScheme = ColorScheme.fromSeed(
+      seedColor: const Color(0xFFFF0000),
+    );
     final theme = AppTheme.fromDynamicColorScheme(colorScheme);
     expect(theme.useMaterial3, isTrue);
     expect(theme.colorScheme, colorScheme);

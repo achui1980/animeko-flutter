@@ -18,34 +18,45 @@ void main() {
     storage = SecureTokenStorage(backing);
   });
 
-  test('saveSession writes userId and the full token triple as one JSON blob', () async {
-    when(
-      () => backing.write(key: any(named: 'key'), value: any(named: 'value')),
-    ).thenAnswer((_) async {});
-
-    await storage.saveSession(
-      const StoredSession(
-        userId: 'user-1',
-        tokens: AniTokens(
-          accessToken: 'access-1',
-          refreshToken: 'refresh-1',
-          expiresAtMillis: 1700000000000,
+  test(
+    'saveSession writes userId and the full token triple as one JSON blob',
+    () async {
+      when(
+        () => backing.write(
+          key: any(named: 'key'),
+          value: any(named: 'value'),
         ),
-      ),
-    );
+      ).thenAnswer((_) async {});
 
-    final captured = verify(
-      () => backing.write(key: 'ani_session', value: captureAny(named: 'value')),
-    ).captured.single as String;
-    final decoded = jsonDecode(captured) as Map<String, dynamic>;
-    expect(decoded, {
-      'userId': 'user-1',
-      'accessToken': 'access-1',
-      'refreshToken': 'refresh-1',
-      'expiresAtMillis': 1700000000000,
-      'bangumiAccessToken': null,
-    });
-  });
+      await storage.saveSession(
+        const StoredSession(
+          userId: 'user-1',
+          tokens: AniTokens(
+            accessToken: 'access-1',
+            refreshToken: 'refresh-1',
+            expiresAtMillis: 1700000000000,
+          ),
+        ),
+      );
+
+      final captured =
+          verify(
+                () => backing.write(
+                  key: 'ani_session',
+                  value: captureAny(named: 'value'),
+                ),
+              ).captured.single
+              as String;
+      final decoded = jsonDecode(captured) as Map<String, dynamic>;
+      expect(decoded, {
+        'userId': 'user-1',
+        'accessToken': 'access-1',
+        'refreshToken': 'refresh-1',
+        'expiresAtMillis': 1700000000000,
+        'bangumiAccessToken': null,
+      });
+    },
+  );
 
   test('readSession round-trips a previously saved session', () async {
     when(() => backing.read(key: 'ani_session')).thenAnswer(
@@ -72,11 +83,16 @@ void main() {
     expect(await storage.readSession(), isNull);
   });
 
-  test('readSession returns null for corrupt JSON instead of throwing', () async {
-    when(() => backing.read(key: 'ani_session')).thenAnswer((_) async => 'not json{{{');
+  test(
+    'readSession returns null for corrupt JSON instead of throwing',
+    () async {
+      when(
+        () => backing.read(key: 'ani_session'),
+      ).thenAnswer((_) async => 'not json{{{');
 
-    expect(await storage.readSession(), isNull);
-  });
+      expect(await storage.readSession(), isNull);
+    },
+  );
 
   test('clear deletes the single session key', () async {
     when(() => backing.delete(key: any(named: 'key'))).thenAnswer((_) async {});

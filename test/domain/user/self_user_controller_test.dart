@@ -20,7 +20,9 @@ void main() {
 
   setUp(() {
     api = MockUserApi();
-    container = ProviderContainer(overrides: [userApiProvider.overrideWithValue(api)]);
+    container = ProviderContainer(
+      overrides: [userApiProvider.overrideWithValue(api)],
+    );
     addTearDown(container.dispose);
   });
 

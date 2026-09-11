@@ -90,7 +90,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 SliverToBoxAdapter(
                   child: ErrorRetryView(
                     message: 'Failed to load recommendations: $error',
-                    onRetry: () => ref.invalidate(homeRecommendationsControllerProvider),
+                    onRetry: () =>
+                        ref.invalidate(homeRecommendationsControllerProvider),
                   ),
                 ),
               ],
@@ -107,17 +108,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       mainAxisSpacing: 8,
                       crossAxisSpacing: 8,
                     ),
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final card = recPage.items[index];
-                        return AnimeCoverCard(
-                          imageUrl: card.imageUrl ?? '',
-                          title: card.nameCn ?? card.name,
-                          onTap: () => openSubjectDetail(context, card),
-                        );
-                      },
-                      childCount: recPage.items.length,
-                    ),
+                    delegate: SliverChildBuilderDelegate((context, index) {
+                      final card = recPage.items[index];
+                      return AnimeCoverCard(
+                        imageUrl: card.imageUrl ?? '',
+                        title: card.nameCn ?? card.name,
+                        onTap: () => openSubjectDetail(context, card),
+                      );
+                    }, childCount: recPage.items.length),
                   ),
                 ),
                 SliverToBoxAdapter(
@@ -166,12 +164,19 @@ class _CollapsingHomeAppBar extends StatelessWidget {
       actions: actions,
       flexibleSpace: LayoutBuilder(
         builder: (context, constraints) {
-          final t = ((constraints.maxHeight - kToolbarHeight) /
-                  (_expandedHeight - kToolbarHeight))
-              .clamp(0.0, 1.0);
-          final fontSize = _collapsedFontSize + (_expandedFontSize - _collapsedFontSize) * t;
-          final fontWeight = FontWeight.lerp(FontWeight.w500, FontWeight.w700, t);
-          final iconSize = _collapsedIconSize + (_expandedIconSize - _collapsedIconSize) * t;
+          final t =
+              ((constraints.maxHeight - kToolbarHeight) /
+                      (_expandedHeight - kToolbarHeight))
+                  .clamp(0.0, 1.0);
+          final fontSize =
+              _collapsedFontSize + (_expandedFontSize - _collapsedFontSize) * t;
+          final fontWeight = FontWeight.lerp(
+            FontWeight.w500,
+            FontWeight.w700,
+            t,
+          );
+          final iconSize =
+              _collapsedIconSize + (_expandedIconSize - _collapsedIconSize) * t;
           return FlexibleSpaceBar(
             centerTitle: true,
             titlePadding: const EdgeInsetsDirectional.only(bottom: 16),
@@ -186,7 +191,11 @@ class _CollapsingHomeAppBar extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Image.asset('assets/icon/app_icon.png', width: iconSize, height: iconSize),
+                Image.asset(
+                  'assets/icon/app_icon.png',
+                  width: iconSize,
+                  height: iconSize,
+                ),
                 const SizedBox(width: 10),
                 Column(
                   mainAxisSize: MainAxisSize.min,
@@ -194,7 +203,10 @@ class _CollapsingHomeAppBar extends StatelessWidget {
                   children: [
                     Text(
                       'AniMeow',
-                      style: GoogleFonts.fredoka(fontSize: fontSize, fontWeight: fontWeight),
+                      style: GoogleFonts.fredoka(
+                        fontSize: fontSize,
+                        fontWeight: fontWeight,
+                      ),
                     ),
                     if (t > 0.01)
                       Opacity(
@@ -204,7 +216,9 @@ class _CollapsingHomeAppBar extends StatelessWidget {
                           style: TextStyle(
                             fontSize: _subtitleFontSize,
                             fontWeight: FontWeight.w400,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ),
@@ -247,8 +261,10 @@ class _TrendingSection extends StatelessWidget {
         padding: EdgeInsets.all(32),
         child: Center(child: CircularProgressIndicator()),
       ),
-      error: (error, stack) =>
-          ErrorRetryView(message: 'Failed to load trending: $error', onRetry: onRetry),
+      error: (error, stack) => ErrorRetryView(
+        message: 'Failed to load trending: $error',
+        onRetry: onRetry,
+      ),
       data: (cards) {
         if (cards.isEmpty) return const SizedBox.shrink();
         return Column(
@@ -285,7 +301,9 @@ class _RecommendationsFooter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (failed) {
-      return Center(child: TextButton(onPressed: onRetry, child: const Text('加载失败，点击重试')));
+      return Center(
+        child: TextButton(onPressed: onRetry, child: const Text('加载失败，点击重试')),
+      );
     }
     if (loading) {
       return const Padding(

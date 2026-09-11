@@ -13,8 +13,14 @@ void main() {
   tearDown(() => db.close());
 
   test('subjects table round-trips a row', () async {
-    await db.into(db.subjects).insert(
-          SubjectsCompanion.insert(id: const Value(1), name: 'Test Anime', nameCn: '测试动画'),
+    await db
+        .into(db.subjects)
+        .insert(
+          SubjectsCompanion.insert(
+            id: const Value(1),
+            name: 'Test Anime',
+            nameCn: '测试动画',
+          ),
         );
 
     final rows = await db.select(db.subjects).get();
@@ -24,10 +30,18 @@ void main() {
   });
 
   test('episodes table round-trips a row', () async {
-    await db.into(db.subjects).insert(
-          SubjectsCompanion.insert(id: const Value(1), name: 'Test Anime', nameCn: '测试动画'),
+    await db
+        .into(db.subjects)
+        .insert(
+          SubjectsCompanion.insert(
+            id: const Value(1),
+            name: 'Test Anime',
+            nameCn: '测试动画',
+          ),
         );
-    await db.into(db.episodes).insert(
+    await db
+        .into(db.episodes)
+        .insert(
           EpisodesCompanion.insert(
             id: const Value(10),
             subjectId: 1,
@@ -43,10 +57,18 @@ void main() {
   });
 
   test('subjectCollections table round-trips a dirty row', () async {
-    await db.into(db.subjects).insert(
-          SubjectsCompanion.insert(id: const Value(1), name: 'Test Anime', nameCn: '测试动画'),
+    await db
+        .into(db.subjects)
+        .insert(
+          SubjectsCompanion.insert(
+            id: const Value(1),
+            name: 'Test Anime',
+            nameCn: '测试动画',
+          ),
         );
-    await db.into(db.subjectCollections).insert(
+    await db
+        .into(db.subjectCollections)
+        .insert(
           SubjectCollectionsCompanion.insert(
             subjectId: const Value(1),
             collectionType: 'DOING',
@@ -63,7 +85,9 @@ void main() {
   });
 
   test('subjectImageCache table round-trips a row', () async {
-    await db.into(db.subjectImageCache).insert(
+    await db
+        .into(db.subjectImageCache)
+        .insert(
           SubjectImageCacheCompanion.insert(
             subjectId: const Value(42),
             imageUrl: 'https://example.com/a.jpg',
@@ -82,8 +106,13 @@ void main() {
   });
 
   test('searchHistory table round-trips a row', () async {
-    await db.into(db.searchHistory).insert(
-          SearchHistoryCompanion.insert(query: 'mahou shoujo', searchedAt: DateTime(2026, 1, 1)),
+    await db
+        .into(db.searchHistory)
+        .insert(
+          SearchHistoryCompanion.insert(
+            query: 'mahou shoujo',
+            searchedAt: DateTime(2026, 1, 1),
+          ),
         );
 
     final rows = await db.select(db.searchHistory).get();
@@ -92,17 +121,22 @@ void main() {
     expect(rows.single.query, 'mahou shoujo');
   });
 
-  test('inserting an Episode with a non-existent subjectId throws (FK enforcement)', () async {
-    expect(
-      () async => await db.into(db.episodes).insert(
-            EpisodesCompanion.insert(
-              id: const Value(10),
-              subjectId: 999,
-              sort: '1',
-              name: 'Episode 1',
+  test(
+    'inserting an Episode with a non-existent subjectId throws (FK enforcement)',
+    () async {
+      expect(
+        () async => await db
+            .into(db.episodes)
+            .insert(
+              EpisodesCompanion.insert(
+                id: const Value(10),
+                subjectId: 999,
+                sort: '1',
+                name: 'Episode 1',
+              ),
             ),
-          ),
-      throwsA(anything),
-    );
-  });
+        throwsA(anything),
+      );
+    },
+  );
 }

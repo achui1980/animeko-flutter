@@ -44,12 +44,15 @@ void main() {
         expect(storage.getThemeMode(), ThemeMode.dark);
       });
 
-      test('getThemeMode returns null for an unrecognized stored value', () async {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('theme_mode', 'bogus');
-        final storage = SettingsStorage(prefs);
-        expect(storage.getThemeMode(), isNull);
-      });
+      test(
+        'getThemeMode returns null for an unrecognized stored value',
+        () async {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('theme_mode', 'bogus');
+          final storage = SettingsStorage(prefs);
+          expect(storage.getThemeMode(), isNull);
+        },
+      );
 
       test('setThemeMode(ThemeMode.system) round-trips', () async {
         final prefs = await SharedPreferences.getInstance();
@@ -66,12 +69,15 @@ void main() {
         expect(storage.getPlaybackSpeed(), 1.0);
       });
 
-      test('setPlaybackSpeed persists and getPlaybackSpeed reads it back', () async {
-        final prefs = await SharedPreferences.getInstance();
-        final storage = SettingsStorage(prefs);
-        await storage.setPlaybackSpeed(1.5);
-        expect(storage.getPlaybackSpeed(), 1.5);
-      });
+      test(
+        'setPlaybackSpeed persists and getPlaybackSpeed reads it back',
+        () async {
+          final prefs = await SharedPreferences.getInstance();
+          final storage = SettingsStorage(prefs);
+          await storage.setPlaybackSpeed(1.5);
+          expect(storage.getPlaybackSpeed(), 1.5);
+        },
+      );
     });
 
     group('dynamic color', () {
@@ -81,12 +87,15 @@ void main() {
         expect(storage.getUseDynamicColor(), false);
       });
 
-      test('setUseDynamicColor persists and getUseDynamicColor reads it back', () async {
-        final prefs = await SharedPreferences.getInstance();
-        final storage = SettingsStorage(prefs);
-        await storage.setUseDynamicColor(true);
-        expect(storage.getUseDynamicColor(), true);
-      });
+      test(
+        'setUseDynamicColor persists and getUseDynamicColor reads it back',
+        () async {
+          final prefs = await SharedPreferences.getInstance();
+          final storage = SettingsStorage(prefs);
+          await storage.setUseDynamicColor(true);
+          expect(storage.getUseDynamicColor(), true);
+        },
+      );
     });
 
     group('seed color', () {
@@ -96,12 +105,15 @@ void main() {
         expect(storage.getSeedColorValue(), isNull);
       });
 
-      test('setSeedColorValue persists and getSeedColorValue reads it back', () async {
-        final prefs = await SharedPreferences.getInstance();
-        final storage = SettingsStorage(prefs);
-        await storage.setSeedColorValue(0xFF00FF00);
-        expect(storage.getSeedColorValue(), 0xFF00FF00);
-      });
+      test(
+        'setSeedColorValue persists and getSeedColorValue reads it back',
+        () async {
+          final prefs = await SharedPreferences.getInstance();
+          final storage = SettingsStorage(prefs);
+          await storage.setSeedColorValue(0xFF00FF00);
+          expect(storage.getSeedColorValue(), 0xFF00FF00);
+        },
+      );
     });
   });
 }

@@ -88,7 +88,10 @@ void main() {
     });
 
     test('Anime1Episode implements MediaEpisode with sourceId "anime1"', () {
-      const episode = Anime1Episode(title: 'ep1', pageUrl: 'https://anime1.me/1');
+      const episode = Anime1Episode(
+        title: 'ep1',
+        pageUrl: 'https://anime1.me/1',
+      );
       expect(episode, isA<MediaEpisode>());
       expect(episode.sourceId, 'anime1');
     });

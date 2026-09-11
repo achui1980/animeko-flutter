@@ -5,9 +5,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const _cards = [
-  SubjectCard(id: 1, name: 'Foo', nameCn: 'Foo', imageUrl: 'https://example.com/1.png'),
-  SubjectCard(id: 2, name: 'Bar', nameCn: 'Bar', imageUrl: 'https://example.com/2.png'),
-  SubjectCard(id: 3, name: 'Baz', nameCn: 'Baz', imageUrl: 'https://example.com/3.png'),
+  SubjectCard(
+    id: 1,
+    name: 'Foo',
+    nameCn: 'Foo',
+    imageUrl: 'https://example.com/1.png',
+  ),
+  SubjectCard(
+    id: 2,
+    name: 'Bar',
+    nameCn: 'Bar',
+    imageUrl: 'https://example.com/2.png',
+  ),
+  SubjectCard(
+    id: 3,
+    name: 'Baz',
+    nameCn: 'Baz',
+    imageUrl: 'https://example.com/3.png',
+  ),
 ];
 
 Widget _wrap(Widget child) {
@@ -18,7 +33,9 @@ Widget _wrap(Widget child) {
 
 void main() {
   testWidgets("renders a CarouselView with each card's title", (tester) async {
-    await tester.pumpWidget(_wrap(const TrendingCarousel(cards: _cards, onTap: _noop)));
+    await tester.pumpWidget(
+      _wrap(const TrendingCarousel(cards: _cards, onTap: _noop)),
+    );
     await tester.pump();
 
     expect(find.byType(CarouselView), findsOneWidget);
@@ -52,7 +69,9 @@ void main() {
   });
 
   testWidgets('renders nothing when there are no cards', (tester) async {
-    await tester.pumpWidget(_wrap(const TrendingCarousel(cards: [], onTap: _noop)));
+    await tester.pumpWidget(
+      _wrap(const TrendingCarousel(cards: [], onTap: _noop)),
+    );
     await tester.pump();
 
     expect(find.byType(CarouselView), findsNothing);
@@ -62,7 +81,9 @@ void main() {
     final controller = CarouselController();
     addTearDown(controller.dispose);
     await tester.pumpWidget(
-      _wrap(TrendingCarousel(cards: _cards, onTap: _noop, controller: controller)),
+      _wrap(
+        TrendingCarousel(cards: _cards, onTap: _noop, controller: controller),
+      ),
     );
     await tester.pump();
 
@@ -77,7 +98,9 @@ void main() {
   testWidgets('shows arrow buttons on desktop platforms', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
 
-    await tester.pumpWidget(_wrap(const TrendingCarousel(cards: _cards, onTap: _noop)));
+    await tester.pumpWidget(
+      _wrap(const TrendingCarousel(cards: _cards, onTap: _noop)),
+    );
     await tester.pump();
 
     expect(find.byIcon(Icons.chevron_left), findsOneWidget);
@@ -86,10 +109,14 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
-  testWidgets('does not show arrow buttons on mobile platforms', (tester) async {
+  testWidgets('does not show arrow buttons on mobile platforms', (
+    tester,
+  ) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
 
-    await tester.pumpWidget(_wrap(const TrendingCarousel(cards: _cards, onTap: _noop)));
+    await tester.pumpWidget(
+      _wrap(const TrendingCarousel(cards: _cards, onTap: _noop)),
+    );
     await tester.pump();
 
     expect(find.byIcon(Icons.chevron_left), findsNothing);
@@ -104,7 +131,9 @@ void main() {
     addTearDown(controller.dispose);
 
     await tester.pumpWidget(
-      _wrap(TrendingCarousel(cards: _cards, onTap: _noop, controller: controller)),
+      _wrap(
+        TrendingCarousel(cards: _cards, onTap: _noop, controller: controller),
+      ),
     );
     await tester.pump();
 

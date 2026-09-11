@@ -152,7 +152,14 @@ void main() {
     tester,
   ) async {
     const noTitleEpisodes = [
-      BangumiEpisode(id: 11, sort: 11, name: '', nameCn: '', airdate: '', type: 0),
+      BangumiEpisode(
+        id: 11,
+        sort: 11,
+        name: '',
+        nameCn: '',
+        airdate: '',
+        type: 0,
+      ),
     ];
     await tester.pumpWidget(
       MaterialApp(

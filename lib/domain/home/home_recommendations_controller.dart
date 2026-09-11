@@ -44,7 +44,9 @@ class HomeRecommendationsController extends _$HomeRecommendationsController {
       offset: current.items.length,
       limit: _pageSize,
     );
-    final newItems = response.items.map(SubjectCard.fromRecommendation).toList();
+    final newItems = response.items
+        .map(SubjectCard.fromRecommendation)
+        .toList();
     state = AsyncData(
       HomeRecommendationsPage(
         items: [...current.items, ...newItems],

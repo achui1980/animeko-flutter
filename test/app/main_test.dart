@@ -23,18 +23,29 @@ class _FakeSeedColorController extends SeedColorController {
 }
 
 void main() {
-  testWidgets('applies AppTheme.light()/dark() and the persisted ThemeMode', (tester) async {
+  testWidgets('applies AppTheme.light()/dark() and the persisted ThemeMode', (
+    tester,
+  ) async {
     final container = ProviderContainer(
       overrides: [
-        themeModeControllerProvider.overrideWith(() => _FakeThemeModeController()),
-        dynamicColorControllerProvider.overrideWith(() => _FakeDynamicColorController()),
-        seedColorControllerProvider.overrideWith(() => _FakeSeedColorController()),
+        themeModeControllerProvider.overrideWith(
+          () => _FakeThemeModeController(),
+        ),
+        dynamicColorControllerProvider.overrideWith(
+          () => _FakeDynamicColorController(),
+        ),
+        seedColorControllerProvider.overrideWith(
+          () => _FakeSeedColorController(),
+        ),
       ],
     );
     addTearDown(container.dispose);
 
     await tester.pumpWidget(
-      UncontrolledProviderScope(container: container, child: const AnimekoFlutterApp()),
+      UncontrolledProviderScope(
+        container: container,
+        child: const AnimekoFlutterApp(),
+      ),
     );
     await tester.pump();
 

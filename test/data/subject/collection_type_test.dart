@@ -3,13 +3,16 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('CollectionType wire mapping', () {
-    test('wireValue maps every enum value to its SCREAMING_SNAKE_CASE wire string', () {
-      expect(CollectionType.wish.wireValue, 'WISH');
-      expect(CollectionType.doing.wireValue, 'DOING');
-      expect(CollectionType.done.wireValue, 'DONE');
-      expect(CollectionType.onHold.wireValue, 'ON_HOLD');
-      expect(CollectionType.dropped.wireValue, 'DROPPED');
-    });
+    test(
+      'wireValue maps every enum value to its SCREAMING_SNAKE_CASE wire string',
+      () {
+        expect(CollectionType.wish.wireValue, 'WISH');
+        expect(CollectionType.doing.wireValue, 'DOING');
+        expect(CollectionType.done.wireValue, 'DONE');
+        expect(CollectionType.onHold.wireValue, 'ON_HOLD');
+        expect(CollectionType.dropped.wireValue, 'DROPPED');
+      },
+    );
 
     test('collectionTypeFromWire parses every valid wire value', () {
       expect(collectionTypeFromWire('WISH'), CollectionType.wish);
@@ -19,9 +22,12 @@ void main() {
       expect(collectionTypeFromWire('DROPPED'), CollectionType.dropped);
     });
 
-    test('collectionTypeFromWire throws FormatException for an unknown value', () {
-      expect(() => collectionTypeFromWire('BOGUS'), throwsFormatException);
-    });
+    test(
+      'collectionTypeFromWire throws FormatException for an unknown value',
+      () {
+        expect(() => collectionTypeFromWire('BOGUS'), throwsFormatException);
+      },
+    );
 
     test('collectionTypeFromWireNullable returns null for null input', () {
       expect(collectionTypeFromWireNullable(null), isNull);

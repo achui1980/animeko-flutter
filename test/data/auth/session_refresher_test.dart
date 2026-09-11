@@ -45,9 +45,9 @@ void main() {
         expiresAtMillis: 999,
       ),
     );
-    when(() => api.refreshToken('old-refresh')).thenAnswer(
-      (_) async => response,
-    );
+    when(
+      () => api.refreshToken('old-refresh'),
+    ).thenAnswer((_) async => response);
     when(() => storage.saveSession(any())).thenAnswer((_) async {});
 
     final result = await refresher.refresh('old-refresh');
@@ -59,49 +59,58 @@ void main() {
     verify(() => storage.saveSession(any())).called(1);
   });
 
-  test('a failed API refresh clears storage and returns RefreshFailure', () async {
-    when(() => api.refreshToken('old-refresh')).thenThrow(
-      Exception('refresh token rejected'),
-    );
-    when(() => storage.clear()).thenAnswer((_) async {});
+  test(
+    'a failed API refresh clears storage and returns RefreshFailure',
+    () async {
+      when(
+        () => api.refreshToken('old-refresh'),
+      ).thenThrow(Exception('refresh token rejected'));
+      when(() => storage.clear()).thenAnswer((_) async {});
 
-    final result = await refresher.refresh('old-refresh');
+      final result = await refresher.refresh('old-refresh');
 
-    expect(result, isA<RefreshFailure>());
-    expect((result as RefreshFailure).error, isA<UnknownAppError>());
-    verify(() => storage.clear()).called(1);
-  });
+      expect(result, isA<RefreshFailure>());
+      expect((result as RefreshFailure).error, isA<UnknownAppError>());
+      verify(() => storage.clear()).called(1);
+    },
+  );
 
-  test('a successful API refresh but a failed local save does NOT clear storage', () async {
-    const response = UserAuthRoutingLoginResponse(
-      userId: 'user-1',
-      tokens: AniTokens(
-        accessToken: 'new-access',
-        refreshToken: 'new-refresh',
-        expiresAtMillis: 999,
-      ),
-    );
-    when(() => api.refreshToken('old-refresh')).thenAnswer(
-      (_) async => response,
-    );
-    when(() => storage.saveSession(any())).thenThrow(
-      Exception('keychain unavailable'),
-    );
+  test(
+    'a successful API refresh but a failed local save does NOT clear storage',
+    () async {
+      const response = UserAuthRoutingLoginResponse(
+        userId: 'user-1',
+        tokens: AniTokens(
+          accessToken: 'new-access',
+          refreshToken: 'new-refresh',
+          expiresAtMillis: 999,
+        ),
+      );
+      when(
+        () => api.refreshToken('old-refresh'),
+      ).thenAnswer((_) async => response);
+      when(
+        () => storage.saveSession(any()),
+      ).thenThrow(Exception('keychain unavailable'));
 
-    final result = await refresher.refresh('old-refresh');
+      final result = await refresher.refresh('old-refresh');
 
-    expect(result, isA<RefreshFailure>());
-    verifyNever(() => storage.clear());
-  });
+      expect(result, isA<RefreshFailure>());
+      verifyNever(() => storage.clear());
+    },
+  );
 
-  test('refresh() never throws even if clearing storage itself fails', () async {
-    when(() => api.refreshToken('old-refresh')).thenThrow(
-      Exception('refresh token rejected'),
-    );
-    when(() => storage.clear()).thenThrow(Exception('keychain unavailable'));
+  test(
+    'refresh() never throws even if clearing storage itself fails',
+    () async {
+      when(
+        () => api.refreshToken('old-refresh'),
+      ).thenThrow(Exception('refresh token rejected'));
+      when(() => storage.clear()).thenThrow(Exception('keychain unavailable'));
 
-    final result = await refresher.refresh('old-refresh');
+      final result = await refresher.refresh('old-refresh');
 
-    expect(result, isA<RefreshFailure>());
-  });
+      expect(result, isA<RefreshFailure>());
+    },
+  );
 }

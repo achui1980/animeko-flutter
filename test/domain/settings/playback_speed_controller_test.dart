@@ -14,20 +14,26 @@ void main() {
     setUp(() {
       storage = MockSettingsStorage();
       container = ProviderContainer(
-        overrides: [settingsStorageProvider.overrideWith((ref) async => storage)],
+        overrides: [
+          settingsStorageProvider.overrideWith((ref) async => storage),
+        ],
       );
       addTearDown(container.dispose);
     });
 
     test('build reads the persisted playback speed', () async {
       when(() => storage.getPlaybackSpeed()).thenReturn(1.5);
-      final result = await container.read(playbackSpeedControllerProvider.future);
+      final result = await container.read(
+        playbackSpeedControllerProvider.future,
+      );
       expect(result, 1.5);
     });
 
     test('build defaults to 1.0 when nothing is persisted', () async {
       when(() => storage.getPlaybackSpeed()).thenReturn(1.0);
-      final result = await container.read(playbackSpeedControllerProvider.future);
+      final result = await container.read(
+        playbackSpeedControllerProvider.future,
+      );
       expect(result, 1.0);
     });
 

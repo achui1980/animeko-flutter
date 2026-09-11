@@ -34,8 +34,6 @@ class AppTheme {
   /// Builds a theme directly from a platform-provided dynamic
   /// [ColorScheme] (see `DynamicColorBuilder` in `main.dart`), bypassing
   /// [kSeedColor]/[light]/[dark] entirely.
-  static ThemeData fromDynamicColorScheme(ColorScheme colorScheme) => ThemeData(
-    useMaterial3: true,
-    colorScheme: colorScheme,
-  );
+  static ThemeData fromDynamicColorScheme(ColorScheme colorScheme) =>
+      ThemeData(useMaterial3: true, colorScheme: colorScheme);
 }

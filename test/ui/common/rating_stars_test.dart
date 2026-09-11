@@ -24,7 +24,9 @@ void main() {
       expect(find.text('0.0'), findsOneWidget);
     });
 
-    testWidgets('score of 7 shows 3 filled, 1 half, 1 empty star', (tester) async {
+    testWidgets('score of 7 shows 3 filled, 1 half, 1 empty star', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         const MaterialApp(home: Scaffold(body: RatingStars(score: 7))),
       );

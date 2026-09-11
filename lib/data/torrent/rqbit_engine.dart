@@ -48,8 +48,8 @@ class RqbitEngine {
   /// Test-only constructor that skips process management and talks to a
   /// pre-configured [Dio] on a fixed port.
   RqbitEngine.forTesting(Dio dio, {required int port})
-      : _dio = dio,
-        _port = port;
+    : _dio = dio,
+      _port = port;
 
   Dio? _dio;
   int? _port;
@@ -58,42 +58,41 @@ class RqbitEngine {
   Future<void> ensureStarted() async {
     if (_process != null && _port != null) return;
 
-    final process = await Process.start(
-      _rqbitBinaryPath(),
-      [
-        '--http-api-listen-addr',
-        '127.0.0.1:0',
-        // rqbit's `--listen-port 0` does NOT mean "pick a random port" for
-        // the `server` subcommand -- it falls back to the hardcoded
-        // default of 4240 regardless (verified empirically: two instances
-        // both passed `--listen-port 0` and the second still failed with
-        // "Address already in use" on 4240). So we reserve an actual free
-        // ephemeral port ourselves and pass its number explicitly. This
-        // avoids collisions with a leftover rqbit process from a previous
-        // run (e.g. after a force-quit that skipped shutdown()), another
-        // app using rqbit, etc. -- which otherwise makes rqbit exit before
-        // ever printing "started HTTP API", and _readAssignedPort() throw
-        // "Bad state: No element" on the exhausted stdout stream.
-        '--listen-port',
-        '${await _reserveEphemeralPort()}',
-        '--disable-upnp-port-forward',
-        '--disable-dht-persistence',
-        'server',
-        'start',
-        await _downloadDir(),
-      ],
+    final process = await Process.start(_rqbitBinaryPath(), [
+      '--http-api-listen-addr',
+      '127.0.0.1:0',
+      // rqbit's `--listen-port 0` does NOT mean "pick a random port" for
+      // the `server` subcommand -- it falls back to the hardcoded
+      // default of 4240 regardless (verified empirically: two instances
+      // both passed `--listen-port 0` and the second still failed with
+      // "Address already in use" on 4240). So we reserve an actual free
+      // ephemeral port ourselves and pass its number explicitly. This
+      // avoids collisions with a leftover rqbit process from a previous
+      // run (e.g. after a force-quit that skipped shutdown()), another
+      // app using rqbit, etc. -- which otherwise makes rqbit exit before
+      // ever printing "started HTTP API", and _readAssignedPort() throw
+      // "Bad state: No element" on the exhausted stdout stream.
+      '--listen-port',
+      '${await _reserveEphemeralPort()}',
+      '--disable-upnp-port-forward',
+      '--disable-dht-persistence',
+      'server',
+      'start',
+      await _downloadDir(),
+    ]);
+    unawaited(
+      process.exitCode.then((_) {
+        // Only clear state if this exit event belongs to the process we are
+        // still tracking. Without this identity check, a late exit event from
+        // a previously-killed process (e.g. right after shutdown() is followed
+        // by a fresh ensureStarted() that started a new process) could wipe
+        // out the new process's state.
+        if (identical(_process, process)) {
+          _process = null;
+          _port = null;
+        }
+      }),
     );
-    unawaited(process.exitCode.then((_) {
-      // Only clear state if this exit event belongs to the process we are
-      // still tracking. Without this identity check, a late exit event from
-      // a previously-killed process (e.g. right after shutdown() is followed
-      // by a fresh ensureStarted() that started a new process) could wipe
-      // out the new process's state.
-      if (identical(_process, process)) {
-        _process = null;
-        _port = null;
-      }
-    }));
 
     try {
       _port = await _readAssignedPort(process);

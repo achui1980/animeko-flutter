@@ -10,7 +10,12 @@ import 'package:flutter/material.dart';
 /// collapse/expand control), rather than always truncating regardless
 /// of how short the text actually is.
 class ExpandableSummary extends StatefulWidget {
-  const ExpandableSummary({super.key, required this.text, this.maxLines = 7, this.collapsedHeight = 120});
+  const ExpandableSummary({
+    super.key,
+    required this.text,
+    this.maxLines = 7,
+    this.collapsedHeight = 120,
+  });
 
   final String text;
   final int maxLines;
@@ -46,7 +51,9 @@ class _ExpandableSummaryState extends State<ExpandableSummary> {
               duration: const Duration(milliseconds: 200),
               alignment: Alignment.topLeft,
               child: SizedBox(
-                height: (!overflowing || _expanded) ? null : widget.collapsedHeight,
+                height: (!overflowing || _expanded)
+                    ? null
+                    : widget.collapsedHeight,
                 child: ClipRect(child: SelectableText(widget.text)),
               ),
             ),

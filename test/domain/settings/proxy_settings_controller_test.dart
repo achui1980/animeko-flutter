@@ -24,10 +24,7 @@ void main() {
     });
 
     test('rejects a URL with no scheme', () {
-      expect(
-        validateProxyUrl('127.0.0.1:2222'),
-        '暂不支持该协议（当前仅支持 http://）',
-      );
+      expect(validateProxyUrl('127.0.0.1:2222'), '暂不支持该协议（当前仅支持 http://）');
     });
 
     test('rejects a malformed http:// URL with no port', () {
@@ -45,20 +42,26 @@ void main() {
     setUp(() {
       storage = MockSettingsStorage();
       container = ProviderContainer(
-        overrides: [settingsStorageProvider.overrideWith((ref) async => storage)],
+        overrides: [
+          settingsStorageProvider.overrideWith((ref) async => storage),
+        ],
       );
       addTearDown(container.dispose);
     });
 
     test('build reads the persisted proxy URL', () async {
       when(() => storage.getProxyUrl()).thenReturn('http://127.0.0.1:2222');
-      final result = await container.read(proxySettingsControllerProvider.future);
+      final result = await container.read(
+        proxySettingsControllerProvider.future,
+      );
       expect(result, 'http://127.0.0.1:2222');
     });
 
     test('build returns null when nothing is persisted', () async {
       when(() => storage.getProxyUrl()).thenReturn(null);
-      final result = await container.read(proxySettingsControllerProvider.future);
+      final result = await container.read(
+        proxySettingsControllerProvider.future,
+      );
       expect(result, isNull);
     });
 
@@ -99,7 +102,9 @@ void main() {
       when(() => storage.setProxyUrl(any())).thenAnswer((_) async {});
       await container.read(proxySettingsControllerProvider.future);
 
-      await container.read(proxySettingsControllerProvider.notifier).clearProxy();
+      await container
+          .read(proxySettingsControllerProvider.notifier)
+          .clearProxy();
 
       verify(() => storage.setProxyUrl(null)).called(1);
       expect(container.read(proxySettingsControllerProvider).value, isNull);

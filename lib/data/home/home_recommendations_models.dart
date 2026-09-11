@@ -35,10 +35,7 @@ class SubjectRecommendation {
 /// (AniHomeRecommendationsResponse in the Kotlin client).
 @JsonSerializable()
 class HomeRecommendationsResponse {
-  const HomeRecommendationsResponse({
-    required this.total,
-    required this.items,
-  });
+  const HomeRecommendationsResponse({required this.total, required this.items});
 
   final int total;
   final List<SubjectRecommendation> items;

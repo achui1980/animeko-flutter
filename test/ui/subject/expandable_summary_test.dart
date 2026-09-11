@@ -6,7 +6,9 @@ void main() {
   group('ExpandableSummary', () {
     testWidgets('renders nothing when text is empty', (tester) async {
       await tester.pumpWidget(
-        const MaterialApp(home: Scaffold(body: ExpandableSummary(text: ''))),
+        const MaterialApp(
+          home: Scaffold(body: ExpandableSummary(text: '')),
+        ),
       );
 
       expect(find.byType(SelectableText), findsNothing);
@@ -15,19 +17,26 @@ void main() {
 
     testWidgets('short text shows no 展开 button', (tester) async {
       await tester.pumpWidget(
-        const MaterialApp(home: Scaffold(body: ExpandableSummary(text: 'A short summary.'))),
+        const MaterialApp(
+          home: Scaffold(body: ExpandableSummary(text: 'A short summary.')),
+        ),
       );
 
       expect(find.text('展开'), findsNothing);
       expect(find.text('A short summary.'), findsOneWidget);
     });
 
-    testWidgets('long text shows a 展开 button that toggles to 收起', (tester) async {
+    testWidgets('long text shows a 展开 button that toggles to 收起', (
+      tester,
+    ) async {
       final longText = List.generate(50, (i) => 'word$i').join(' ');
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: SizedBox(width: 100, child: ExpandableSummary(text: longText, maxLines: 2)),
+            body: SizedBox(
+              width: 100,
+              child: ExpandableSummary(text: longText, maxLines: 2),
+            ),
           ),
         ),
       );

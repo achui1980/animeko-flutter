@@ -13,7 +13,9 @@ void main() {
 
   setUp(() {
     api = MockTrendsApi();
-    container = ProviderContainer(overrides: [trendsApiProvider.overrideWithValue(api)]);
+    container = ProviderContainer(
+      overrides: [trendsApiProvider.overrideWithValue(api)],
+    );
     addTearDown(container.dispose);
   });
 
@@ -37,9 +39,9 @@ void main() {
   });
 
   test('returns an empty list when there are no trending subjects', () async {
-    when(() => api.getTrends()).thenAnswer(
-      (_) async => const TrendsResponse(trendingSubjects: []),
-    );
+    when(
+      () => api.getTrends(),
+    ).thenAnswer((_) async => const TrendsResponse(trendingSubjects: []));
 
     final result = await container.read(trendingProvider.future);
 

@@ -34,7 +34,9 @@ void main() {
     test('returns the detail from SubjectApi.getSubject', () async {
       when(() => api.getSubject(1)).thenAnswer((_) async => _detail);
 
-      final result = await container.read(subjectDetailControllerProvider(subjectId: 1).future);
+      final result = await container.read(
+        subjectDetailControllerProvider(subjectId: 1).future,
+      );
 
       expect(result.nameCn, 'A-cn');
     });
@@ -51,10 +53,16 @@ void main() {
 
   group('SubjectCharacters', () {
     test('returns the list from SubjectApi.getCharacters', () async {
-      const character = RelatedCharacter(index: 0, character: CharacterInfo(name: 'X'), role: 1);
+      const character = RelatedCharacter(
+        index: 0,
+        character: CharacterInfo(name: 'X'),
+        role: 1,
+      );
       when(() => api.getCharacters(1)).thenAnswer((_) async => [character]);
 
-      final result = await container.read(subjectCharactersProvider(subjectId: 1).future);
+      final result = await container.read(
+        subjectCharactersProvider(subjectId: 1).future,
+      );
 
       expect(result.single.character.name, 'X');
     });
@@ -74,7 +82,9 @@ void main() {
       const staff = StaffMember(name: 'Y');
       when(() => api.getStaff(1)).thenAnswer((_) async => [staff]);
 
-      final result = await container.read(subjectStaffProvider(subjectId: 1).future);
+      final result = await container.read(
+        subjectStaffProvider(subjectId: 1).future,
+      );
 
       expect(result.single.name, 'Y');
     });

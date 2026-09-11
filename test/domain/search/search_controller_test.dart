@@ -35,50 +35,58 @@ void main() {
     expect(result, isEmpty);
   });
 
-  test('empty keywords resets to an empty list without calling the API', () async {
-    await container.read(searchControllerProvider.future);
-    container.read(searchControllerProvider.notifier).search(keywords: '   ');
-    // No debounce wait needed -- empty-keyword path is synchronous.
-    final state = container.read(searchControllerProvider);
-    expect(state.value, isEmpty);
-    verifyNever(() => api.search(keywords: any(named: 'keywords')));
-  });
+  test(
+    'empty keywords resets to an empty list without calling the API',
+    () async {
+      await container.read(searchControllerProvider.future);
+      container.read(searchControllerProvider.notifier).search(keywords: '   ');
+      // No debounce wait needed -- empty-keyword path is synchronous.
+      final state = container.read(searchControllerProvider);
+      expect(state.value, isEmpty);
+      verifyNever(() => api.search(keywords: any(named: 'keywords')));
+    },
+  );
 
-  test('non-empty keywords call the API after the debounce and map results', () async {
-    when(
-      () => api.search(
-        keywords: any(named: 'keywords'),
-        tags: any(named: 'tags'),
-        sortBy: any(named: 'sortBy'),
-      ),
-    ).thenAnswer(
-      (_) async => const SearchResponse(
-        items: [
-          SubjectSearchResult(
-            id: 1,
-            name: 'Frieren',
-            nameCn: '芙莉莲',
-            imageLarge: 'https://example.com/f.jpg',
-            airDate: '2023-09-29',
-            tags: [],
-          ),
-        ],
-      ),
-    );
+  test(
+    'non-empty keywords call the API after the debounce and map results',
+    () async {
+      when(
+        () => api.search(
+          keywords: any(named: 'keywords'),
+          tags: any(named: 'tags'),
+          sortBy: any(named: 'sortBy'),
+        ),
+      ).thenAnswer(
+        (_) async => const SearchResponse(
+          items: [
+            SubjectSearchResult(
+              id: 1,
+              name: 'Frieren',
+              nameCn: '芙莉莲',
+              imageLarge: 'https://example.com/f.jpg',
+              airDate: '2023-09-29',
+              tags: [],
+            ),
+          ],
+        ),
+      );
 
-    await container.read(searchControllerProvider.future);
-    container.read(searchControllerProvider.notifier).search(keywords: 'frieren');
+      await container.read(searchControllerProvider.future);
+      container
+          .read(searchControllerProvider.notifier)
+          .search(keywords: 'frieren');
 
-    // Debounce is zero, but the timer callback still runs as a
-    // microtask/event -- pump the event loop once.
-    await Future<void>.delayed(Duration.zero);
-    await Future<void>.delayed(Duration.zero);
+      // Debounce is zero, but the timer callback still runs as a
+      // microtask/event -- pump the event loop once.
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
 
-    final state = container.read(searchControllerProvider);
-    expect(state.value, isNotNull);
-    expect(state.value!.single.name, 'Frieren');
-    expect(state.value!.single.id, 1);
-  });
+      final state = container.read(searchControllerProvider);
+      expect(state.value, isNotNull);
+      expect(state.value!.single.name, 'Frieren');
+      expect(state.value!.single.id, 1);
+    },
+  );
 
   test('a thrown API error surfaces as AsyncError', () async {
     when(
@@ -90,7 +98,9 @@ void main() {
     ).thenThrow(Exception('network down'));
 
     await container.read(searchControllerProvider.future);
-    container.read(searchControllerProvider.notifier).search(keywords: 'frieren');
+    container
+        .read(searchControllerProvider.notifier)
+        .search(keywords: 'frieren');
 
     await Future<void>.delayed(Duration.zero);
     await Future<void>.delayed(Duration.zero);
