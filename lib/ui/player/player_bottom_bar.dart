@@ -20,6 +20,7 @@ class PlayerBottomBar extends StatelessWidget {
     required this.currentSpeed,
     required this.speedOptions,
     required this.onSpeedSelected,
+    this.onLineSwitch,
     required this.onDrawerToggle,
     required this.onFullscreenToggle,
     required this.isFullscreen,
@@ -33,6 +34,7 @@ class PlayerBottomBar extends StatelessWidget {
   final double currentSpeed;
   final List<double> speedOptions;
   final ValueChanged<double> onSpeedSelected;
+  final VoidCallback? onLineSwitch;
   final VoidCallback onDrawerToggle;
   final VoidCallback onFullscreenToggle;
   final bool isFullscreen;
@@ -79,8 +81,7 @@ class PlayerBottomBar extends StatelessWidget {
                 value: sliderValue,
                 max: sliderMax,
                 onChanged: durationMs > 0
-                    ? (value) =>
-                          onSeek(Duration(milliseconds: value.round()))
+                    ? (value) => onSeek(Duration(milliseconds: value.round()))
                     : null,
               ),
             ),
@@ -105,6 +106,11 @@ class PlayerBottomBar extends StatelessWidget {
                   ),
                 ),
               ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.alt_route, color: Colors.white),
+              tooltip: '线路',
+              onPressed: onLineSwitch,
             ),
             IconButton(
               icon: const Icon(Icons.playlist_play, color: Colors.white),

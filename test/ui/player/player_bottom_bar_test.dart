@@ -12,6 +12,7 @@ void main() {
     ValueChanged<Duration>? onSeek,
     double currentSpeed = 1.0,
     ValueChanged<double>? onSpeedSelected,
+    VoidCallback? onLineSwitch,
     VoidCallback? onDrawerToggle,
     VoidCallback? onFullscreenToggle,
     bool isFullscreen = false,
@@ -27,6 +28,7 @@ void main() {
           currentSpeed: currentSpeed,
           speedOptions: const [0.5, 0.75, 1.0, 1.25, 1.5, 2.0],
           onSpeedSelected: onSpeedSelected ?? (_) {},
+          onLineSwitch: onLineSwitch,
           onDrawerToggle: onDrawerToggle ?? () {},
           onFullscreenToggle: onFullscreenToggle ?? () {},
           isFullscreen: isFullscreen,
@@ -99,9 +101,41 @@ void main() {
     expect(selectedSpeed, 2.0);
   });
 
-  testWidgets('tapping the drawer icon invokes onDrawerToggle', (
+  testWidgets('shows the line-switch icon when onLineSwitch is provided', (
     tester,
   ) async {
+    await tester.pumpWidget(buildBar(onLineSwitch: () {}));
+
+    expect(find.byIcon(Icons.alt_route), findsOneWidget);
+  });
+
+  testWidgets('tapping the line-switch icon invokes onLineSwitch', (
+    tester,
+  ) async {
+    var tapped = false;
+    await tester.pumpWidget(buildBar(onLineSwitch: () => tapped = true));
+
+    await tester.tap(find.byIcon(Icons.alt_route));
+
+    expect(tapped, isTrue);
+  });
+
+  testWidgets('line-switch icon button is disabled when onLineSwitch is null', (
+    tester,
+  ) async {
+    await tester.pumpWidget(buildBar());
+
+    final button = tester.widget<IconButton>(
+      find.ancestor(
+        of: find.byIcon(Icons.alt_route),
+        matching: find.byType(IconButton),
+      ),
+    );
+
+    expect(button.onPressed, isNull);
+  });
+
+  testWidgets('tapping the drawer icon invokes onDrawerToggle', (tester) async {
     var tapped = false;
     await tester.pumpWidget(buildBar(onDrawerToggle: () => tapped = true));
 
@@ -125,9 +159,7 @@ void main() {
     tester,
   ) async {
     var tapped = false;
-    await tester.pumpWidget(
-      buildBar(onFullscreenToggle: () => tapped = true),
-    );
+    await tester.pumpWidget(buildBar(onFullscreenToggle: () => tapped = true));
 
     await tester.tap(find.byIcon(Icons.fullscreen));
 
