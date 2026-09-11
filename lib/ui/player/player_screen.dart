@@ -80,6 +80,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   List<MediaPlaybackSource>? _candidates;
   int _candidateIndex = 0;
+  bool _isSwitchingCandidate = false;
 
   StreamSubscription<bool>? _completedSubscription;
   StreamSubscription<bool>? _bufferingSubscription;
@@ -595,20 +596,42 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   /// the previously-open candidate first, matching the fire-and-forget
   /// `unawaited(dispose())` pattern used by the automatic fallback paths
   /// above and by `_retry()`.
+  ///
+  /// Guarded by [_isSwitchingCandidate]: a second call while one is
+  /// already in flight is a no-op, same idiom as the `candidates == null`
+  /// staleness checks elsewhere in this class. Without this, reopening
+  /// the line-switch sheet and picking a second candidate before the
+  /// first `_openCandidate` call (which can take several seconds, e.g.
+  /// for a BT candidate needing `prepare()`) has finished would race
+  /// both calls against `_candidateIndex` and `_player`, and the button
+  /// in `PlayerBottomBar` is disabled while this flag is set as the
+  /// primary defense -- the flag itself is the correctness backstop for
+  /// any race that slips through (e.g. a rapid double-tap before the
+  /// `setState` in the `finally` block below propagates).
   Future<void> _switchToCandidate(int newIndex) async {
     final candidates = _candidates;
-    if (candidates == null || newIndex == _candidateIndex) return;
-    final capturedPosition = _player.state.position;
-    final previous = candidates[_candidateIndex];
-    unawaited(previous.dispose());
-    _candidateIndex = newIndex;
-    await _openCandidate(candidates[newIndex]);
-    // `_openCandidate` -> `_maybeResumePosition()` seeks to the
-    // last *persisted* (SharedPreferences) position, not the in-memory
-    // position at the moment of switching -- overwrite it with the
-    // captured value so manual line switches preserve exactly where
-    // playback was, matching mainstream video players' behavior.
-    await _player.seek(capturedPosition);
+    if (candidates == null ||
+        newIndex == _candidateIndex ||
+        _isSwitchingCandidate) {
+      return;
+    }
+    _isSwitchingCandidate = true;
+    try {
+      final capturedPosition = _player.state.position;
+      final previous = candidates[_candidateIndex];
+      unawaited(previous.dispose());
+      _candidateIndex = newIndex;
+      await _openCandidate(candidates[newIndex]);
+      // `_openCandidate` -> `_maybeResumePosition()` seeks to the
+      // last *persisted* (SharedPreferences) position, not the in-memory
+      // position at the moment of switching -- overwrite it with the
+      // captured value so manual line switches preserve exactly where
+      // playback was, matching mainstream video players' behavior.
+      await _player.seek(capturedPosition);
+    } finally {
+      _isSwitchingCandidate = false;
+      if (mounted) setState(() {});
+    }
   }
 
   void _showLineSwitchSheet() {
@@ -888,7 +911,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                                               .setPlaybackSpeed(value);
                                         },
                                         onLineSwitch:
-                                            (_candidates?.length ?? 0) > 1
+                                            (_candidates?.length ?? 0) > 1 &&
+                                                !_isSwitchingCandidate
                                             ? _showLineSwitchSheet
                                             : null,
                                         onDrawerToggle: _toggleDrawer,
