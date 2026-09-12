@@ -98,6 +98,79 @@ void main() {
 
       expect(parsed.resolution, '720P');
     });
+
+    test('parses a SxxExx title (Nix-Raws style)', () {
+      const title =
+          '[Nix-Raws] ふつつかな悪女ではございますが S01E09 '
+          '(Baha 1920x1080 AVC AAC MP4)';
+      final parsed = parseTitle(title);
+
+      expect(parsed.episodeRange, isNotNull);
+      expect(parsed.episodeRange!.contains(9), isTrue);
+      expect(parsed.episodeRange!.expand(), [9]);
+      expect(parsed.resolution, '1080P');
+      expect(parsed.alliance, 'Nix-Raws');
+    });
+
+    test('parses a bare Exx title', () {
+      const title = '[SomeRaws] 恶女不才，请多关照 E09 [1080P]';
+      final parsed = parseTitle(title);
+
+      expect(parsed.episodeRange, isNotNull);
+      expect(parsed.episodeRange!.expand(), [9]);
+    });
+
+    test('parses a lowercase sxxexx title', () {
+      const title = '[SomeRaws] 恶女不才，请多关照 s01e09 [1080P]';
+      final parsed = parseTitle(title);
+
+      expect(parsed.episodeRange, isNotNull);
+      expect(parsed.episodeRange!.expand(), [9]);
+    });
+
+    test('parses 第09话 / 第9集 / 第09話', () {
+      for (final word in ['第09话', '第9集', '第09話']) {
+        final parsed = parseTitle('[桜都字幕组] 恶女不才，请多关照 [$word][1080P][简体]');
+
+        expect(parsed.episodeRange, isNotNull, reason: word);
+        expect(parsed.episodeRange!.expand(), [9], reason: word);
+      }
+    });
+
+    test('parses a v2 re-release episode number (TSDM style)', () {
+      const title = '[TSDM字幕组][恶女不才，请多关照][09v2][1080p][简中]';
+      final parsed = parseTitle(title);
+
+      expect(parsed.episodeRange, isNotNull);
+      expect(parsed.episodeRange!.expand(), [9]);
+      expect(parsed.alliance, 'TSDM字幕组');
+      expect(parsed.resolution, '1080P');
+    });
+
+    test('regression: the pre-existing bare-number formats still parse', () {
+      expect(
+        parseTitle(
+          '[ANi] 恶女不才，请多关照 - 09 [1080P][Baha][CHT][MP4]',
+        ).episodeRange!.expand(),
+        [9],
+      );
+      expect(
+        parseTitle(
+          '[ExileSub][恶女不才，请多关照][10][繁体][1080P]',
+        ).episodeRange!.expand(),
+        [10],
+      );
+      expect(
+        parseTitle(
+          '【澄空学园】★07月新番[恶女不才，请多关照][07-10][1080P][简体][MP4]',
+        ).episodeRange!.expand(),
+        [7, 8, 9, 10],
+      );
+    });
+
+    test('regression: a resolution-only title still has no episode', () {
+      expect(parseTitle('[Group][Show][1080P][MP4]').episodeRange, isNull);
+    });
   });
 
   group('EpisodeRange', () {

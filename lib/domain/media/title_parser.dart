@@ -36,6 +36,27 @@ const _resolutionNumbers = {360, 480, 720, 848, 1080, 1440, 1920, 2160};
 final _bracketPattern = RegExp(r'\[(.+?)\]|【(.+?)】');
 final _rangeWordPattern = RegExp(r'^(\d{1,4})\s*[-~～]{1,2}\s*(\d{1,4})$');
 final _singleEpisodeWordPattern = RegExp(r'^\d{1,4}$');
+
+/// `S01E09` / `s1e9` / `E09`. The season prefix is optional and
+/// deliberately ignored: this project groups releases by episode number
+/// only (see [EpisodeRange]), and a Mikan per-bangumi feed already scopes
+/// results to one season.
+final _seasonEpisodeWordPattern = RegExp(
+  r'^(?:S\d{1,2})?E(\d{1,4})$',
+  caseSensitive: false,
+);
+
+/// `第09话` / `第9集` / `第09話`.
+final _chineseEpisodeWordPattern = RegExp(r'^第(\d{1,4})[话集話]$');
+
+/// `09v2` -- a re-released ("v2"/"v3") cut of episode 9. The version
+/// suffix is dropped, so a re-release lands in the same episode bucket as
+/// the original.
+final _versionedEpisodeWordPattern = RegExp(
+  r'^(\d{1,4})v\d{1,2}$',
+  caseSensitive: false,
+);
+
 final _resolutionXPattern = RegExp(r'(\d{3,4})[xX](\d{3,4})');
 final _resolutionPPattern = RegExp(r'(\d{3,4})[Pp]\b');
 
@@ -142,6 +163,30 @@ EpisodeRange? _tryParseEpisode(String rawWord) {
       return EpisodeRange.single(value);
     }
   }
+
+  // The two explicitly-marked forms below need no [_resolutionNumbers]
+  // guard: an `E`/`第…话` marker is never how a resolution is written, so
+  // there is no bare-number ambiguity to protect against.
+  final seasonEpisodeMatch = _seasonEpisodeWordPattern.firstMatch(word);
+  if (seasonEpisodeMatch != null) {
+    final value = int.tryParse(seasonEpisodeMatch.group(1)!);
+    if (value != null) return EpisodeRange.single(value);
+  }
+
+  final chineseEpisodeMatch = _chineseEpisodeWordPattern.firstMatch(word);
+  if (chineseEpisodeMatch != null) {
+    final value = int.tryParse(chineseEpisodeMatch.group(1)!);
+    if (value != null) return EpisodeRange.single(value);
+  }
+
+  final versionedMatch = _versionedEpisodeWordPattern.firstMatch(word);
+  if (versionedMatch != null) {
+    final value = int.tryParse(versionedMatch.group(1)!);
+    if (value != null && !_resolutionNumbers.contains(value)) {
+      return EpisodeRange.single(value);
+    }
+  }
+
   return null;
 }
 
