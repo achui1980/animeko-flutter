@@ -20,10 +20,17 @@ const _defaultBangumiPageUrl = 'https://mikanani.me/Home/Bangumi/{bangumiId}';
 /// How many of the highest-ranked cards get a back-link verification
 /// request. Mikan's 条目 search returns whole series families (all seasons,
 /// movies, ...), so the correct one is essentially always in the top few;
-/// this bounds the first-visit request cost at 1 + 3.
+/// this bounds the per-keyword first-visit request cost at 1 search + 3
+/// verifications. Overall the worst case is 3 searches + 3 verifications
+/// (= 6 requests): the verification budget is only spent on the first
+/// keyword candidate that returns any cards, and every earlier candidate
+/// costs one search each.
 const _maxVerifiedCards = 3;
 
 final _bangumiHrefPattern = RegExp(r'^/Home/Bangumi/(\d+)');
+
+/// A `bgm.tv` subject back-link href, e.g. `https://bgm.tv/subject/545008`.
+final _bgmSubjectHrefPattern = RegExp(r'bgm\.tv/subject/(\d+)');
 
 /// Parses the 条目 cards out of a Mikan `/Home/Search` page body.
 ///
@@ -43,7 +50,8 @@ List<MikanSubjectCard> parseMikanSearchResults(String body) {
     if (href == null) continue;
     final match = _bangumiHrefPattern.firstMatch(href);
     if (match == null) continue;
-    final bangumiId = int.parse(match.group(1)!);
+    final bangumiId = int.tryParse(match.group(1)!);
+    if (bangumiId == null) continue;
     final title = link
         .querySelector('div.an-text')
         ?.attributes['title']
@@ -183,10 +191,21 @@ class MikanSubjectLocator {
         url,
         options: Options(responseType: ResponseType.plain),
       );
-      // The negative lookahead stops `.../subject/545008` from matching a
-      // page that only links `.../subject/5450089`.
-      final pattern = RegExp('bgm\\.tv/subject/$subjectId(?![0-9])');
-      return pattern.hasMatch(response.data ?? '');
+      // Only a real anchor counts: a bare `bgm.tv/subject/<id>` string
+      // anywhere else on the page (HTML comment, script payload, prose)
+      // must not pass, because a wrong mapping is cached long-term.
+      final document = html_parser.parse(response.data ?? '');
+      for (final link in document.querySelectorAll(
+        'a[href*="bgm.tv/subject/"]',
+      )) {
+        final id = _bgmSubjectHrefPattern
+            .firstMatch(link.attributes['href'] ?? '')
+            ?.group(1);
+        // Comparing parsed ints stops `.../subject/5450089` from
+        // satisfying a request for 545008, and is overflow-safe.
+        if (id != null && int.tryParse(id) == subjectId) return true;
+      }
+      return false;
     } catch (_) {
       return false;
     }

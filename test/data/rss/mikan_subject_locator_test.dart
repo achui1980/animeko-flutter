@@ -22,6 +22,29 @@ String searchUrl(String keyword) =>
 String bangumiPageUrl(int bangumiId) =>
     'https://mikanani.me/Home/Bangumi/$bangumiId';
 
+/// A single `/Home/Search` anchor+card in the shape the real page uses.
+/// [title] goes into the `div.an-text` `title` attribute verbatim (no
+/// trimming) so tests can pin the parser's own trim/blank handling.
+String searchCardAnchor(int bangumiId, String title) =>
+    '<li><a href="/Home/Bangumi/$bangumiId" target="_blank">'
+    '<div class="an-info"><div class="an-info-group">'
+    '<div class="an-text" title="$title">$title</div>'
+    '</div></div></a></li>';
+
+/// Wraps [anchors] in the minimum `/Home/Search` page structure.
+String searchPageWith(Iterable<String> anchors) =>
+    '<!DOCTYPE html><html><body><div class="central-container">'
+    '<ul class="list-inline an-ul">${anchors.join()}</ul>'
+    '</div></body></html>';
+
+/// A `/Home/Bangumi/<id>` page whose only real back-link anchor points at
+/// [linkedSubjectId].
+String bangumiPageLinking(int linkedSubjectId) =>
+    '<!DOCTYPE html><html><body><p class="bangumi-info">'
+    '<a class="w-other-c" href="https://bgm.tv/subject/$linkedSubjectId" '
+    'target="_blank">https://bgm.tv/subject/$linkedSubjectId</a>'
+    '</p></body></html>';
+
 void main() {
   late MockDio dio;
   late MikanSubjectLocator locator;
@@ -88,6 +111,19 @@ void main() {
 
     test('returns an empty list for garbage input', () {
       expect(parseMikanSearchResults('not html at all'), isEmpty);
+    });
+
+    test('skips a card whose title is blank and trims a padded one', () {
+      expect(
+        parseMikanSearchResults(searchPageWith([searchCardAnchor(7, '   ')])),
+        isEmpty,
+      );
+
+      final cards = parseMikanSearchResults(
+        searchPageWith([searchCardAnchor(7, ' Padded ')]),
+      );
+      expect(cards, hasLength(1));
+      expect(cards.single.title, 'Padded');
     });
   });
 
@@ -265,6 +301,128 @@ void main() {
         locator.resolveBangumiId(subjectId: _subjectId, nameCn: _nameCn),
         completion(isNull),
       );
+    });
+
+    test('de-duplicates repeated cards so they do not eat the verification '
+        'budget', () async {
+      // Real Mikan cards carry more than one `/Home/Bangumi/<id>` anchor
+      // per 条目 (image + text), so without de-duplication three copies of
+      // the top-ranked card would consume the whole cap-of-3 budget and
+      // the correct card would never be verified.
+      const nameCn = '测试番剧';
+      final page = searchPageWith([
+        searchCardAnchor(1, nameCn),
+        searchCardAnchor(1, nameCn),
+        searchCardAnchor(1, nameCn),
+        searchCardAnchor(9, '$nameCn 第二季'),
+      ]);
+
+      expect(parseMikanSearchResults(page), hasLength(2));
+
+      stubPages({
+        searchUrl(nameCn): page,
+        // The higher-ranked duplicate is a different subject...
+        bangumiPageUrl(1): bangumiPageLinking(500002),
+        // ...and the lower-ranked card is the real one.
+        bangumiPageUrl(9): bangumiPageLinking(_subjectId),
+      });
+
+      final result = await locator.resolveBangumiId(
+        subjectId: _subjectId,
+        nameCn: nameCn,
+      );
+
+      expect(result, 9);
+      expect(requestedUrls(), [
+        searchUrl(nameCn),
+        bangumiPageUrl(1),
+        bangumiPageUrl(9),
+      ]);
+    });
+
+    test('verifies at most the top 3 cards, then gives up', () async {
+      const nameCn = '目标番剧';
+      // Similarity against `nameCn` strictly decreases down this list, so
+      // the only back-linking card (15) is ranked last and falls outside
+      // the cap.
+      final page = searchPageWith([
+        searchCardAnchor(11, nameCn),
+        searchCardAnchor(12, '${nameCn}2'),
+        searchCardAnchor(13, '${nameCn}XY'),
+        searchCardAnchor(14, '${nameCn}XYZW'),
+        searchCardAnchor(15, '${nameCn}XYZWVU'),
+      ]);
+
+      stubPages({
+        searchUrl(nameCn): page,
+        bangumiPageUrl(11): bangumiPageLinking(500011),
+        bangumiPageUrl(12): bangumiPageLinking(500012),
+        bangumiPageUrl(13): bangumiPageLinking(500013),
+        bangumiPageUrl(14): bangumiPageLinking(500014),
+        bangumiPageUrl(15): bangumiPageLinking(_subjectId),
+      });
+
+      final result = await locator.resolveBangumiId(
+        subjectId: _subjectId,
+        nameCn: nameCn,
+      );
+
+      expect(result, isNull);
+      // 1 search + exactly 3 verifications: cards 14 and 15 are never
+      // fetched even though 15 would have matched.
+      expect(requestedUrls(), [
+        searchUrl(nameCn),
+        bangumiPageUrl(11),
+        bangumiPageUrl(12),
+        bangumiPageUrl(13),
+      ]);
+    });
+
+    test('stops at the first keyword that returns cards instead of widening '
+        'to the next candidate', () async {
+      const nameCn = '某番剧～副标题～';
+      expect(mikanSearchCandidates(nameCn: nameCn), ['某番剧', nameCn]);
+
+      stubPages({
+        // The truncated keyword finds a wrong subject...
+        searchUrl('某番剧'): searchPageWith([searchCardAnchor(21, '某番剧')]),
+        bangumiPageUrl(21): bangumiPageLinking(500021),
+        // ...and the raw name would have found the right one, but that
+        // search must never be issued (design doc: 第一个返回卡片的即停).
+        searchUrl(nameCn): searchPageWith([searchCardAnchor(22, nameCn)]),
+        bangumiPageUrl(22): bangumiPageLinking(_subjectId),
+      });
+
+      final result = await locator.resolveBangumiId(
+        subjectId: _subjectId,
+        nameCn: nameCn,
+      );
+
+      expect(result, isNull);
+      expect(requestedUrls(), [searchUrl('某番剧'), bangumiPageUrl(21)]);
+    });
+
+    test('does not accept a subject id that only appears outside an '
+        'anchor href', () async {
+      stubPages({
+        searchUrl('恶女不才，请多关照'): searchPage,
+        // The page's only real back-link points somewhere else; the
+        // requested id is present, but merely inside an HTML comment.
+        bangumiPageUrl(_bangumiId):
+            '<!DOCTYPE html><html><body>'
+            '<!-- previously https://bgm.tv/subject/$_subjectId -->'
+            '<p class="bangumi-info"><a class="w-other-c" '
+            'href="https://bgm.tv/subject/999999">x</a></p>'
+            '</body></html>',
+        bangumiPageUrl(_decoyBangumiId): bangumiPage3999,
+      });
+
+      final result = await locator.resolveBangumiId(
+        subjectId: _subjectId,
+        nameCn: _nameCn,
+      );
+
+      expect(result, isNull);
     });
   });
 }
