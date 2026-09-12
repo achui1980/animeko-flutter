@@ -130,4 +130,4 @@ final class MediaSourcesProvider
   }
 }
 
-String _$mediaSourcesHash() => r'aec5eb1692ed88bb44c4b9c52ce30c9f8ddef5ff';
+String _$mediaSourcesHash() => r'c4e79aaea51dc90f49b8ef8db96ae09cac22a7c3';

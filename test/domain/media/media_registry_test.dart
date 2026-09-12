@@ -3,11 +3,13 @@ import 'package:animeko_flutter/data/anime1/anime1_api.dart';
 import 'package:animeko_flutter/data/anime1/anime1_models.dart';
 import 'package:animeko_flutter/data/dilidili/dilidili_api.dart';
 import 'package:animeko_flutter/data/dilidili/dilidili_models.dart';
+import 'package:animeko_flutter/data/local_database.dart';
 import 'package:animeko_flutter/data/xifan/xifan_api.dart';
 import 'package:animeko_flutter/data/xifan/xifan_models.dart';
 import 'package:animeko_flutter/data/yinghua/yinghua_api.dart';
 import 'package:animeko_flutter/data/yinghua/yinghua_models.dart';
 import 'package:animeko_flutter/domain/media/media_registry.dart';
+import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:riverpod/riverpod.dart';
@@ -281,7 +283,11 @@ void main() {
   test('mediaSourcesProvider returns the registered sources '
       '(yinghua and dilidili are intentionally disabled -- see '
       'mediaSources doc comment)', () {
-    final container = ProviderContainer();
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    final container = ProviderContainer(
+      overrides: [appDatabaseProvider.overrideWithValue(db)],
+    );
     addTearDown(container.dispose);
     final sources = container.read(mediaSourcesProvider);
     expect(sources.map((s) => s.id), ['anime1', 'xifan', 'mikan']);

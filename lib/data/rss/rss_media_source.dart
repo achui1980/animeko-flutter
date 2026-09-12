@@ -5,6 +5,8 @@ import '../../domain/media/media_source.dart';
 import '../../domain/media/title_parser.dart';
 import '../torrent/rqbit_engine.dart';
 import '../torrent/torrent_playback_source.dart';
+import 'mikan_subject_locator.dart';
+import 'mikan_subject_mapping_repository.dart';
 import 'rss_parser.dart';
 
 part 'rss_media_source.g.dart';
@@ -18,11 +20,29 @@ class RssSourceConfig {
     required this.name,
     required this.searchUrl,
     required this.iconUrl,
+    this.subjectSearchUrl,
+    this.bangumiFeedUrl,
   });
 
   final String name;
   final String searchUrl;
   final String iconUrl;
+
+  /// Template with a `{keyword}` placeholder for this source's *subject*
+  /// (条目) search page -- an HTML page, not a feed. Only Mikan has one; it
+  /// is consumed by `MikanSubjectLocator` (see [mikanSubjectLocator]) to
+  /// resolve a Bangumi subjectId to this source's own subject id. Null for
+  /// sources that only offer keyword search.
+  final String? subjectSearchUrl;
+
+  /// Template with a `{bangumiId}` placeholder for this source's complete
+  /// per-subject feed. When non-null AND the subject mapping resolves,
+  /// [RssMediaSource.search] fetches this instead of [searchUrl] -- a
+  /// keyword search only returns releases whose *torrent title* contains
+  /// every whitespace-separated part of the keyword, which silently drops
+  /// whole subtitle groups (design doc "背景与问题"). Null for sources with
+  /// no per-subject feed, whose behavior is then unchanged.
+  final String? bangumiFeedUrl;
 }
 
 const mikanRssSourceConfig = RssSourceConfig(
@@ -33,6 +53,8 @@ const mikanRssSourceConfig = RssSourceConfig(
   // official domain uses the exact same `/RSS/Search?searchstr=` endpoint
   // and RSS/torrent XML shape, so this is a drop-in swap.
   searchUrl: 'https://mikanani.me/RSS/Search?searchstr={keyword}',
+  subjectSearchUrl: 'https://mikanani.me/Home/Search?searchstr={keyword}',
+  bangumiFeedUrl: 'https://mikanani.me/RSS/Bangumi?bangumiId={bangumiId}',
   iconUrl: 'https://mikanani.me/favicon.ico',
 );
 
@@ -108,11 +130,24 @@ class RssEpisode implements MediaEpisode {
 /// [resolvePlayback] only ever read from the cached [RssSeriesCandidate],
 /// issuing no further network requests.
 class RssMediaSource implements MediaSource {
-  RssMediaSource(this.config, this._dio, this._engine);
+  RssMediaSource(
+    this.config,
+    this._dio,
+    this._engine, {
+    MikanSubjectLocator? locator,
+    MikanSubjectMappingRepository? mappingRepository,
+  }) : _locator = locator,
+       _mappings = mappingRepository;
 
   final RssSourceConfig config;
   final Dio _dio;
   final RqbitEngine _engine;
+
+  /// Both null for RSS sources that have no per-subject feed (see
+  /// [RssSourceConfig.bangumiFeedUrl]) and in tests that only exercise the
+  /// keyword-search path.
+  final MikanSubjectLocator? _locator;
+  final MikanSubjectMappingRepository? _mappings;
 
   @override
   String get id => config.name;
@@ -122,10 +157,7 @@ class RssMediaSource implements MediaSource {
 
   @override
   Future<List<MediaCandidate>> search(String title, {int? subjectId}) async {
-    final url = config.searchUrl.replaceAll(
-      '{keyword}',
-      Uri.encodeQueryComponent(title),
-    );
+    final url = await _resolveFeedUrl(title, subjectId);
     final response = await _dio.get<String>(url);
     final items = parseRssFeed(response.data ?? '');
     final groups = groupByEpisode(items);
@@ -133,6 +165,63 @@ class RssMediaSource implements MediaSource {
     return [
       RssSeriesCandidate(sourceId: config.name, title: title, groups: groups),
     ];
+  }
+
+  /// The complete per-subject feed when this source has one and the subject
+  /// mapping resolves, else today's keyword search. Both paths return the
+  /// same RSS shape, so everything downstream is unchanged.
+  Future<String> _resolveFeedUrl(String title, int? subjectId) async {
+    final bangumiFeedUrl = config.bangumiFeedUrl;
+    final locator = _locator;
+    final mappings = _mappings;
+    if (subjectId == null ||
+        bangumiFeedUrl == null ||
+        locator == null ||
+        mappings == null) {
+      return _keywordSearchUrl(title);
+    }
+
+    final bangumiId = await _resolveBangumiId(
+      subjectId: subjectId,
+      nameCn: title,
+      locator: locator,
+      mappings: mappings,
+    );
+    if (bangumiId == null) return _keywordSearchUrl(title);
+    return bangumiFeedUrl.replaceAll('{bangumiId}', '$bangumiId');
+  }
+
+  String _keywordSearchUrl(String title) =>
+      config.searchUrl.replaceAll('{keyword}', Uri.encodeQueryComponent(title));
+
+  /// Cache first, then the locator (whose result -- including a negative
+  /// one -- is written back). Returns null on ANY problem: a mapping is an
+  /// optimization, never a precondition, so a broken cache or an unlocatable
+  /// subject must degrade to keyword search rather than fail the source
+  /// (design doc "错误处理").
+  Future<int?> _resolveBangumiId({
+    required int subjectId,
+    required String nameCn,
+    required MikanSubjectLocator locator,
+    required MikanSubjectMappingRepository mappings,
+  }) async {
+    try {
+      final cached = await mappings.lookup(subjectId);
+      if (cached != null) return cached.bangumiId;
+
+      // Null when the subject was never cached locally, in which case the
+      // locator simply skips its Japanese-name keyword candidate.
+      final nameJp = await mappings.readJapaneseName(subjectId);
+      final resolved = await locator.resolveBangumiId(
+        subjectId: subjectId,
+        nameCn: nameCn,
+        nameJp: nameJp,
+      );
+      await mappings.save(subjectId, resolved);
+      return resolved;
+    } catch (_) {
+      return null;
+    }
   }
 
   @override
@@ -196,3 +285,16 @@ Dio mikanRssDio(Ref ref) {
   );
   return dio;
 }
+
+/// Resolves Bangumi subject ids to Mikan bangumi ids for
+/// [RssMediaSource.search].
+///
+/// Deliberately built on the same [mikanRssDio] as the feed requests: the
+/// 条目 search page and bangumi pages live on the same host and need the
+/// same proxy handling and timeout bounds. The `!` is safe by construction
+/// -- [mikanRssSourceConfig] always declares a [RssSourceConfig.subjectSearchUrl].
+@riverpod
+MikanSubjectLocator mikanSubjectLocator(Ref ref) => MikanSubjectLocator(
+  ref.watch(mikanRssDioProvider),
+  searchUrlTemplate: mikanRssSourceConfig.subjectSearchUrl!,
+);

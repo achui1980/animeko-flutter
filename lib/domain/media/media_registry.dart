@@ -5,6 +5,7 @@ import '../../data/anime1/anime1_api.dart';
 import '../../data/anime1/anime1_models.dart';
 import '../../data/dilidili/dilidili_api.dart';
 import '../../data/dilidili/dilidili_models.dart';
+import '../../data/rss/mikan_subject_mapping_repository.dart';
 import '../../data/rss/rss_media_source.dart';
 import '../../data/torrent/rqbit_engine.dart';
 import '../../data/xifan/xifan_api.dart';
@@ -154,5 +155,7 @@ List<MediaSource> mediaSources(Ref ref) => [
     mikanRssSourceConfig,
     ref.watch(mikanRssDioProvider),
     ref.watch(rqbitEngineProvider),
+    locator: ref.watch(mikanSubjectLocatorProvider),
+    mappingRepository: ref.watch(mikanSubjectMappingRepositoryProvider),
   ),
 ];
