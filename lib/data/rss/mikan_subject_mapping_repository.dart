@@ -15,6 +15,19 @@ class CachedMikanMapping {
   const CachedMikanMapping(this.bangumiId);
 
   final int? bangumiId;
+
+  /// Value semantics so a positive result (a runtime instance) compares the
+  /// same way as the canonicalized `const CachedMikanMapping(null)` the
+  /// negative path returns.
+  @override
+  bool operator ==(Object other) =>
+      other is CachedMikanMapping && other.bangumiId == bangumiId;
+
+  @override
+  int get hashCode => bangumiId.hashCode;
+
+  @override
+  String toString() => 'CachedMikanMapping($bangumiId)';
 }
 
 /// Read/write access to the persistent `subjectId -> Mikan bangumiId`

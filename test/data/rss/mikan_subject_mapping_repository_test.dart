@@ -66,6 +66,25 @@ void main() {
         expect(cached, isNull);
       },
     );
+
+    test(
+      'treats a negative result exactly negativeTtl old as a miss',
+      () async {
+        await repositoryAt(now).save(545008, null);
+
+        final cached = await repositoryAt(
+          now.add(MikanSubjectMappingRepository.negativeTtl),
+        ).lookup(545008);
+
+        expect(cached, isNull);
+      },
+    );
+
+    test('does not serve another subject\'s mapping', () async {
+      await repositoryAt(now).save(999999, 4012);
+
+      expect(await repositoryAt(now).lookup(545008), isNull);
+    });
   });
 
   group('save', () {
@@ -123,6 +142,32 @@ void main() {
           );
 
       expect(await repositoryAt(now).readJapaneseName(545008), isNull);
+    });
+
+    test('does not serve another subject\'s name', () async {
+      await db
+          .into(db.subjects)
+          .insert(
+            SubjectsCompanion.insert(
+              id: const Value(999999),
+              name: 'ふつつかな悪女ではございますが ～雛宮蝶鼠伝奇～',
+              nameCn: '恶女不才，请多关照 ～雏宫蝶鼠换身传～',
+            ),
+          );
+
+      expect(await repositoryAt(now).readJapaneseName(545008), isNull);
+    });
+  });
+
+  group('CachedMikanMapping', () {
+    test('compares by value, including on the positive lookup path', () async {
+      await repositoryAt(now).save(545008, 4012);
+
+      final cached = await repositoryAt(now).lookup(545008);
+
+      expect(cached, const CachedMikanMapping(4012));
+      expect(cached.hashCode, const CachedMikanMapping(4012).hashCode);
+      expect(cached, isNot(const CachedMikanMapping(null)));
     });
   });
 }
