@@ -79,6 +79,19 @@ dev_dependencies:
 # The following section is specific to Flutter packages.
 flutter:
 
+  config:
+    # Pin plugin integration to CocoaPods for every developer / Flutter version.
+    #
+    # Flutter >= 3.44 enables Swift Package Manager by default while older SDKs
+    # (e.g. 3.41) do not. Mixing both against the same macos/Flutter/ephemeral
+    # produces "target 'wakelock_plus' referenced in product 'wakelock-plus' is
+    # empty" and a Podfile.lock that flip-flops between 3 and 11 pods.
+    #
+    # media_kit_libs_macos_video and media_kit_video ship no Package.swift, so
+    # CocoaPods has to run regardless — pinning it off keeps a single
+    # integration path that matches the committed macos/Podfile.lock.
+    enable-swift-package-manager: false
+
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.
