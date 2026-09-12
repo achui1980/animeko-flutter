@@ -53,7 +53,7 @@ final class SubjectEpisodesControllerProvider
 }
 
 String _$subjectEpisodesControllerHash() =>
-    r'6b7ee29939ad52e8ea4774b77a6aa0afe3a3db0a';
+    r'a6fa3fb103035aed44a81fbca648bcc3385f6e34';
 
 final class SubjectEpisodesControllerFamily extends $Family
     with

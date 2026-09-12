@@ -82,7 +82,9 @@ abstract class MediaSource {
   /// (see `RssMediaSource`, which resolves it to a Mikan bangumiId and then
   /// fetches that subject's complete feed) use it to return far more
   /// complete results than a keyword search can; every other source
-  /// ignores it. Sources MUST still work when it is null.
+  /// ignores it. Sources MUST still work when it is null, but callers
+  /// should pass it whenever they know it -- omitting it silently degrades
+  /// sources like `RssMediaSource` to a keyword search.
   Future<List<MediaCandidate>> search(String title, {int? subjectId});
 
   /// Lists every episode under [candidate] (which must have come from
