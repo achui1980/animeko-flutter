@@ -54,8 +54,9 @@ String _$mikanRssDioHash() => r'26282b11d744b4d53c7d4f56ab07c4f60d0ad0f2';
 ///
 /// Deliberately built on the same [mikanRssDio] as the feed requests: the
 /// 条目 search page and bangumi pages live on the same host and need the
-/// same proxy handling and timeout bounds. The `!` is safe by construction
-/// -- [mikanRssSourceConfig] always declares a [RssSourceConfig.subjectSearchUrl].
+/// same proxy handling and timeout bounds. Reads the shared
+/// [_mikanSubjectSearchUrl] const rather than
+/// [mikanRssSourceConfig]'s nullable copy, so no null-assert is needed.
 
 @ProviderFor(mikanSubjectLocator)
 final mikanSubjectLocatorProvider = MikanSubjectLocatorProvider._();
@@ -65,8 +66,9 @@ final mikanSubjectLocatorProvider = MikanSubjectLocatorProvider._();
 ///
 /// Deliberately built on the same [mikanRssDio] as the feed requests: the
 /// 条目 search page and bangumi pages live on the same host and need the
-/// same proxy handling and timeout bounds. The `!` is safe by construction
-/// -- [mikanRssSourceConfig] always declares a [RssSourceConfig.subjectSearchUrl].
+/// same proxy handling and timeout bounds. Reads the shared
+/// [_mikanSubjectSearchUrl] const rather than
+/// [mikanRssSourceConfig]'s nullable copy, so no null-assert is needed.
 
 final class MikanSubjectLocatorProvider
     extends
@@ -81,8 +83,9 @@ final class MikanSubjectLocatorProvider
   ///
   /// Deliberately built on the same [mikanRssDio] as the feed requests: the
   /// 条目 search page and bangumi pages live on the same host and need the
-  /// same proxy handling and timeout bounds. The `!` is safe by construction
-  /// -- [mikanRssSourceConfig] always declares a [RssSourceConfig.subjectSearchUrl].
+  /// same proxy handling and timeout bounds. Reads the shared
+  /// [_mikanSubjectSearchUrl] const rather than
+  /// [mikanRssSourceConfig]'s nullable copy, so no null-assert is needed.
   MikanSubjectLocatorProvider._()
     : super(
         from: null,
@@ -118,4 +121,4 @@ final class MikanSubjectLocatorProvider
 }
 
 String _$mikanSubjectLocatorHash() =>
-    r'c8382943db54fa73f2fa01f606bf61dae95ff1f5';
+    r'6fdf5f88517871318cb66a667f82bc856f527c7a';

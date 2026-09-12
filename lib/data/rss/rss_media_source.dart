@@ -45,6 +45,12 @@ class RssSourceConfig {
   final String? bangumiFeedUrl;
 }
 
+/// Mikan's 条目 (subject) search page template, shared by
+/// [mikanRssSourceConfig] and the [mikanSubjectLocator] provider so neither
+/// has to null-assert the other's copy.
+const _mikanSubjectSearchUrl =
+    'https://mikanani.me/Home/Search?searchstr={keyword}';
+
 const mikanRssSourceConfig = RssSourceConfig(
   name: 'mikan',
   // mikanani.me is Mikan's official domain. An earlier revision pointed at
@@ -53,7 +59,7 @@ const mikanRssSourceConfig = RssSourceConfig(
   // official domain uses the exact same `/RSS/Search?searchstr=` endpoint
   // and RSS/torrent XML shape, so this is a drop-in swap.
   searchUrl: 'https://mikanani.me/RSS/Search?searchstr={keyword}',
-  subjectSearchUrl: 'https://mikanani.me/Home/Search?searchstr={keyword}',
+  subjectSearchUrl: _mikanSubjectSearchUrl,
   bangumiFeedUrl: 'https://mikanani.me/RSS/Bangumi?bangumiId={bangumiId}',
   iconUrl: 'https://mikanani.me/favicon.ico',
 );
@@ -136,7 +142,14 @@ class RssMediaSource implements MediaSource {
     this._engine, {
     MikanSubjectLocator? locator,
     MikanSubjectMappingRepository? mappingRepository,
-  }) : _locator = locator,
+  }) : assert(
+         (locator == null) == (mappingRepository == null),
+         'locator and mappingRepository are an all-or-nothing pair: the '
+         'per-subject feed is only used when both are present, so passing '
+         'just one silently reverts every search to the lossy keyword '
+         'search with no error anywhere.',
+       ),
+       _locator = locator,
        _mappings = mappingRepository;
 
   final RssSourceConfig config;
@@ -157,14 +170,41 @@ class RssMediaSource implements MediaSource {
 
   @override
   Future<List<MediaCandidate>> search(String title, {int? subjectId}) async {
-    final url = await _resolveFeedUrl(title, subjectId);
-    final response = await _dio.get<String>(url);
-    final items = parseRssFeed(response.data ?? '');
+    final keywordUrl = _keywordSearchUrl(title);
+    final feedUrl = await _resolveFeedUrl(title, subjectId);
+
+    var items = const <RssItem>[];
+    if (feedUrl != keywordUrl) {
+      items = await _tryFetchItems(feedUrl);
+    }
+    // An empty per-bangumi feed means the mapping is stale (Mikan retired
+    // that bangumiId) or the endpoint changed. Cached positive mappings
+    // never expire and nothing ever deletes them, so without this retry the
+    // source would silently contribute nothing for that subject forever.
+    // The keyword search is lossy, but it beats contributing nothing.
+    if (items.isEmpty) {
+      final response = await _dio.get<String>(keywordUrl);
+      items = parseRssFeed(response.data ?? '');
+    }
     final groups = groupByEpisode(items);
 
     return [
       RssSeriesCandidate(sourceId: config.name, title: title, groups: groups),
     ];
+  }
+
+  /// The feed's items, or an empty list when the request fails or the body
+  /// is unparseable. Only ever used for the *optional* per-bangumi feed:
+  /// [search] treats an empty result as "retry the keyword search", so a
+  /// failure here degrades instead of failing the source. A throw on the
+  /// keyword request itself is deliberately left to propagate.
+  Future<List<RssItem>> _tryFetchItems(String url) async {
+    try {
+      final response = await _dio.get<String>(url);
+      return parseRssFeed(response.data ?? '');
+    } catch (_) {
+      return const [];
+    }
   }
 
   /// The complete per-subject feed when this source has one and the subject
@@ -217,7 +257,13 @@ class RssMediaSource implements MediaSource {
         nameCn: nameCn,
         nameJp: nameJp,
       );
-      await mappings.save(subjectId, resolved);
+      // A failed cache write must not discard an answer we already paid
+      // 1-6 HTTP requests for; worst case the next visit re-resolves it.
+      try {
+        await mappings.save(subjectId, resolved);
+      } catch (_) {
+        // Intentionally ignored -- see above.
+      }
       return resolved;
     } catch (_) {
       return null;
@@ -291,10 +337,11 @@ Dio mikanRssDio(Ref ref) {
 ///
 /// Deliberately built on the same [mikanRssDio] as the feed requests: the
 /// 条目 search page and bangumi pages live on the same host and need the
-/// same proxy handling and timeout bounds. The `!` is safe by construction
-/// -- [mikanRssSourceConfig] always declares a [RssSourceConfig.subjectSearchUrl].
+/// same proxy handling and timeout bounds. Reads the shared
+/// [_mikanSubjectSearchUrl] const rather than
+/// [mikanRssSourceConfig]'s nullable copy, so no null-assert is needed.
 @riverpod
 MikanSubjectLocator mikanSubjectLocator(Ref ref) => MikanSubjectLocator(
   ref.watch(mikanRssDioProvider),
-  searchUrlTemplate: mikanRssSourceConfig.subjectSearchUrl!,
+  searchUrlTemplate: _mikanSubjectSearchUrl,
 );

@@ -30,6 +30,21 @@ const _subjectId = 545008;
 const _bangumiId = 4012;
 const _nameCn = '恶女不才，请多关照 ～雏宫蝶鼠换身传～';
 
+const _bangumiFeedUrl = 'https://mikanani.me/RSS/Bangumi?bangumiId=4012';
+const _keywordUrlPrefix = 'https://mikanani.me/RSS/Search?searchstr=';
+
+/// A well-formed feed with zero `<item>`s -- what Mikan serves for a
+/// bangumiId that no longer exists (or after an endpoint change): HTTP 200,
+/// parseable XML, no releases.
+const _emptyFeedXml =
+    '<?xml version="1.0" encoding="UTF-8"?>'
+    '<rss version="2.0"><channel><title>Mikan Project</title></channel></rss>';
+
+DioException _dioFailure(String url) => DioException(
+  requestOptions: RequestOptions(path: url),
+  message: 'boom',
+);
+
 void main() {
   late MockDio dio;
   late MockRqbitEngine engine;
@@ -263,6 +278,10 @@ void main() {
           nameJp: any(named: 'nameJp'),
         ),
       );
+      // Re-saving a cached negative would refresh its `resolvedAt`, so the
+      // 7-day negative TTL could never elapse and the subject would never
+      // be retried once it does appear on Mikan.
+      verifyNever(() => mappings.save(any(), any()));
     });
 
     test('falls back to keyword search when no subjectId is given', () async {
@@ -275,21 +294,62 @@ void main() {
       verifyNever(() => mappings.lookup(any()));
     });
 
-    test(
-      'falls back to keyword search when the mapping cache throws',
-      () async {
+    // `_resolveBangumiId` promises to return null on ANY problem, so every
+    // collaborator call it makes must degrade to the keyword search -- a
+    // mapping is an optimization, never a precondition. Covering only
+    // `lookup` here would leave the other two throw-paths free to escape.
+    final throwingCollaborators = <String, void Function()>{
+      'mappings.lookup': () {
         when(
           () => mappings.lookup(_subjectId),
         ).thenThrow(Exception('db closed'));
+      },
+      'mappings.readJapaneseName': () {
+        when(() => mappings.lookup(_subjectId)).thenAnswer((_) async => null);
+        when(
+          () => mappings.readJapaneseName(_subjectId),
+        ).thenThrow(Exception('db closed'));
+      },
+      'locator.resolveBangumiId': () {
+        when(() => mappings.lookup(_subjectId)).thenAnswer((_) async => null);
+        when(
+          () => locator.resolveBangumiId(
+            subjectId: _subjectId,
+            nameCn: _nameCn,
+            nameJp: null,
+          ),
+        ).thenThrow(Exception('unexpected locator crash'));
+      },
+    };
+
+    for (final entry in throwingCollaborators.entries) {
+      test('falls back to keyword search when ${entry.key} throws', () async {
+        entry.value();
 
         await mappedSource.search(_nameCn, subjectId: _subjectId);
 
-        expect(
-          requestedUrls().single,
-          startsWith('https://mikanani.me/RSS/Search?searchstr='),
-        );
-      },
-    );
+        expect(requestedUrls().single, startsWith(_keywordUrlPrefix));
+      });
+    }
+
+    test('keeps using the per-bangumi feed when caching the resolved '
+        'mapping fails', () async {
+      when(() => mappings.lookup(_subjectId)).thenAnswer((_) async => null);
+      when(
+        () => locator.resolveBangumiId(
+          subjectId: _subjectId,
+          nameCn: _nameCn,
+          nameJp: null,
+        ),
+      ).thenAnswer((_) async => _bangumiId);
+      when(() => mappings.save(any(), any())).thenThrow(Exception('db closed'));
+
+      await mappedSource.search(_nameCn, subjectId: _subjectId);
+
+      // The id was already paid for with 1-6 HTTP requests; a failed cache
+      // write must only cost a re-resolve next visit, not the whole feed.
+      expect(requestedUrls(), [_bangumiFeedUrl]);
+    });
 
     test('a source without a locator keeps using keyword search', () async {
       await source.search(_nameCn, subjectId: _subjectId);
@@ -297,6 +357,86 @@ void main() {
       expect(
         requestedUrls().single,
         startsWith('https://mikanani.me/RSS/Search?searchstr='),
+      );
+    });
+
+    group('per-bangumi feed fallbacks', () {
+      /// Answers the mock Dio per URL: these tests need the per-bangumi feed
+      /// and the keyword search to behave differently within one `search`.
+      void routeDio(Future<Response<String>> Function(String url) handler) {
+        when(() => dio.get<String>(any())).thenAnswer(
+          (invocation) =>
+              handler(invocation.positionalArguments.first as String),
+        );
+      }
+
+      setUp(() {
+        when(
+          () => mappings.lookup(_subjectId),
+        ).thenAnswer((_) async => const CachedMikanMapping(_bangumiId));
+      });
+
+      test('retries the keyword search when the per-bangumi feed request '
+          'throws', () async {
+        routeDio((url) async {
+          if (url.startsWith(_bangumiFeedUrl)) throw _dioFailure(url);
+          return _xmlResponse(xmlBody);
+        });
+
+        final candidates = await mappedSource.search(
+          _nameCn,
+          subjectId: _subjectId,
+        );
+
+        expect(requestedUrls(), [
+          _bangumiFeedUrl,
+          startsWith(_keywordUrlPrefix),
+        ]);
+        expect((candidates.single as RssSeriesCandidate).groups, isNotEmpty);
+      });
+
+      test('retries the keyword search when the per-bangumi feed is empty '
+          'but returns HTTP 200', () async {
+        routeDio(
+          (url) async => _xmlResponse(
+            url.startsWith(_bangumiFeedUrl) ? _emptyFeedXml : xmlBody,
+          ),
+        );
+
+        final candidates = await mappedSource.search(
+          _nameCn,
+          subjectId: _subjectId,
+        );
+
+        expect(requestedUrls(), [
+          _bangumiFeedUrl,
+          startsWith(_keywordUrlPrefix),
+        ]);
+        expect((candidates.single as RssSeriesCandidate).groups, isNotEmpty);
+      });
+
+      test('a failing keyword search still propagates after an empty '
+          'per-bangumi feed', () async {
+        routeDio((url) async {
+          if (url.startsWith(_bangumiFeedUrl)) {
+            return _xmlResponse(_emptyFeedXml);
+          }
+          throw _dioFailure(url);
+        });
+
+        await expectLater(
+          () => mappedSource.search(_nameCn, subjectId: _subjectId),
+          throwsA(isA<DioException>()),
+        );
+      });
+    });
+
+    test('a failing keyword search propagates unchanged', () async {
+      when(() => dio.get<String>(any())).thenThrow(_dioFailure('/'));
+
+      await expectLater(
+        () => source.search(_nameCn),
+        throwsA(isA<DioException>()),
       );
     });
   });

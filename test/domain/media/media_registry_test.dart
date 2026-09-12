@@ -1,14 +1,19 @@
 // test/domain/media/media_registry_test.dart
+import 'dart:io';
+
 import 'package:animeko_flutter/data/anime1/anime1_api.dart';
 import 'package:animeko_flutter/data/anime1/anime1_models.dart';
 import 'package:animeko_flutter/data/dilidili/dilidili_api.dart';
 import 'package:animeko_flutter/data/dilidili/dilidili_models.dart';
 import 'package:animeko_flutter/data/local_database.dart';
+import 'package:animeko_flutter/data/rss/mikan_subject_mapping_repository.dart';
+import 'package:animeko_flutter/data/rss/rss_media_source.dart';
 import 'package:animeko_flutter/data/xifan/xifan_api.dart';
 import 'package:animeko_flutter/data/xifan/xifan_models.dart';
 import 'package:animeko_flutter/data/yinghua/yinghua_api.dart';
 import 'package:animeko_flutter/data/yinghua/yinghua_models.dart';
 import 'package:animeko_flutter/domain/media/media_registry.dart';
+import 'package:dio/dio.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -21,6 +26,11 @@ class MockXifanApi extends Mock implements XifanApi {}
 class MockYinghuaApi extends Mock implements YinghuaApi {}
 
 class MockDilidiliApi extends Mock implements DilidiliApi {}
+
+class MockDio extends Mock implements Dio {}
+
+class MockMikanSubjectMappingRepository extends Mock
+    implements MikanSubjectMappingRepository {}
 
 void main() {
   group('Anime1MediaSource', () {
@@ -291,5 +301,55 @@ void main() {
     addTearDown(container.dispose);
     final sources = container.read(mediaSourcesProvider);
     expect(sources.map((s) => s.id), ['anime1', 'xifan', 'mikan']);
+  });
+
+  // Guards the *production wiring*, not RssMediaSource itself: dropping
+  // either `locator:` or `mappingRepository:` from [mediaSources] leaves
+  // `flutter analyze` clean and every other test green, while silently
+  // reverting all Mikan searches to the lossy keyword search -- i.e. the
+  // exact bug the per-bangumi feed exists to fix.
+  test('the registered mikan source is wired with both subject-mapping '
+      'collaborators, so it fetches the per-bangumi feed', () async {
+    const subjectId = 545008;
+    const bangumiId = 4012;
+    final feedBody = File(
+      'test/fixtures/mikan/rss_bangumi_4012.xml',
+    ).readAsStringSync();
+
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+
+    final dio = MockDio();
+    when(() => dio.get<String>(any())).thenAnswer(
+      (_) async => Response<String>(
+        data: feedBody,
+        requestOptions: RequestOptions(path: '/'),
+        statusCode: 200,
+      ),
+    );
+
+    final mappings = MockMikanSubjectMappingRepository();
+    when(
+      () => mappings.lookup(subjectId),
+    ).thenAnswer((_) async => const CachedMikanMapping(bangumiId));
+
+    final container = ProviderContainer(
+      overrides: [
+        appDatabaseProvider.overrideWithValue(db),
+        mikanRssDioProvider.overrideWithValue(dio),
+        mikanSubjectMappingRepositoryProvider.overrideWithValue(mappings),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final mikan = container
+        .read(mediaSourcesProvider)
+        .firstWhere((s) => s.id == 'mikan');
+    await mikan.search('恶女不才，请多关照', subjectId: subjectId);
+
+    final urls = verify(
+      () => dio.get<String>(captureAny()),
+    ).captured.cast<String>();
+    expect(urls, ['https://mikanani.me/RSS/Bangumi?bangumiId=$bangumiId']);
   });
 }
