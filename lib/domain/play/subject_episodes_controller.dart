@@ -48,7 +48,7 @@ class SubjectEpisodesController extends _$SubjectEpisodesController {
     // Query every source concurrently -- one source's latency/failure
     // must not block or fail the others (Decision 7: silent ignore).
     final results = await Future.wait(
-      sources.map((source) => _fetchFromSource(source, subjectName)),
+      sources.map((source) => _fetchFromSource(source, subjectName, subjectId)),
     );
 
     final merged = results.expand((episodes) => episodes).toList();
@@ -61,9 +61,10 @@ class SubjectEpisodesController extends _$SubjectEpisodesController {
   Future<List<MergedEpisode>> _fetchFromSource(
     MediaSource source,
     String subjectName,
+    int subjectId,
   ) async {
     try {
-      final candidates = await source.search(subjectName);
+      final candidates = await source.search(subjectName, subjectId: subjectId);
       final best = matchBest(candidates, subjectName);
       if (best == null) return const [];
       final episodes = await source.listEpisodes(best);

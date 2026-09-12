@@ -25,7 +25,8 @@ class _FakeSource implements MediaSource {
   final String displayName;
 
   @override
-  Future<List<MediaCandidate>> search(String title) async => const [];
+  Future<List<MediaCandidate>> search(String title, {int? subjectId}) async =>
+      const [];
 
   @override
   Future<List<MediaEpisode>> listEpisodes(MediaCandidate candidate) async =>

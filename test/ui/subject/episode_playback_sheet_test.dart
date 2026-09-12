@@ -59,7 +59,7 @@ void main() {
       // asserts no `Timer` is left pending when a test ends, and this
       // test intentionally never lets the search settle within it.
       when(
-        () => source.search(any()),
+        () => source.search(any(), subjectId: any(named: 'subjectId')),
       ).thenAnswer((_) => Completer<List<MediaCandidate>>().future);
 
       await tester.pumpWidget(
@@ -86,7 +86,9 @@ void main() {
     final source = MockMediaSource();
     when(() => source.id).thenReturn('anime1');
     when(() => source.displayName).thenReturn('anime1.me');
-    when(() => source.search(any())).thenAnswer((_) async => const []);
+    when(
+      () => source.search(any(), subjectId: any(named: 'subjectId')),
+    ).thenAnswer((_) async => const []);
 
     await tester.pumpWidget(
       wrap(
@@ -113,7 +115,7 @@ void main() {
     when(() => source.id).thenReturn('anime1');
     when(() => source.displayName).thenReturn('anime1.me');
     when(
-      () => source.search('目标番剧'),
+      () => source.search('目标番剧', subjectId: 1),
     ).thenAnswer((_) async => [const _FakeCandidate('anime1', '目标番剧')]);
     when(() => source.listEpisodes(any())).thenAnswer(
       (_) async => [const _FakeEpisode(sourceId: 'anime1', title: '第1集')],

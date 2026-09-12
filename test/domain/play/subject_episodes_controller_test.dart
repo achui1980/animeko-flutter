@@ -61,13 +61,13 @@ void main() {
 
     test('merges episodes from every source that finds a match', () async {
       when(
-        () => sourceA.search('目标番剧'),
+        () => sourceA.search('目标番剧', subjectId: 1),
       ).thenAnswer((_) async => [const _FakeCandidate('a', '目标番剧')]);
       when(
         () => sourceA.listEpisodes(any()),
       ).thenAnswer((_) async => [const _FakeEpisode('a', 'A的第1集')]);
       when(
-        () => sourceB.search('目标番剧'),
+        () => sourceB.search('目标番剧', subjectId: 1),
       ).thenAnswer((_) async => [const _FakeCandidate('b', '目标番剧')]);
       when(
         () => sourceB.listEpisodes(any()),
@@ -82,12 +82,28 @@ void main() {
       );
     });
 
+    test('passes the subjectId through to every source', () async {
+      when(
+        () => sourceA.search(any(), subjectId: any(named: 'subjectId')),
+      ).thenAnswer((_) async => []);
+      when(
+        () => sourceB.search(any(), subjectId: any(named: 'subjectId')),
+      ).thenAnswer((_) async => []);
+
+      await expectLater(read(), throwsA(isA<MediaNotFoundException>()));
+
+      verify(() => sourceA.search('目标番剧', subjectId: 1)).called(1);
+      verify(() => sourceB.search('目标番剧', subjectId: 1)).called(1);
+    });
+
     test(
       'silently ignores a source that finds no matching candidate',
       () async {
-        when(() => sourceA.search('目标番剧')).thenAnswer((_) async => []);
         when(
-          () => sourceB.search('目标番剧'),
+          () => sourceA.search('目标番剧', subjectId: 1),
+        ).thenAnswer((_) async => []);
+        when(
+          () => sourceB.search('目标番剧', subjectId: 1),
         ).thenAnswer((_) async => [const _FakeCandidate('b', '目标番剧')]);
         when(
           () => sourceB.listEpisodes(any()),
@@ -102,9 +118,11 @@ void main() {
     );
 
     test('silently ignores a source whose search throws', () async {
-      when(() => sourceA.search('目标番剧')).thenThrow(Exception('network down'));
       when(
-        () => sourceB.search('目标番剧'),
+        () => sourceA.search('目标番剧', subjectId: 1),
+      ).thenThrow(Exception('network down'));
+      when(
+        () => sourceB.search('目标番剧', subjectId: 1),
       ).thenAnswer((_) async => [const _FakeCandidate('b', '目标番剧')]);
       when(
         () => sourceB.listEpisodes(any()),
@@ -119,8 +137,12 @@ void main() {
     test(
       'throws MediaNotFoundException when every source finds nothing',
       () async {
-        when(() => sourceA.search(any())).thenAnswer((_) async => []);
-        when(() => sourceB.search(any())).thenThrow(Exception('also down'));
+        when(
+          () => sourceA.search(any(), subjectId: any(named: 'subjectId')),
+        ).thenAnswer((_) async => []);
+        when(
+          () => sourceB.search(any(), subjectId: any(named: 'subjectId')),
+        ).thenThrow(Exception('also down'));
 
         await expectLater(read(), throwsA(isA<MediaNotFoundException>()));
       },
@@ -128,13 +150,17 @@ void main() {
 
     test('queries all sources concurrently, not sequentially', () async {
       final order = <String>[];
-      when(() => sourceA.search(any())).thenAnswer((_) async {
+      when(
+        () => sourceA.search(any(), subjectId: any(named: 'subjectId')),
+      ).thenAnswer((_) async {
         order.add('a-start');
         await Future<void>.delayed(const Duration(milliseconds: 20));
         order.add('a-end');
         return [];
       });
-      when(() => sourceB.search(any())).thenAnswer((_) async {
+      when(
+        () => sourceB.search(any(), subjectId: any(named: 'subjectId')),
+      ).thenAnswer((_) async {
         order.add('b-start');
         return [];
       });

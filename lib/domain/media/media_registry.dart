@@ -31,7 +31,7 @@ class Anime1MediaSource implements MediaSource {
   String get displayName => 'anime1.me';
 
   @override
-  Future<List<MediaCandidate>> search(String title) =>
+  Future<List<MediaCandidate>> search(String title, {int? subjectId}) =>
       _api.searchCategories(title);
 
   @override
@@ -59,7 +59,8 @@ class XifanMediaSource implements MediaSource {
   String get displayName => '稀饭动漫';
 
   @override
-  Future<List<MediaCandidate>> search(String title) => _api.search(title);
+  Future<List<MediaCandidate>> search(String title, {int? subjectId}) =>
+      _api.search(title);
 
   @override
   Future<List<MediaEpisode>> listEpisodes(MediaCandidate candidate) =>
@@ -83,7 +84,8 @@ class YinghuaMediaSource implements MediaSource {
   String get displayName => '樱花动漫';
 
   @override
-  Future<List<MediaCandidate>> search(String title) => _api.search(title);
+  Future<List<MediaCandidate>> search(String title, {int? subjectId}) =>
+      _api.search(title);
 
   @override
   Future<List<MediaEpisode>> listEpisodes(MediaCandidate candidate) =>
@@ -107,7 +109,8 @@ class DilidiliMediaSource implements MediaSource {
   String get displayName => '嘀哩嘀哩';
 
   @override
-  Future<List<MediaCandidate>> search(String title) => _api.search(title);
+  Future<List<MediaCandidate>> search(String title, {int? subjectId}) =>
+      _api.search(title);
 
   @override
   Future<List<MediaEpisode>> listEpisodes(MediaCandidate candidate) =>

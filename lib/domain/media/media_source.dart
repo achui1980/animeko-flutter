@@ -76,7 +76,14 @@ abstract class MediaSource {
   /// candidate (not just the best match -- matching is the caller's job,
   /// see `title_matcher.dart`). May throw on network/parse failure; the
   /// caller decides how to handle that (see `SubjectEpisodesController`).
-  Future<List<MediaCandidate>> search(String title);
+  ///
+  /// [subjectId] is the Bangumi subject id the search is being run for,
+  /// when the caller knows it. Sources that can look up a subject directly
+  /// (see `RssMediaSource`, which resolves it to a Mikan bangumiId and then
+  /// fetches that subject's complete feed) use it to return far more
+  /// complete results than a keyword search can; every other source
+  /// ignores it. Sources MUST still work when it is null.
+  Future<List<MediaCandidate>> search(String title, {int? subjectId});
 
   /// Lists every episode under [candidate] (which must have come from
   /// this same source's [search]).

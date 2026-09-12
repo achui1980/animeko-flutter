@@ -121,7 +121,7 @@ class RssMediaSource implements MediaSource {
   String get displayName => config.name;
 
   @override
-  Future<List<MediaCandidate>> search(String title) async {
+  Future<List<MediaCandidate>> search(String title, {int? subjectId}) async {
     final url = config.searchUrl.replaceAll(
       '{keyword}',
       Uri.encodeQueryComponent(title),
