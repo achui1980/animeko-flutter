@@ -12,9 +12,19 @@ Flutter 实现，**当前阶段只支持 macOS 桌面端**（Android / Windows �
 
 | 依赖 | 版本 / 说明 |
 | --- | --- |
-| Flutter SDK | stable 3.41+（Dart SDK `^3.11.4`） |
+| Flutter SDK | **推荐 3.41.6**（stable，Dart SDK `^3.11.4`）——已在本仓库端到端验证 |
 | Xcode + Command Line Tools | 构建 macOS Runner 必需 |
 | Homebrew 依赖 | 见下方 |
+
+> **⚠️ 多个 Flutter SDK 共存的坑**：如果机器上装了多个 Flutter SDK（例如 fvm、
+> 手动装的不同版本），务必确认 `which flutter` 解析到的是同一个版本，且
+> **交互式 shell 和非交互式 shell（Xcode Run Script 阶段会用非交互式 shell）
+> 解析出的 `flutter` 必须一致**——否则同一次构建会混用两个 SDK 的
+> `macos/Flutter/ephemeral`，报出类似
+> `target 'wakelock_plus' referenced in product 'wakelock-plus' is empty` 的
+> 错误。`pubspec.yaml` 里已用 `flutter: config: enable-swift-package-manager: false`
+> 固定了插件集成方式（CocoaPods，不受 Flutter 版本默认值影响），但 SDK 本身
+> 仍需保持统一。
 
 ### 需要额外用 Homebrew 安装的依赖
 

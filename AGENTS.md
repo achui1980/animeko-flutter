@@ -10,6 +10,22 @@ Design/planning docs for *why* things are built this way live in
 Read `docs/superpowers/specs/2026-08-27-flutter-migration-phase1-design.md` first
 for the full architecture rationale if a task touches app-wide structure.
 
+## Flutter SDK version
+
+**Recommended: Flutter 3.41.6 stable** (Dart `3.11.4`) — the version this repo's macOS
+build has been verified end-to-end against. If multiple Flutter SDKs exist on the
+machine (e.g. via fvm, or a leftover manual install), make sure `which flutter`
+resolves to the same SDK in **both interactive and non-interactive shells** —
+Xcode's Run Script build phases spawn non-interactive shells, so a PATH set only in
+`~/.zshrc` (interactive) while `~/.zshenv` (all shells) points elsewhere will run two
+different SDKs against the same `macos/Flutter/ephemeral` in one build, producing
+errors like `target 'wakelock_plus' referenced in product 'wakelock-plus' is empty`.
+`pubspec.yaml` pins plugin integration to CocoaPods via
+`flutter: config: enable-swift-package-manager: false` (Flutter >= 3.44 defaults
+Swift Package Manager to on; two of the macOS plugins — media_kit_libs_macos_video,
+media_kit_video — don't support it anyway), so that part is SDK-version-independent,
+but the SDK binary itself still needs to be consistent across shells.
+
 ## Commands
 
 ```bash
