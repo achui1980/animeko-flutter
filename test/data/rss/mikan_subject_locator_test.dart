@@ -45,6 +45,25 @@ String bangumiPageLinking(int linkedSubjectId) =>
     'target="_blank">https://bgm.tv/subject/$linkedSubjectId</a>'
     '</p></body></html>';
 
+/// A *keyword-level* failure: a non-2xx answer proves the host is up, so it
+/// says nothing about whether the *next* keyword would also fail.
+DioException keywordLevelFailure(String url) => DioException.badResponse(
+  statusCode: 503,
+  requestOptions: RequestOptions(path: url),
+  response: Response(
+    statusCode: 503,
+    requestOptions: RequestOptions(path: url),
+  ),
+);
+
+/// A *host-level* failure: the transport never reached the server, so every
+/// remaining keyword candidate would fail the same way (and each one costs a
+/// full connect timeout).
+DioException hostLevelFailure(String url) => DioException.connectionError(
+  requestOptions: RequestOptions(path: url),
+  reason: 'host unreachable',
+);
+
 void main() {
   late MockDio dio;
   late MikanSubjectLocator locator;
@@ -154,6 +173,26 @@ void main() {
     test('skips a blank or duplicate Japanese name', () {
       expect(mikanSearchCandidates(nameCn: '孤独摇滚', nameJp: '   '), ['孤独摇滚']);
       expect(mikanSearchCandidates(nameCn: '孤独摇滚', nameJp: '孤独摇滚'), ['孤独摇滚']);
+    });
+  });
+
+  group('MikanLocateResult', () {
+    test('rejects a bangumiId that does not agree with the outcome', () {
+      // A caller that trusted `bangumiId` on a non-`found` outcome would
+      // cache a guess; one that ignored it on `found` would throw the
+      // verified answer away. Neither shape is constructible.
+      expect(
+        () => MikanLocateResult(MikanLocateOutcome.found),
+        throwsA(isA<AssertionError>()),
+      );
+      expect(
+        () => MikanLocateResult(MikanLocateOutcome.absent, _bangumiId),
+        throwsA(isA<AssertionError>()),
+      );
+      expect(
+        () => MikanLocateResult(MikanLocateOutcome.undetermined, _bangumiId),
+        throwsA(isA<AssertionError>()),
+      );
     });
   });
 
@@ -320,19 +359,17 @@ void main() {
       expect(result.bangumiId, isNull);
     });
 
-    test('still tries the later keyword candidates after a failed search '
-        'request', () async {
-      // A failed search says nothing about the *next* keyword, so the loop
-      // keeps going and can still reach a conclusive `found`.
+    test('still tries the later keyword candidates after a keyword-level '
+        'search failure', () async {
+      // A non-2xx answer proves the host is up, so it says nothing about the
+      // *next* keyword: the loop keeps going and can still reach a
+      // conclusive `found`.
       when(
         () => dio.get<String>(any(), options: any(named: 'options')),
       ).thenAnswer((invocation) async {
         final url = invocation.positionalArguments.first as String;
         if (url == searchUrl('恶女不才，请多关照')) {
-          throw DioException.connectionTimeout(
-            timeout: const Duration(seconds: 10),
-            requestOptions: RequestOptions(path: url),
-          );
+          throw keywordLevelFailure(url);
         }
         if (url == searchUrl(_nameCn)) return htmlResponse(searchPage);
         return htmlResponse(bangumiPage4012);
@@ -362,10 +399,7 @@ void main() {
       ).thenAnswer((invocation) async {
         final url = invocation.positionalArguments.first as String;
         if (url == searchUrl('恶女不才，请多关照')) {
-          throw DioException.connectionTimeout(
-            timeout: const Duration(seconds: 10),
-            requestOptions: RequestOptions(path: url),
-          );
+          throw keywordLevelFailure(url);
         }
         return htmlResponse(emptySearchPage);
       });
@@ -377,6 +411,105 @@ void main() {
 
       expect(result.outcome, MikanLocateOutcome.undetermined);
       expect(requestedUrls(), [searchUrl('恶女不才，请多关照'), searchUrl(_nameCn)]);
+    });
+
+    test('stays undetermined when the last candidate failed, even though an '
+        'earlier one conclusively found no cards', () async {
+      // The mirror image of the test above: the sticky flag must not depend
+      // on whether the unanswered keyword came first or last.
+      when(
+        () => dio.get<String>(any(), options: any(named: 'options')),
+      ).thenAnswer((invocation) async {
+        final url = invocation.positionalArguments.first as String;
+        if (url == searchUrl(_nameCn)) throw keywordLevelFailure(url);
+        return htmlResponse(emptySearchPage);
+      });
+
+      final result = await locator.resolveBangumiId(
+        subjectId: _subjectId,
+        nameCn: _nameCn,
+      );
+
+      expect(result.outcome, MikanLocateOutcome.undetermined);
+      expect(requestedUrls(), [searchUrl('恶女不才，请多关照'), searchUrl(_nameCn)]);
+    });
+
+    test('abandons the remaining keyword candidates once the host itself is '
+        'unreachable', () async {
+      // Every candidate targets the same host, so retrying one costs a full
+      // connect timeout (10s) to learn nothing. One probe is enough.
+      when(
+        () => dio.get<String>(any(), options: any(named: 'options')),
+      ).thenAnswer((invocation) async {
+        throw hostLevelFailure(invocation.positionalArguments.first as String);
+      });
+
+      final result = await locator.resolveBangumiId(
+        subjectId: _subjectId,
+        nameCn: _nameCn,
+        nameJp: _nameJp,
+      );
+
+      // Giving up early must not turn the answer negative-cacheable: the
+      // host never said anything about this subject.
+      expect(result.outcome, MikanLocateOutcome.undetermined);
+      expect(result.bangumiId, isNull);
+      expect(requestedUrls(), [searchUrl('恶女不才，请多关照')]);
+    });
+
+    test('still probes every keyword candidate when each search fails at the '
+        'keyword level', () async {
+      // Counterpart to the test above: a non-2xx can be keyword-specific, so
+      // the budget of 3 candidates is still worth spending.
+      when(
+        () => dio.get<String>(any(), options: any(named: 'options')),
+      ).thenAnswer((invocation) async {
+        throw keywordLevelFailure(
+          invocation.positionalArguments.first as String,
+        );
+      });
+
+      final result = await locator.resolveBangumiId(
+        subjectId: _subjectId,
+        nameCn: _nameCn,
+        nameJp: _nameJp,
+      );
+
+      expect(result.outcome, MikanLocateOutcome.undetermined);
+      expect(requestedUrls(), [
+        searchUrl('恶女不才，请多关照'),
+        searchUrl('ふつつかな悪女ではございますが'),
+        searchUrl(_nameCn),
+      ]);
+    });
+
+    test('reports undetermined without throwing when a search fails with a '
+        'non-Dio throwable', () async {
+      // `resolveBangumiId` runs inside SubjectEpisodesController's
+      // `Future.wait`, so it must swallow throwables that are neither a
+      // DioException nor even an Exception.
+      for (final thrown in <Object>[
+        StateError('client closed'),
+        'plain string failure',
+      ]) {
+        dio = MockDio();
+        locator = MikanSubjectLocator(dio);
+        when(
+          () => dio.get<String>(any(), options: any(named: 'options')),
+        ).thenAnswer((_) async => throw thrown);
+
+        final result = await locator.resolveBangumiId(
+          subjectId: _subjectId,
+          nameCn: _nameCn,
+        );
+
+        expect(
+          result.outcome,
+          MikanLocateOutcome.undetermined,
+          reason: '$thrown',
+        );
+        expect(result.bangumiId, isNull, reason: '$thrown');
+      }
     });
 
     test('de-duplicates repeated cards so they do not eat the verification '

@@ -124,10 +124,47 @@ enum MikanLocateOutcome {
 /// [bangumiId] is non-null only for [MikanLocateOutcome.found]; both other
 /// outcomes mean "use the keyword search for this call".
 class MikanLocateResult {
-  const MikanLocateResult(this.outcome, [this.bangumiId]);
+  const MikanLocateResult(this.outcome, [this.bangumiId])
+    : assert(
+        (outcome == MikanLocateOutcome.found) == (bangumiId != null),
+        'a bangumiId is exactly the `found` outcome',
+      );
 
   final MikanLocateOutcome outcome;
   final int? bangumiId;
+}
+
+/// `DioException` types that mean "the transport never reached the server".
+///
+/// They cannot be keyword-specific, so once one happens every remaining
+/// keyword candidate is guaranteed to fail the same way -- each after a full
+/// 10s timeout (see `mikanRssDio`). Every other type (notably
+/// [DioExceptionType.badResponse]) leaves open the possibility that a
+/// different keyword answers.
+const _hostLevelFailures = {
+  DioExceptionType.connectionTimeout,
+  DioExceptionType.connectionError,
+  DioExceptionType.receiveTimeout,
+  DioExceptionType.sendTimeout,
+};
+
+/// The outcome of one `/Home/Search` request.
+///
+/// [cards] is non-null exactly when the page was both fetched and parsed, so
+/// an empty list means "answered, and there genuinely are no cards" -- the
+/// only version of "no cards" that may be negative-cached. When it is null,
+/// [hostUnreachable] says which kind of failure happened: see
+/// [_hostLevelFailures].
+class _SearchAttempt {
+  const _SearchAttempt.answered(List<MikanSubjectCard> this.cards)
+    : hostUnreachable = false;
+
+  const _SearchAttempt.keywordFailed() : cards = null, hostUnreachable = false;
+
+  const _SearchAttempt.hostUnreachable() : cards = null, hostUnreachable = true;
+
+  final List<MikanSubjectCard>? cards;
+  final bool hostUnreachable;
 }
 
 /// Resolves a Bangumi `subjectId` to Mikan's own `bangumiId`, so the caller
@@ -169,15 +206,24 @@ class MikanSubjectLocator {
       nameCn: nameCn,
       nameJp: nameJp,
     )) {
-      final cards = await _searchCards(keyword);
+      final attempt = await _searchCards(keyword);
+      final cards = attempt.cards;
       if (cards == null) {
-        // A failed search says nothing about the *next* keyword (it may
-        // even be keyword-specific), so keep going -- a later candidate can
-        // still produce a conclusive `found`. This also keeps the request
-        // sequence identical to the pre-fix behaviour, where a failed
-        // search was indistinguishable from an empty one. The flag above is
-        // what stops the missing answer from being silently lost.
+        // The flag is what stops the missing answer from being silently
+        // collapsed into "absent"; what to do *next* depends on why the
+        // search failed.
         sawUndetermined = true;
+        if (attempt.hostUnreachable) {
+          // Every candidate hits the same host, so the remaining ones would
+          // each burn a full 10s timeout to learn nothing. Trading them away
+          // costs only the (unlikely) case where the host recovers within
+          // this very resolution; the outcome is `undetermined` either way,
+          // so the next visit retries from scratch.
+          break;
+        }
+        // A non-2xx or an unparseable body can genuinely be
+        // keyword-specific, so a later candidate may still reach a
+        // conclusive `found` -- worth one more request.
         continue;
       }
       if (cards.isEmpty) continue;
@@ -215,11 +261,10 @@ class MikanSubjectLocator {
         : MikanLocateOutcome.absent,
   );
 
-  /// The page's 条目 cards, or `null` when the page could not be fetched or
-  /// parsed at all. An empty list therefore means "answered, and there
-  /// genuinely are no cards" -- the only version of "no cards" that may be
-  /// negative-cached.
-  Future<List<MikanSubjectCard>?> _searchCards(String keyword) async {
+  /// The page's 条目 cards, or -- when the page could not be fetched or
+  /// parsed at all -- which kind of failure got in the way. See
+  /// [_SearchAttempt].
+  Future<_SearchAttempt> _searchCards(String keyword) async {
     try {
       final url = searchUrlTemplate.replaceAll(
         '{keyword}',
@@ -229,12 +274,21 @@ class MikanSubjectLocator {
         url,
         options: Options(responseType: ResponseType.plain),
       );
-      return parseMikanSearchResults(response.data ?? '');
+      return _SearchAttempt.answered(
+        parseMikanSearchResults(response.data ?? ''),
+      );
+    } on DioException catch (e) {
+      // Either way the caller falls back to keyword search for *this* call
+      // without recording a negative mapping (design doc "错误处理"); the
+      // type only decides whether the next candidate is worth trying.
+      return _hostLevelFailures.contains(e.type)
+          ? const _SearchAttempt.hostUnreachable()
+          : const _SearchAttempt.keywordFailed();
     } catch (_) {
-      // Timeout / non-2xx / unparseable HTML: undetermined, so the caller
-      // falls back to keyword search for *this* call without recording a
-      // negative mapping (design doc "错误处理").
-      return null;
+      // Unparseable HTML, and -- mandatory, since `on DioException` does not
+      // cover them -- any `Error` or other non-`Exception` throwable:
+      // `resolveBangumiId` runs inside a `Future.wait` and must never throw.
+      return const _SearchAttempt.keywordFailed();
     }
   }
 
