@@ -207,7 +207,10 @@ void main() {
           nameCn: _nameCn,
           nameJp: 'ふつつかな悪女ではございますが',
         ),
-      ).thenAnswer((_) async => _bangumiId);
+      ).thenAnswer(
+        (_) async =>
+            const MikanLocateResult(MikanLocateOutcome.found, _bangumiId),
+      );
 
       await mappedSource.search(_nameCn, subjectId: _subjectId);
 
@@ -239,8 +242,8 @@ void main() {
       },
     );
 
-    test('falls back to keyword search when the locator finds nothing, '
-        'and caches that negative result', () async {
+    test('falls back to keyword search when the locator conclusively finds '
+        'nothing, and caches that negative result', () async {
       when(() => mappings.lookup(_subjectId)).thenAnswer((_) async => null);
       when(
         () => locator.resolveBangumiId(
@@ -248,7 +251,9 @@ void main() {
           nameCn: _nameCn,
           nameJp: null,
         ),
-      ).thenAnswer((_) async => null);
+      ).thenAnswer(
+        (_) async => const MikanLocateResult(MikanLocateOutcome.absent),
+      );
 
       await mappedSource.search(_nameCn, subjectId: _subjectId);
 
@@ -257,6 +262,34 @@ void main() {
         startsWith('https://mikanani.me/RSS/Search?searchstr='),
       );
       verify(() => mappings.save(_subjectId, null)).called(1);
+    });
+
+    test('falls back to keyword search WITHOUT caching when the locator '
+        'could not determine an answer', () async {
+      when(() => mappings.lookup(_subjectId)).thenAnswer((_) async => null);
+      when(
+        () => locator.resolveBangumiId(
+          subjectId: _subjectId,
+          nameCn: _nameCn,
+          nameJp: null,
+        ),
+      ).thenAnswer(
+        (_) async => const MikanLocateResult(MikanLocateOutcome.undetermined),
+      );
+
+      await mappedSource.search(_nameCn, subjectId: _subjectId);
+
+      // This call still degrades to the keyword search...
+      expect(
+        requestedUrls().single,
+        startsWith('https://mikanani.me/RSS/Search?searchstr='),
+      );
+      // ...but persisting it would mean "confirmed absent from Mikan" for
+      // the whole 7-day negative TTL, so one transient failure would pin
+      // the subject to the lossy keyword search for a week with no recovery
+      // path (nothing ever deletes a mapping row). The next visit must be
+      // free to ask the locator again.
+      verifyNever(() => mappings.save(any(), any()));
     });
 
     test('falls back to keyword search for a cached negative result, '
@@ -341,7 +374,10 @@ void main() {
           nameCn: _nameCn,
           nameJp: null,
         ),
-      ).thenAnswer((_) async => _bangumiId);
+      ).thenAnswer(
+        (_) async =>
+            const MikanLocateResult(MikanLocateOutcome.found, _bangumiId),
+      );
       when(() => mappings.save(any(), any())).thenThrow(Exception('db closed'));
 
       await mappedSource.search(_nameCn, subjectId: _subjectId);

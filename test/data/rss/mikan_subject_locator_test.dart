@@ -171,7 +171,8 @@ void main() {
         nameCn: _nameCn,
       );
 
-      expect(result, _bangumiId);
+      expect(result.outcome, MikanLocateOutcome.found);
+      expect(result.bangumiId, _bangumiId);
       // Exactly two requests: the first keyword candidate, then the
       // best-ranked card's page. The decoy (listed first in the HTML) must
       // never be fetched.
@@ -194,7 +195,8 @@ void main() {
         nameJp: _nameJp,
       );
 
-      expect(result, _bangumiId);
+      expect(result.outcome, MikanLocateOutcome.found);
+      expect(result.bangumiId, _bangumiId);
       expect(requestedUrls(), [
         searchUrl('恶女不才，请多关照'),
         searchUrl('ふつつかな悪女ではございますが'),
@@ -203,7 +205,7 @@ void main() {
     });
 
     test(
-      'returns null when no card back-links the requested subject',
+      'reports absent when no card back-links the requested subject',
       () async {
         stubPages({
           searchUrl('恶女不才，请多关照'): searchPage,
@@ -216,7 +218,10 @@ void main() {
           nameCn: _nameCn,
         );
 
-        expect(result, isNull);
+        // Every request answered, every card verified and rejected: this is
+        // a conclusive "not on Mikan", so it is safe to negative-cache.
+        expect(result.outcome, MikanLocateOutcome.absent);
+        expect(result.bangumiId, isNull);
         // Both cards were verified before giving up (the cap is 3).
         expect(
           requestedUrls(),
@@ -243,10 +248,12 @@ void main() {
         nameCn: _nameCn,
       );
 
-      expect(result, isNull);
+      expect(result.outcome, MikanLocateOutcome.absent);
+      expect(result.bangumiId, isNull);
     });
 
-    test('returns null when every keyword candidate finds no cards', () async {
+    test('reports absent when every keyword candidate finds a page with no '
+        'cards', () async {
       stubPages(const {});
 
       final result = await locator.resolveBangumiId(
@@ -255,31 +262,38 @@ void main() {
         nameJp: _nameJp,
       );
 
-      expect(result, isNull);
+      expect(result.outcome, MikanLocateOutcome.absent);
+      expect(result.bangumiId, isNull);
       expect(requestedUrls(), hasLength(3));
     });
 
-    test(
-      'returns null instead of throwing when a search request fails',
-      () async {
-        when(
-          () => dio.get<String>(any(), options: any(named: 'options')),
-        ).thenThrow(
-          DioException.connectionTimeout(
-            timeout: const Duration(seconds: 10),
-            requestOptions: RequestOptions(path: '/'),
-          ),
-        );
-
-        await expectLater(
-          locator.resolveBangumiId(subjectId: _subjectId, nameCn: _nameCn),
-          completion(isNull),
-        );
-      },
-    );
-
-    test('returns null instead of throwing when a verification request '
+    test('reports undetermined instead of absent when every search request '
         'fails', () async {
+      when(
+        () => dio.get<String>(any(), options: any(named: 'options')),
+      ).thenThrow(
+        DioException.connectionTimeout(
+          timeout: const Duration(seconds: 10),
+          requestOptions: RequestOptions(path: '/'),
+        ),
+      );
+
+      // Awaiting (rather than catching) also pins the no-throw contract:
+      // the locator runs inside SubjectEpisodesController's `Future.wait`.
+      final result = await locator.resolveBangumiId(
+        subjectId: _subjectId,
+        nameCn: _nameCn,
+      );
+
+      // A transient network failure must NOT be cached as "absent": that
+      // would pin the subject to the lossy keyword search for the whole
+      // 7-day negative TTL, with no recovery path.
+      expect(result.outcome, MikanLocateOutcome.undetermined);
+      expect(result.bangumiId, isNull);
+    });
+
+    test('reports undetermined instead of absent when a verification '
+        'request fails', () async {
       when(
         () => dio.get<String>(any(), options: any(named: 'options')),
       ).thenAnswer((invocation) async {
@@ -297,10 +311,72 @@ void main() {
         return htmlResponse(searchPage);
       });
 
-      await expectLater(
-        locator.resolveBangumiId(subjectId: _subjectId, nameCn: _nameCn),
-        completion(isNull),
+      final result = await locator.resolveBangumiId(
+        subjectId: _subjectId,
+        nameCn: _nameCn,
       );
+
+      expect(result.outcome, MikanLocateOutcome.undetermined);
+      expect(result.bangumiId, isNull);
+    });
+
+    test('still tries the later keyword candidates after a failed search '
+        'request', () async {
+      // A failed search says nothing about the *next* keyword, so the loop
+      // keeps going and can still reach a conclusive `found`.
+      when(
+        () => dio.get<String>(any(), options: any(named: 'options')),
+      ).thenAnswer((invocation) async {
+        final url = invocation.positionalArguments.first as String;
+        if (url == searchUrl('恶女不才，请多关照')) {
+          throw DioException.connectionTimeout(
+            timeout: const Duration(seconds: 10),
+            requestOptions: RequestOptions(path: url),
+          );
+        }
+        if (url == searchUrl(_nameCn)) return htmlResponse(searchPage);
+        return htmlResponse(bangumiPage4012);
+      });
+
+      final result = await locator.resolveBangumiId(
+        subjectId: _subjectId,
+        nameCn: _nameCn,
+      );
+
+      expect(result.outcome, MikanLocateOutcome.found);
+      expect(result.bangumiId, _bangumiId);
+      expect(requestedUrls(), [
+        searchUrl('恶女不才，请多关照'),
+        searchUrl(_nameCn),
+        bangumiPageUrl(_bangumiId),
+      ]);
+    });
+
+    test('stays undetermined when an earlier search failed, even though the '
+        'last candidate conclusively found no cards', () async {
+      // The inconclusive step is sticky across the whole candidate loop:
+      // "one keyword returned nothing" is not evidence of absence while
+      // another keyword was never actually answered.
+      when(
+        () => dio.get<String>(any(), options: any(named: 'options')),
+      ).thenAnswer((invocation) async {
+        final url = invocation.positionalArguments.first as String;
+        if (url == searchUrl('恶女不才，请多关照')) {
+          throw DioException.connectionTimeout(
+            timeout: const Duration(seconds: 10),
+            requestOptions: RequestOptions(path: url),
+          );
+        }
+        return htmlResponse(emptySearchPage);
+      });
+
+      final result = await locator.resolveBangumiId(
+        subjectId: _subjectId,
+        nameCn: _nameCn,
+      );
+
+      expect(result.outcome, MikanLocateOutcome.undetermined);
+      expect(requestedUrls(), [searchUrl('恶女不才，请多关照'), searchUrl(_nameCn)]);
     });
 
     test('de-duplicates repeated cards so they do not eat the verification '
@@ -332,7 +408,8 @@ void main() {
         nameCn: nameCn,
       );
 
-      expect(result, 9);
+      expect(result.outcome, MikanLocateOutcome.found);
+      expect(result.bangumiId, 9);
       expect(requestedUrls(), [
         searchUrl(nameCn),
         bangumiPageUrl(1),
@@ -367,7 +444,7 @@ void main() {
         nameCn: nameCn,
       );
 
-      expect(result, isNull);
+      expect(result.outcome, MikanLocateOutcome.absent);
       // 1 search + exactly 3 verifications: cards 14 and 15 are never
       // fetched even though 15 would have matched.
       expect(requestedUrls(), [
@@ -398,7 +475,7 @@ void main() {
         nameCn: nameCn,
       );
 
-      expect(result, isNull);
+      expect(result.outcome, MikanLocateOutcome.absent);
       expect(requestedUrls(), [searchUrl('某番剧'), bangumiPageUrl(21)]);
     });
 
@@ -422,7 +499,8 @@ void main() {
         nameCn: _nameCn,
       );
 
-      expect(result, isNull);
+      expect(result.outcome, MikanLocateOutcome.absent);
+      expect(result.bangumiId, isNull);
     });
   });
 }

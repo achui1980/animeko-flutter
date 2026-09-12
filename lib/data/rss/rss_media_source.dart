@@ -234,11 +234,19 @@ class RssMediaSource implements MediaSource {
   String _keywordSearchUrl(String title) =>
       config.searchUrl.replaceAll('{keyword}', Uri.encodeQueryComponent(title));
 
-  /// Cache first, then the locator (whose result -- including a negative
-  /// one -- is written back). Returns null on ANY problem: a mapping is an
+  /// Cache first, then the locator, whose answer is written back only when it
+  /// was *conclusive*. Returns null on ANY problem: a mapping is an
   /// optimization, never a precondition, so a broken cache or an unlocatable
   /// subject must degrade to keyword search rather than fail the source
   /// (design doc "错误处理").
+  ///
+  /// [MikanLocateOutcome.undetermined] is deliberately not persisted: a
+  /// stored `null` means "confirmed absent from Mikan" and is honoured for
+  /// [MikanSubjectMappingRepository.negativeTtl], so caching one transient
+  /// network failure would pin the subject to the lossy keyword search for
+  /// 7 days -- and nothing ever deletes a mapping row, so the network
+  /// recovering would not help. Not caching it costs at most a re-resolve on
+  /// the next visit.
   Future<int?> _resolveBangumiId({
     required int subjectId,
     required String nameCn,
@@ -257,14 +265,18 @@ class RssMediaSource implements MediaSource {
         nameCn: nameCn,
         nameJp: nameJp,
       );
-      // A failed cache write must not discard an answer we already paid
-      // 1-6 HTTP requests for; worst case the next visit re-resolves it.
-      try {
-        await mappings.save(subjectId, resolved);
-      } catch (_) {
-        // Intentionally ignored -- see above.
+      if (resolved.outcome != MikanLocateOutcome.undetermined) {
+        // A failed cache write must not discard an answer we already paid
+        // 1-6 HTTP requests for; worst case the next visit re-resolves it.
+        try {
+          await mappings.save(subjectId, resolved.bangumiId);
+        } catch (_) {
+          // Intentionally ignored -- see above.
+        }
       }
-      return resolved;
+      // Null for both `absent` and `undetermined`: either way *this* call
+      // falls back to the keyword search.
+      return resolved.bangumiId;
     } catch (_) {
       return null;
     }

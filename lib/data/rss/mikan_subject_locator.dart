@@ -97,6 +97,39 @@ String _truncateAtDecoration(String name) {
   return name.substring(0, match.start).trim();
 }
 
+/// Whether a [MikanSubjectLocator.resolveBangumiId] answer is safe to cache.
+///
+/// The distinction exists because `RssMediaSource` persists a `null` mapping
+/// as "confirmed absent from Mikan" and honours it for
+/// `MikanSubjectMappingRepository.negativeTtl` (7 days). Collapsing a
+/// transient network failure into that negative answer would pin the subject
+/// to the lossy keyword search for a week, with no recovery path (nothing
+/// ever deletes a mapping row).
+enum MikanLocateOutcome {
+  /// A card's Mikan page carries the requested `bgm.tv/subject/<id>`
+  /// back-link. Cacheable permanently.
+  found,
+
+  /// Every step was answered and none matched: the subject really is not on
+  /// Mikan (yet). Cacheable under the negative TTL.
+  absent,
+
+  /// At least one step could not be answered (request failed / body
+  /// unusable), so "not found" carries no information. Must NOT be cached.
+  undetermined,
+}
+
+/// The result of one subject resolution attempt.
+///
+/// [bangumiId] is non-null only for [MikanLocateOutcome.found]; both other
+/// outcomes mean "use the keyword search for this call".
+class MikanLocateResult {
+  const MikanLocateResult(this.outcome, [this.bangumiId]);
+
+  final MikanLocateOutcome outcome;
+  final int? bangumiId;
+}
+
 /// Resolves a Bangumi `subjectId` to Mikan's own `bangumiId`, so the caller
 /// can fetch that subject's complete per-bangumi RSS feed instead of a
 /// keyword search (which silently drops whole subtitle groups -- see design
@@ -122,16 +155,31 @@ class MikanSubjectLocator {
   /// Template with a `{bangumiId}` placeholder.
   final String bangumiPageUrlTemplate;
 
-  Future<int?> resolveBangumiId({
+  Future<MikanLocateResult> resolveBangumiId({
     required int subjectId,
     required String nameCn,
     String? nameJp,
   }) async {
+    // Sticky for the whole resolution: once any single step went
+    // unanswered, "nothing matched" is no longer evidence of absence, so
+    // the caller must not negative-cache it.
+    var sawUndetermined = false;
+
     for (final keyword in mikanSearchCandidates(
       nameCn: nameCn,
       nameJp: nameJp,
     )) {
       final cards = await _searchCards(keyword);
+      if (cards == null) {
+        // A failed search says nothing about the *next* keyword (it may
+        // even be keyword-specific), so keep going -- a later candidate can
+        // still produce a conclusive `found`. This also keeps the request
+        // sequence identical to the pre-fix behaviour, where a failed
+        // search was indistinguishable from an empty one. The flag above is
+        // what stops the missing answer from being silently lost.
+        sawUndetermined = true;
+        continue;
+      }
       if (cards.isEmpty) continue;
 
       final ranked = [...cards]
@@ -143,23 +191,35 @@ class MikanSubjectLocator {
         );
 
       for (final card in ranked.take(_maxVerifiedCards)) {
-        if (await _hasBackLink(
+        final verified = await _hasBackLink(
           bangumiId: card.bangumiId,
           subjectId: subjectId,
-        )) {
-          return card.bangumiId;
+        );
+        if (verified == true) {
+          return MikanLocateResult(MikanLocateOutcome.found, card.bangumiId);
         }
+        if (verified == null) sawUndetermined = true;
       }
 
       // This keyword *did* return cards, they just were not this subject.
       // Retrying a broader keyword would only widen an already-wrong
       // result set, so stop here (design doc: 第一个返回卡片的即停).
-      return null;
+      return _noMatch(sawUndetermined);
     }
-    return null;
+    return _noMatch(sawUndetermined);
   }
 
-  Future<List<MikanSubjectCard>> _searchCards(String keyword) async {
+  MikanLocateResult _noMatch(bool sawUndetermined) => MikanLocateResult(
+    sawUndetermined
+        ? MikanLocateOutcome.undetermined
+        : MikanLocateOutcome.absent,
+  );
+
+  /// The page's 条目 cards, or `null` when the page could not be fetched or
+  /// parsed at all. An empty list therefore means "answered, and there
+  /// genuinely are no cards" -- the only version of "no cards" that may be
+  /// negative-cached.
+  Future<List<MikanSubjectCard>?> _searchCards(String keyword) async {
     try {
       final url = searchUrlTemplate.replaceAll(
         '{keyword}',
@@ -171,14 +231,17 @@ class MikanSubjectLocator {
       );
       return parseMikanSearchResults(response.data ?? '');
     } catch (_) {
-      // Timeout / non-2xx / unparseable HTML: treat as "no cards" so the
-      // caller falls back to keyword search instead of failing the whole
-      // media source (design doc "错误处理").
-      return const [];
+      // Timeout / non-2xx / unparseable HTML: undetermined, so the caller
+      // falls back to keyword search for *this* call without recording a
+      // negative mapping (design doc "错误处理").
+      return null;
     }
   }
 
-  Future<bool> _hasBackLink({
+  /// Whether [bangumiId]'s Mikan page back-links [subjectId], or `null` when
+  /// that page could not be fetched or parsed. `false` therefore means "this
+  /// page conclusively names some other subject".
+  Future<bool?> _hasBackLink({
     required int bangumiId,
     required int subjectId,
   }) async {
@@ -207,7 +270,7 @@ class MikanSubjectLocator {
       }
       return false;
     } catch (_) {
-      return false;
+      return null;
     }
   }
 }
