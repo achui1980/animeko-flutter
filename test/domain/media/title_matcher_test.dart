@@ -62,4 +62,37 @@ void main() {
       expect(result, target);
     });
   });
+
+  group('titleSimilarity', () {
+    test('identical strings score 1.0', () {
+      expect(titleSimilarity('恶女不才，请多关照', '恶女不才，请多关照'), 1.0);
+    });
+
+    test('empty input scores 0', () {
+      expect(titleSimilarity('', '恶女不才'), 0);
+      expect(titleSimilarity('恶女不才', ''), 0);
+    });
+
+    test('containment scores by length ratio', () {
+      expect(titleSimilarity('abcd', 'ab'), 0.5);
+      expect(titleSimilarity('ab', 'abcd'), 0.5);
+    });
+
+    test('disjoint character sets score 0', () {
+      expect(titleSimilarity('abc', 'xyz'), 0);
+    });
+
+    test('partial overlap scores by character-set ratio', () {
+      // {a,b,c} vs {a,b,d}: intersection 2, union 4.
+      expect(titleSimilarity('abc', 'abd'), 0.5);
+    });
+
+    test('an unrelated Mikan title scores lower than the exact title', () {
+      const subjectName = '恶女不才，请多关照 ～雏宫蝶鼠换身传～';
+      expect(
+        titleSimilarity('不完美恶女 剧场版', subjectName),
+        lessThan(titleSimilarity(subjectName, subjectName)),
+      );
+    });
+  });
 }

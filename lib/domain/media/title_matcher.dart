@@ -1,7 +1,7 @@
 // lib/domain/media/title_matcher.dart
 import 'media_source.dart';
 
-/// Minimum similarity score (see [_similarity]) for a candidate to be
+/// Minimum similarity score (see [titleSimilarity]) for a candidate to be
 /// considered a match. This is an initial guess, not tuned against real
 /// site data -- adjust during manual verification if it produces too
 /// many false positives/negatives (see design doc "测试策略").
@@ -238,8 +238,8 @@ Set<String> _segments(String normalized) {
   return {normalized, ...parts};
 }
 
-/// The highest [_similarity] score across every combination of [a]'s and
-/// [b]'s [_segments]. This lets a title's short "core" name match a
+/// The highest [titleSimilarity] score across every combination of [a]'s
+/// and [b]'s [_segments]. This lets a title's short "core" name match a
 /// candidate even when one side carries extra subtitle text that would
 /// otherwise dilute a whole-string character-overlap score below
 /// [matchThreshold] (see design doc's follow-up note on word-order and
@@ -248,7 +248,7 @@ double _bestSimilarity(String a, String b) {
   var best = 0.0;
   for (final segmentA in _segments(a)) {
     for (final segmentB in _segments(b)) {
-      final score = _similarity(segmentA, segmentB);
+      final score = titleSimilarity(segmentA, segmentB);
       if (score > best) best = score;
     }
   }
@@ -260,7 +260,15 @@ double _bestSimilarity(String a, String b) {
 /// length-ratio, otherwise falls back to a character-set overlap ratio.
 /// See design doc "标题匹配策略" for why Levenshtein/Jaro-Winkler are
 /// deliberately not used here.
-double _similarity(String a, String b) {
+///
+/// Public (rather than private to [matchBest]) so callers that rank
+/// plain `(id, title)` pairs instead of [MediaCandidate]s can reuse the
+/// exact same scoring -- see `MikanSubjectLocator`, which ranks Mikan
+/// 条目 search cards. Callers that only need to pick the best
+/// [MediaCandidate] should keep using [matchBest]: unlike this function,
+/// it also normalizes (case/width/Simplified-vs-Traditional) and
+/// segment-splits both sides first.
+double titleSimilarity(String a, String b) {
   if (a.isEmpty || b.isEmpty) return 0;
   if (a == b) return 1;
   if (a.contains(b) || b.contains(a)) {
