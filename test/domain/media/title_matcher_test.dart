@@ -71,6 +71,7 @@ void main() {
     test('empty input scores 0', () {
       expect(titleSimilarity('', '恶女不才'), 0);
       expect(titleSimilarity('恶女不才', ''), 0);
+      expect(titleSimilarity('', ''), 0);
     });
 
     test('containment scores by length ratio', () {
@@ -87,11 +88,13 @@ void main() {
       expect(titleSimilarity('abc', 'abd'), 0.5);
     });
 
-    test('an unrelated Mikan title scores lower than the exact title', () {
+    test('a matching Mikan card title outranks an unrelated one', () {
       const subjectName = '恶女不才，请多关照 ～雏宫蝶鼠换身传～';
+      const match = '恶女不才，请多关照'; // plausible Mikan 条目 card title
+      const decoy = '不完美恶女 剧场版';
       expect(
-        titleSimilarity('不完美恶女 剧场版', subjectName),
-        lessThan(titleSimilarity(subjectName, subjectName)),
+        titleSimilarity(match, subjectName),
+        greaterThan(titleSimilarity(decoy, subjectName)),
       );
     });
   });

@@ -1,7 +1,7 @@
 // lib/domain/media/title_matcher.dart
 import 'media_source.dart';
 
-/// Minimum similarity score (see [titleSimilarity]) for a candidate to be
+/// Minimum similarity score (see [_bestSimilarity]) for a candidate to be
 /// considered a match. This is an initial guess, not tuned against real
 /// site data -- adjust during manual verification if it produces too
 /// many false positives/negatives (see design doc "测试策略").
@@ -258,11 +258,14 @@ double _bestSimilarity(String a, String b) {
 /// Deliberately simple, non-academic similarity score in `[0, 1]`:
 /// containment (one string fully contains the other) scores by
 /// length-ratio, otherwise falls back to a character-set overlap ratio.
+/// Empty input always scores 0, even when both sides are empty -- the
+/// empty guard runs ahead of the identity check, so the "identical
+/// strings score 1" invariant does not extend to `('', '')`.
 /// See design doc "标题匹配策略" for why Levenshtein/Jaro-Winkler are
 /// deliberately not used here.
 ///
-/// Public (rather than private to [matchBest]) so callers that rank
-/// plain `(id, title)` pairs instead of [MediaCandidate]s can reuse the
+/// Public rather than library-private, so callers that rank plain
+/// `(id, title)` pairs instead of [MediaCandidate]s can reuse the
 /// exact same scoring -- see `MikanSubjectLocator`, which ranks Mikan
 /// 条目 search cards. Callers that only need to pick the best
 /// [MediaCandidate] should keep using [matchBest]: unlike this function,
