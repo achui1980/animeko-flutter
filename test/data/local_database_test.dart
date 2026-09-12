@@ -1,5 +1,5 @@
 import 'package:animeko_flutter/data/local_database.dart';
-import 'package:drift/drift.dart' show Value;
+import 'package:drift/drift.dart' show Migrator, Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -101,9 +101,81 @@ void main() {
     expect(rows.single.imageUrl, 'https://example.com/a.jpg');
   });
 
-  test('AppDatabase.schemaVersion is 2 (bumped for subjectImageCache)', () {
-    expect(db.schemaVersion, 2);
+  test('AppDatabase.schemaVersion is 3 (bumped for mikanSubjectMappings)', () {
+    expect(db.schemaVersion, 3);
   });
+
+  test('mikanSubjectMappings table round-trips a resolved row', () async {
+    await db
+        .into(db.mikanSubjectMappings)
+        .insert(
+          MikanSubjectMappingsCompanion.insert(
+            subjectId: const Value(545008),
+            mikanBangumiId: const Value(4012),
+            resolvedAt: DateTime(2026, 9, 11),
+          ),
+        );
+
+    final rows = await db.select(db.mikanSubjectMappings).get();
+
+    expect(rows, hasLength(1));
+    expect(rows.single.subjectId, 545008);
+    expect(rows.single.mikanBangumiId, 4012);
+    expect(rows.single.resolvedAt, DateTime(2026, 9, 11));
+  });
+
+  test('mikanSubjectMappings accepts a null mikanBangumiId (confirmed '
+      'absent from Mikan)', () async {
+    await db
+        .into(db.mikanSubjectMappings)
+        .insert(
+          MikanSubjectMappingsCompanion.insert(
+            subjectId: const Value(1),
+            resolvedAt: DateTime(2026, 9, 11),
+          ),
+        );
+
+    final rows = await db.select(db.mikanSubjectMappings).get();
+
+    expect(rows.single.mikanBangumiId, isNull);
+  });
+
+  test('mikanSubjectMappings does NOT require a matching Subjects row '
+      '(no FK: a subject may never have been cached locally)', () async {
+    await db
+        .into(db.mikanSubjectMappings)
+        .insert(
+          MikanSubjectMappingsCompanion.insert(
+            subjectId: const Value(999999),
+            resolvedAt: DateTime(2026, 9, 11),
+          ),
+        );
+
+    expect(await db.select(db.mikanSubjectMappings).get(), hasLength(1));
+  });
+
+  test(
+    'onUpgrade from schema 2 creates the mikanSubjectMappings table',
+    () async {
+      // A fresh in-memory database is created at the current schema, so drop
+      // the new table to simulate a schema-2 database, then run the real
+      // onUpgrade callback for the 2 -> 3 step.
+      await db.customStatement('DROP TABLE mikan_subject_mappings');
+
+      await db.migration.onUpgrade(Migrator(db), 2, 3);
+
+      await db
+          .into(db.mikanSubjectMappings)
+          .insert(
+            MikanSubjectMappingsCompanion.insert(
+              subjectId: const Value(545008),
+              mikanBangumiId: const Value(4012),
+              resolvedAt: DateTime(2026, 9, 11),
+            ),
+          );
+      expect(await db.select(db.mikanSubjectMappings).get(), hasLength(1));
+    },
+  );
 
   test('searchHistory table round-trips a row', () async {
     await db

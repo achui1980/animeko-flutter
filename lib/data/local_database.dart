@@ -75,6 +75,33 @@ class SubjectImageCache extends Table {
   Set<Column> get primaryKey => {subjectId};
 }
 
+/// Persistent cache of the `Bangumi subjectId -> Mikan bangumiId` mapping
+/// resolved by `MikanSubjectLocator` (see
+/// `lib/data/rss/mikan_subject_locator.dart`). Resolving costs up to 4 HTTP
+/// requests (one 条目 search plus up to three back-link verifications), so
+/// the result is cached and re-used on every later visit to the same
+/// subject.
+///
+/// [mikanBangumiId] is nullable and `null` means "confirmed *not* findable
+/// on Mikan", which is a real, cacheable answer (the source then falls back
+/// to keyword search) -- but only for 7 days, since a newly-aired subject
+/// can show up on Mikan later (see
+/// `MikanSubjectMappingRepository.negativeTtl`). Positive results never
+/// expire.
+///
+/// Deliberately has NO foreign key to [Subjects]: `PRAGMA foreign_keys` is
+/// ON for this connection (see [AppDatabase.migration]) and nothing in the
+/// app currently writes [Subjects], so a `references(Subjects, #id)` here
+/// would make every mapping insert fail.
+class MikanSubjectMappings extends Table {
+  IntColumn get subjectId => integer()();
+  IntColumn get mikanBangumiId => integer().nullable()();
+  DateTimeColumn get resolvedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {subjectId};
+}
+
 @DriftDatabase(
   tables: [
     Subjects,
@@ -82,13 +109,14 @@ class SubjectImageCache extends Table {
     SubjectCollections,
     SearchHistory,
     SubjectImageCache,
+    MikanSubjectMappings,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   /// SQLite does not enforce declared FOREIGN KEY constraints unless this
   /// pragma is turned on for the connection -- drift does not do this
@@ -100,6 +128,9 @@ class AppDatabase extends _$AppDatabase {
     onUpgrade: (m, from, to) async {
       if (from < 2) {
         await m.createTable(subjectImageCache);
+      }
+      if (from < 3) {
+        await m.createTable(mikanSubjectMappings);
       }
     },
     beforeOpen: (details) async {

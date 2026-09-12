@@ -1530,6 +1530,273 @@ class SubjectImageCacheCompanion
   }
 }
 
+class $MikanSubjectMappingsTable extends MikanSubjectMappings
+    with TableInfo<$MikanSubjectMappingsTable, MikanSubjectMapping> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $MikanSubjectMappingsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _subjectIdMeta = const VerificationMeta(
+    'subjectId',
+  );
+  @override
+  late final GeneratedColumn<int> subjectId = GeneratedColumn<int>(
+    'subject_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _mikanBangumiIdMeta = const VerificationMeta(
+    'mikanBangumiId',
+  );
+  @override
+  late final GeneratedColumn<int> mikanBangumiId = GeneratedColumn<int>(
+    'mikan_bangumi_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _resolvedAtMeta = const VerificationMeta(
+    'resolvedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> resolvedAt = GeneratedColumn<DateTime>(
+    'resolved_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [subjectId, mikanBangumiId, resolvedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'mikan_subject_mappings';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<MikanSubjectMapping> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('subject_id')) {
+      context.handle(
+        _subjectIdMeta,
+        subjectId.isAcceptableOrUnknown(data['subject_id']!, _subjectIdMeta),
+      );
+    }
+    if (data.containsKey('mikan_bangumi_id')) {
+      context.handle(
+        _mikanBangumiIdMeta,
+        mikanBangumiId.isAcceptableOrUnknown(
+          data['mikan_bangumi_id']!,
+          _mikanBangumiIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('resolved_at')) {
+      context.handle(
+        _resolvedAtMeta,
+        resolvedAt.isAcceptableOrUnknown(data['resolved_at']!, _resolvedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_resolvedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {subjectId};
+  @override
+  MikanSubjectMapping map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return MikanSubjectMapping(
+      subjectId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}subject_id'],
+      )!,
+      mikanBangumiId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}mikan_bangumi_id'],
+      ),
+      resolvedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}resolved_at'],
+      )!,
+    );
+  }
+
+  @override
+  $MikanSubjectMappingsTable createAlias(String alias) {
+    return $MikanSubjectMappingsTable(attachedDatabase, alias);
+  }
+}
+
+class MikanSubjectMapping extends DataClass
+    implements Insertable<MikanSubjectMapping> {
+  final int subjectId;
+  final int? mikanBangumiId;
+  final DateTime resolvedAt;
+  const MikanSubjectMapping({
+    required this.subjectId,
+    this.mikanBangumiId,
+    required this.resolvedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['subject_id'] = Variable<int>(subjectId);
+    if (!nullToAbsent || mikanBangumiId != null) {
+      map['mikan_bangumi_id'] = Variable<int>(mikanBangumiId);
+    }
+    map['resolved_at'] = Variable<DateTime>(resolvedAt);
+    return map;
+  }
+
+  MikanSubjectMappingsCompanion toCompanion(bool nullToAbsent) {
+    return MikanSubjectMappingsCompanion(
+      subjectId: Value(subjectId),
+      mikanBangumiId: mikanBangumiId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(mikanBangumiId),
+      resolvedAt: Value(resolvedAt),
+    );
+  }
+
+  factory MikanSubjectMapping.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return MikanSubjectMapping(
+      subjectId: serializer.fromJson<int>(json['subjectId']),
+      mikanBangumiId: serializer.fromJson<int?>(json['mikanBangumiId']),
+      resolvedAt: serializer.fromJson<DateTime>(json['resolvedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'subjectId': serializer.toJson<int>(subjectId),
+      'mikanBangumiId': serializer.toJson<int?>(mikanBangumiId),
+      'resolvedAt': serializer.toJson<DateTime>(resolvedAt),
+    };
+  }
+
+  MikanSubjectMapping copyWith({
+    int? subjectId,
+    Value<int?> mikanBangumiId = const Value.absent(),
+    DateTime? resolvedAt,
+  }) => MikanSubjectMapping(
+    subjectId: subjectId ?? this.subjectId,
+    mikanBangumiId: mikanBangumiId.present
+        ? mikanBangumiId.value
+        : this.mikanBangumiId,
+    resolvedAt: resolvedAt ?? this.resolvedAt,
+  );
+  MikanSubjectMapping copyWithCompanion(MikanSubjectMappingsCompanion data) {
+    return MikanSubjectMapping(
+      subjectId: data.subjectId.present ? data.subjectId.value : this.subjectId,
+      mikanBangumiId: data.mikanBangumiId.present
+          ? data.mikanBangumiId.value
+          : this.mikanBangumiId,
+      resolvedAt: data.resolvedAt.present
+          ? data.resolvedAt.value
+          : this.resolvedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MikanSubjectMapping(')
+          ..write('subjectId: $subjectId, ')
+          ..write('mikanBangumiId: $mikanBangumiId, ')
+          ..write('resolvedAt: $resolvedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(subjectId, mikanBangumiId, resolvedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is MikanSubjectMapping &&
+          other.subjectId == this.subjectId &&
+          other.mikanBangumiId == this.mikanBangumiId &&
+          other.resolvedAt == this.resolvedAt);
+}
+
+class MikanSubjectMappingsCompanion
+    extends UpdateCompanion<MikanSubjectMapping> {
+  final Value<int> subjectId;
+  final Value<int?> mikanBangumiId;
+  final Value<DateTime> resolvedAt;
+  const MikanSubjectMappingsCompanion({
+    this.subjectId = const Value.absent(),
+    this.mikanBangumiId = const Value.absent(),
+    this.resolvedAt = const Value.absent(),
+  });
+  MikanSubjectMappingsCompanion.insert({
+    this.subjectId = const Value.absent(),
+    this.mikanBangumiId = const Value.absent(),
+    required DateTime resolvedAt,
+  }) : resolvedAt = Value(resolvedAt);
+  static Insertable<MikanSubjectMapping> custom({
+    Expression<int>? subjectId,
+    Expression<int>? mikanBangumiId,
+    Expression<DateTime>? resolvedAt,
+  }) {
+    return RawValuesInsertable({
+      if (subjectId != null) 'subject_id': subjectId,
+      if (mikanBangumiId != null) 'mikan_bangumi_id': mikanBangumiId,
+      if (resolvedAt != null) 'resolved_at': resolvedAt,
+    });
+  }
+
+  MikanSubjectMappingsCompanion copyWith({
+    Value<int>? subjectId,
+    Value<int?>? mikanBangumiId,
+    Value<DateTime>? resolvedAt,
+  }) {
+    return MikanSubjectMappingsCompanion(
+      subjectId: subjectId ?? this.subjectId,
+      mikanBangumiId: mikanBangumiId ?? this.mikanBangumiId,
+      resolvedAt: resolvedAt ?? this.resolvedAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (subjectId.present) {
+      map['subject_id'] = Variable<int>(subjectId.value);
+    }
+    if (mikanBangumiId.present) {
+      map['mikan_bangumi_id'] = Variable<int>(mikanBangumiId.value);
+    }
+    if (resolvedAt.present) {
+      map['resolved_at'] = Variable<DateTime>(resolvedAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MikanSubjectMappingsCompanion(')
+          ..write('subjectId: $subjectId, ')
+          ..write('mikanBangumiId: $mikanBangumiId, ')
+          ..write('resolvedAt: $resolvedAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -1540,6 +1807,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $SearchHistoryTable searchHistory = $SearchHistoryTable(this);
   late final $SubjectImageCacheTable subjectImageCache =
       $SubjectImageCacheTable(this);
+  late final $MikanSubjectMappingsTable mikanSubjectMappings =
+      $MikanSubjectMappingsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -1550,6 +1819,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     subjectCollections,
     searchHistory,
     subjectImageCache,
+    mikanSubjectMappings,
   ];
 }
 
@@ -2912,6 +3182,182 @@ typedef $$SubjectImageCacheTableProcessedTableManager =
       SubjectImageCacheData,
       PrefetchHooks Function()
     >;
+typedef $$MikanSubjectMappingsTableCreateCompanionBuilder =
+    MikanSubjectMappingsCompanion Function({
+      Value<int> subjectId,
+      Value<int?> mikanBangumiId,
+      required DateTime resolvedAt,
+    });
+typedef $$MikanSubjectMappingsTableUpdateCompanionBuilder =
+    MikanSubjectMappingsCompanion Function({
+      Value<int> subjectId,
+      Value<int?> mikanBangumiId,
+      Value<DateTime> resolvedAt,
+    });
+
+class $$MikanSubjectMappingsTableFilterComposer
+    extends Composer<_$AppDatabase, $MikanSubjectMappingsTable> {
+  $$MikanSubjectMappingsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get subjectId => $composableBuilder(
+    column: $table.subjectId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get mikanBangumiId => $composableBuilder(
+    column: $table.mikanBangumiId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get resolvedAt => $composableBuilder(
+    column: $table.resolvedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$MikanSubjectMappingsTableOrderingComposer
+    extends Composer<_$AppDatabase, $MikanSubjectMappingsTable> {
+  $$MikanSubjectMappingsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get subjectId => $composableBuilder(
+    column: $table.subjectId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get mikanBangumiId => $composableBuilder(
+    column: $table.mikanBangumiId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get resolvedAt => $composableBuilder(
+    column: $table.resolvedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$MikanSubjectMappingsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $MikanSubjectMappingsTable> {
+  $$MikanSubjectMappingsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get subjectId =>
+      $composableBuilder(column: $table.subjectId, builder: (column) => column);
+
+  GeneratedColumn<int> get mikanBangumiId => $composableBuilder(
+    column: $table.mikanBangumiId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get resolvedAt => $composableBuilder(
+    column: $table.resolvedAt,
+    builder: (column) => column,
+  );
+}
+
+class $$MikanSubjectMappingsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $MikanSubjectMappingsTable,
+          MikanSubjectMapping,
+          $$MikanSubjectMappingsTableFilterComposer,
+          $$MikanSubjectMappingsTableOrderingComposer,
+          $$MikanSubjectMappingsTableAnnotationComposer,
+          $$MikanSubjectMappingsTableCreateCompanionBuilder,
+          $$MikanSubjectMappingsTableUpdateCompanionBuilder,
+          (
+            MikanSubjectMapping,
+            BaseReferences<
+              _$AppDatabase,
+              $MikanSubjectMappingsTable,
+              MikanSubjectMapping
+            >,
+          ),
+          MikanSubjectMapping,
+          PrefetchHooks Function()
+        > {
+  $$MikanSubjectMappingsTableTableManager(
+    _$AppDatabase db,
+    $MikanSubjectMappingsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$MikanSubjectMappingsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$MikanSubjectMappingsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$MikanSubjectMappingsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> subjectId = const Value.absent(),
+                Value<int?> mikanBangumiId = const Value.absent(),
+                Value<DateTime> resolvedAt = const Value.absent(),
+              }) => MikanSubjectMappingsCompanion(
+                subjectId: subjectId,
+                mikanBangumiId: mikanBangumiId,
+                resolvedAt: resolvedAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> subjectId = const Value.absent(),
+                Value<int?> mikanBangumiId = const Value.absent(),
+                required DateTime resolvedAt,
+              }) => MikanSubjectMappingsCompanion.insert(
+                subjectId: subjectId,
+                mikanBangumiId: mikanBangumiId,
+                resolvedAt: resolvedAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$MikanSubjectMappingsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $MikanSubjectMappingsTable,
+      MikanSubjectMapping,
+      $$MikanSubjectMappingsTableFilterComposer,
+      $$MikanSubjectMappingsTableOrderingComposer,
+      $$MikanSubjectMappingsTableAnnotationComposer,
+      $$MikanSubjectMappingsTableCreateCompanionBuilder,
+      $$MikanSubjectMappingsTableUpdateCompanionBuilder,
+      (
+        MikanSubjectMapping,
+        BaseReferences<
+          _$AppDatabase,
+          $MikanSubjectMappingsTable,
+          MikanSubjectMapping
+        >,
+      ),
+      MikanSubjectMapping,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -2926,6 +3372,8 @@ class $AppDatabaseManager {
       $$SearchHistoryTableTableManager(_db, _db.searchHistory);
   $$SubjectImageCacheTableTableManager get subjectImageCache =>
       $$SubjectImageCacheTableTableManager(_db, _db.subjectImageCache);
+  $$MikanSubjectMappingsTableTableManager get mikanSubjectMappings =>
+      $$MikanSubjectMappingsTableTableManager(_db, _db.mikanSubjectMappings);
 }
 
 // **************************************************************************
