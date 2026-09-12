@@ -1,7 +1,7 @@
 # 番剧详情页三栏布局改版 — 设计文档
 
 日期：2026-09-12
-状态：待批准
+状态：已批准
 
 ## 背景与目标
 
@@ -71,11 +71,13 @@ AppBar（仅返回箭头，无标题）
 
 ## 现存缺陷（本轮顺带修掉）
 
-设计阶段对 `https://api.animeko.org` 做了实测（测试用 subject 302286，BLEACH 千年血戦篇），发现两处线上形状与代码模型不符：
+设计阶段对 `https://api.animeko.org` 做了实测（测试用 subject 302286，BLEACH 千年血戦篇），发现三处线上形状与代码模型不符：
 
 1. **角色头像从来没显示过。** `CharacterInfo`（`lib/data/subject/subject_models.dart:139-150`）声明了 `imageUrl`，但线上没有这个 key —— 实际是 `imageMedium` / `imageLarge`。`nameCn` 也没解析，所以名字显示的是日文原名。`json_serializable` 会静默丢弃未声明的 key，所以这个 bug 一直没报错。该文件 `:134-138` 的注释本身就标注了 `imageUrl` 是未经验证的猜测。
 
 2. **制作人员表从来没渲染过。** `StaffMember`（`subject_models.dart:180-192`）期望 `{name（必填）, imageUrl, role}`，而线上是 `{index, person:{id,name,nameCn,type,imageLarge,imageMedium,summary}, position:int}`。必填的 `name` 缺失 → `_$StaffMemberFromJson` 抛异常 → `subjectStaffProvider` 永远是 error 状态 → `_StaffSection` 是静默失败的 section，于是整块从来没出现过。该文件 `:175-179` 也已承认整个形状是猜的。
+
+3. **`getCharacters` / `getStaff` 连信封都是错的。** 两个方法都写成 `_dio.get<Map<String, dynamic>>(...)` 然后读 `response.data!['items'] as List<dynamic>`（`lib/data/subject/subject_api.dart:54-63`、`:70-78`），但线上返回的是**裸 JSON 数组**，没有 `items` 外层对象。dio 拿到数组时 `data` 是 `List`，转型成 `Map<String, dynamic>` 直接抛异常。也就是说角色区块和上面第 1 条说的头像问题是叠加的——**角色区块同样从来没渲染过**，不只是头像空白。修复必须同时改信封（改成 `_dio.get<List<dynamic>>`）和模型字段，只改模型是不够的。
 
 另外纠正三份历史设计文档的错误结论：
 
