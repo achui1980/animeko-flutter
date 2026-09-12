@@ -164,9 +164,10 @@ EpisodeRange? _tryParseEpisode(String rawWord) {
     }
   }
 
-  // The two explicitly-marked forms below need no [_resolutionNumbers]
-  // guard: an `E`/`第…话` marker is never how a resolution is written, so
-  // there is no bare-number ambiguity to protect against.
+  // The next two forms -- `S01E09`/`E09` and `第09话` -- are explicitly
+  // marked, so they need no [_resolutionNumbers] guard: an `E` / `第…话`
+  // marker is never how a resolution is written, leaving no bare-number
+  // ambiguity to protect against.
   final seasonEpisodeMatch = _seasonEpisodeWordPattern.firstMatch(word);
   if (seasonEpisodeMatch != null) {
     final value = int.tryParse(seasonEpisodeMatch.group(1)!);
@@ -179,6 +180,10 @@ EpisodeRange? _tryParseEpisode(String rawWord) {
     if (value != null) return EpisodeRange.single(value);
   }
 
+  // Unlike the two forms above, `09v2` IS ambiguous: the episode number
+  // itself is bare, `v2` only tags the re-encode. So the
+  // [_resolutionNumbers] guard is still required here, to reject a
+  // re-encode tag like `1080v2` as a resolution rather than episode 1080.
   final versionedMatch = _versionedEpisodeWordPattern.firstMatch(word);
   if (versionedMatch != null) {
     final value = int.tryParse(versionedMatch.group(1)!);

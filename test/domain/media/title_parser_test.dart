@@ -168,8 +168,18 @@ void main() {
       );
     });
 
-    test('regression: a resolution-only title still has no episode', () {
-      expect(parseTitle('[Group][Show][1080P][MP4]').episodeRange, isNull);
+    test('regression: a bare resolution number is never an episode', () {
+      // Exercises the _resolutionNumbers guard itself: a bare `1080` token
+      // and a `1080v2` token must both be rejected, so that loosening any
+      // episode pattern cannot smuggle a resolution into the episode slot.
+      expect(
+        parseTitle('[Group][Show][1080][1080P][MP4]').episodeRange,
+        isNull,
+      );
+      expect(
+        parseTitle('[Group][Show][1080v2][1080P][MP4]').episodeRange,
+        isNull,
+      );
     });
   });
 
