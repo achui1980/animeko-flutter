@@ -22,6 +22,8 @@
 
 2. **Riverpod 是 3.x**，不是 2.x。写新 provider 前先看 `lib/domain/subject/subject_detail_controller.dart` 里的现成写法（`@riverpod class Foo extends _$Foo`，函数式 provider 第一个参数类型是 `Ref`，不是 `FooRef`）。
 
+   ⚠️ **Riverpod 3 里 `AsyncValue` 没有 `valueOrNull`**，只有可空的 `value`（`riverpod-3.2.1/lib/src/core/async_value.dart`：`ValueT? get value => _value?.$1;`）。2.x 的 `value` 会在 error 态抛异常、要用 `valueOrNull` 规避——3.x 已经把 `value` 本身改成可空，`valueOrNull` 整个被删掉了。本文档里凡是读「有值就用、没值就退化」的地方统一写 `.value`。
+
 3. **测试的 import 前缀是 `package:animeko_flutter/`。**
 
 4. **验收门：** `flutter analyze` 不能有 error（info 是历史遗留，可以有），`flutter test` 必须全绿。每个 Task 结束都要跑。
@@ -1934,7 +1936,7 @@ class SubjectReviewsController extends _$SubjectReviewsController {
   /// Fetches the next page and appends it. No-op while loading, on error,
   /// or once [SubjectReviewsPage.hasMore] is false.
   Future<void> loadMore() async {
-    final current = state.valueOrNull;
+    final current = state.value;
     if (current == null || !current.hasMore) return;
 
     final next = await ref.read(subjectApiProvider).getReviews(
@@ -2740,13 +2742,13 @@ class ContinueWatchingButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final target = ref
         .watch(continueWatchingProvider(subjectId: subjectId))
-        .valueOrNull;
+        .value;
     if (target == null) return const SizedBox.shrink();
 
     final episodes =
         ref
             .watch(subjectMainEpisodesControllerProvider(subjectId: subjectId))
-            .valueOrNull ??
+            .value ??
         const [];
     final ordinalIndex = episodes.indexWhere(
       (episode) => episode.episodeId == target.episodeId,
@@ -2755,7 +2757,7 @@ class ContinueWatchingButton extends ConsumerWidget {
 
     final storedEpisodeId = ref
         .watch(lastPlayedEpisodeStorageProvider)
-        .valueOrNull
+        .value
         ?.get(subjectId);
     final resumed = storedEpisodeId == target.episodeId;
     final label = resumed
@@ -3063,7 +3065,7 @@ class _SubjectCollectionActionButtonState
     final collectionAsync = ref.watch(
       subjectCollectionControllerProvider(subjectId: widget.subjectId),
     );
-    final collection = collectionAsync.valueOrNull;
+    final collection = collectionAsync.value;
     if (collection == null) return const SizedBox.shrink();
 
     final current = collection.collectionType;
@@ -3853,7 +3855,7 @@ class SubjectCharactersSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final characters =
-        ref.watch(subjectCharactersProvider(subjectId: subjectId)).valueOrNull ??
+        ref.watch(subjectCharactersProvider(subjectId: subjectId)).value ??
         const <RelatedCharacter>[];
 
     return DraggableScrollableSheet(
@@ -3933,7 +3935,7 @@ class SubjectCharacterRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(subjectCharactersProvider(subjectId: subjectId));
-    final characters = async.valueOrNull;
+    final characters = async.value;
 
     if (characters == null) {
       if (async.isLoading) {
@@ -4300,7 +4302,7 @@ class SubjectEpisodesSection extends ConsumerWidget {
     );
     final episodeCount = ref
         .watch(subjectDetailControllerProvider(subjectId: subjectId))
-        .valueOrNull
+        .value
         ?.episodeCount;
 
     return episodesAsync.when(
@@ -4891,12 +4893,12 @@ class SubjectRatingCard extends ConsumerWidget {
     final theme = Theme.of(context);
     final subject = ref
         .watch(subjectDetailControllerProvider(subjectId: subjectId))
-        .valueOrNull;
+        .value;
     if (subject == null) return const SizedBox.shrink();
 
     final selfRating = ref
         .watch(subjectCollectionControllerProvider(subjectId: subjectId))
-        .valueOrNull
+        .value
         ?.selfRating;
     final myScore = selfRating != null && selfRating.score > 0
         ? selfRating.score
@@ -5274,7 +5276,7 @@ class SubjectReviewsSheet extends ConsumerWidget {
     final theme = Theme.of(context);
     final provider = subjectReviewsControllerProvider(subjectId: subjectId);
     final async = ref.watch(provider);
-    final page = async.valueOrNull;
+    final page = async.value;
     final reviews = page?.items ?? const [];
 
     return DraggableScrollableSheet(
@@ -5553,7 +5555,7 @@ class SubjectReviewsCard extends ConsumerWidget {
     final async = ref.watch(
       subjectReviewsControllerProvider(subjectId: subjectId),
     );
-    final page = async.valueOrNull;
+    final page = async.value;
 
     if (page == null) {
       if (!async.isLoading) return const SizedBox.shrink();
@@ -6297,7 +6299,7 @@ class SubjectDetailLeftPane extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final subject = ref
         .watch(subjectDetailControllerProvider(subjectId: subjectId))
-        .valueOrNull;
+        .value;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -6363,11 +6365,11 @@ class SubjectDetailMainPane extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final subject = ref
         .watch(subjectDetailControllerProvider(subjectId: subjectId))
-        .valueOrNull;
+        .value;
     final episodes =
         ref
             .watch(subjectMainEpisodesControllerProvider(subjectId: subjectId))
-            .valueOrNull ??
+            .value ??
         const [];
 
     return Column(
@@ -6426,7 +6428,7 @@ class SubjectDetailSidePane extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final subject = ref
         .watch(subjectDetailControllerProvider(subjectId: subjectId))
-        .valueOrNull;
+        .value;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -6777,7 +6779,7 @@ class SubjectDetailScreen extends ConsumerWidget {
     final episodes =
         ref
             .watch(subjectMainEpisodesControllerProvider(subjectId: subjectId))
-            .valueOrNull ??
+            .value ??
         const [];
 
     return Column(
