@@ -10,15 +10,21 @@ import '../../domain/subject/subject_collection_controller.dart';
 /// [CollectionType.wish]）；已收藏时是「★ <当前状态> ▾」，点开是一个
 /// [PopupMenuButton]，列出其余四个状态和「移除」。
 ///
-/// 取代改版前平铺的 5 个 [ChoiceChip]（旧 `_CollectionButtons`）。菜单项
-/// 的泛型是 `CollectionType?`，`null` 代表「移除」，这样 `onSelected` 只
-/// 需要一个分支判断，不必额外定义一个 sealed 的动作类型。但注意
-/// [PopupMenuButton] 把 `null` 的返回值当成「菜单被取消」交给
-/// `onCanceled`、并不会传给 `onSelected`（framework `popup_menu.dart` 里
-/// `showMenu(...)` 的 `.then`），所以「移除」实际是由它那一项自己的
-/// `onTap` 分发的。
+/// 取代改版前平铺的 5 个 [ChoiceChip]（旧 `_CollectionButtons`，
+/// `subject_detail_screen.dart`）——真正的替换是后面的任务，目前那些
+/// `ChoiceChip` 仍是 app 里唯一渲染的收藏控件，`lib/` 里还没有任何地方构造
+/// 本控件。它归属左栏那一列纵向按钮（design doc
+/// `2026-09-12-subject-detail-three-column-layout-design.md` 247/252 行，
+/// 行为约定见 272-279 行）。
 ///
-/// 乐观更新/回滚与失败重试都由
+/// [PopupMenuButton] 的泛型是 `CollectionType?`，「移除」那一项的值就是
+/// `null`；但它并不是由 `onSelected` 分发的——framework 把 `null` 的返回值
+/// 当成「菜单被取消」交给 `onCanceled` 后直接 return，`onSelected` 根本收不
+/// 到（`popup_menu.dart` 里 `showMenu(...)` 的 `.then`），所以「移除」由它
+/// 自己那一项的 `onTap` 触发，`onSelected` 只剩「非 null 即状态切换」这一个
+/// 判断，也就不必额外定义一个 sealed 的动作类型。
+///
+/// 乐观更新/回滚都由
 /// [SubjectCollectionController.setCollectionType] 负责，本控件只负责在
 /// 请求进行中禁用交互（[_busy]）并把失败呈现为一次性 [SnackBar]。
 class SubjectCollectionActionButton extends ConsumerStatefulWidget {
@@ -52,6 +58,9 @@ class _SubjectCollectionActionButtonState
   bool _busy = false;
 
   Future<void> _setType(CollectionType type) async {
+    // `enabled`/`onPressed` 只在下一帧才反映 [_busy]，所以同一帧里的第二次点击
+    // 还是会走到这里，得自己再拦一次。
+    if (_busy) return;
     setState(() => _busy = true);
     try {
       await ref
@@ -73,6 +82,12 @@ class _SubjectCollectionActionButtonState
   }
 
   Future<void> _remove() async {
+    // 「移除」是从菜单项的 `onTap` 进来的，而菜单项活在 Navigator 的 overlay
+    // route 里、比本控件活得久：菜单打开期间本控件被卸载（窗口宽度跨过三栏断点
+    // 导致 pane 重建就会这样），这里仍会被调用。`onSelected` 那条路径有
+    // framework 自己的 `if (!mounted) return null;`（`popup_menu.dart` 里
+    // `showMenu(...)` 的 `.then`）兜底，`PopupMenuItemState.handleTap` 没有。
+    if (!mounted) return;
     setState(() => _busy = true);
     try {
       await ref

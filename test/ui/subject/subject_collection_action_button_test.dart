@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:animeko_flutter/data/subject/collection_type.dart';
 import 'package:animeko_flutter/data/subject/subject_api.dart';
 import 'package:animeko_flutter/data/subject/subject_image_cache_repository.dart';
@@ -158,6 +160,65 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('更新收藏状态失败'), findsOneWidget);
+    });
+
+    testWidgets('菜单打开期间控件被卸载，再选「移除」不会 setState', (tester) async {
+      when(
+        () => api.getSubject(1),
+      ).thenAnswer((_) async => detailWith(CollectionType.doing));
+      when(() => api.deleteCollection(1)).thenAnswer((_) async {});
+      final overrides = [
+        subjectApiProvider.overrideWithValue(api),
+        subjectImageCacheRepositoryProvider.overrideWithValue(imageCacheRepo),
+      ];
+      await tester.pumpWidget(
+        wrap(
+          const SubjectCollectionActionButton(subjectId: 1, imageUrl: 'u'),
+          overrides: overrides,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('在看'));
+      await tester.pumpAndSettle();
+
+      // 菜单项活在 Navigator 的 overlay route 里，比本控件活得久：把控件从树上
+      // 摘掉（窗口宽度跨过三栏断点导致 pane 重建就会这样）之后菜单还在，而
+      // `PopupMenuItem.onTap` 不像 `onSelected` 那样有 framework 的 mounted 兜底。
+      await tester.pumpWidget(
+        wrap(const SizedBox.shrink(), overrides: overrides),
+      );
+      await tester.pump();
+
+      await tester.tap(find.text('移除'));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('同一帧内连点两次「追番」只调用一次 updateCollection', (tester) async {
+      // PATCH 故意挂着不完成，这样第二次点击落在请求进行中的那段窗口里 ——
+      // 让 stub 立刻返回是观察不到 [_busy] 的：`await tester.tap` 会把 microtask
+      // 冲干净，第一次请求在第二次点击之前就已经跑完、`_busy` 也已经清掉了。
+      final pending = Completer<void>();
+      when(
+        () => api.updateCollection(
+          any(),
+          collectionType: any(named: 'collectionType'),
+        ),
+      ).thenAnswer((_) => pending.future);
+      await pump(tester, null);
+
+      // 中间不 pump：`_busy` 要到下一帧才会改变 `onPressed`，所以拦第二次点击
+      // 只能靠 `_setType` 自己进门先判一次。
+      await tester.tap(find.text('追番'));
+      await tester.tap(find.text('追番'));
+      pending.complete();
+      await tester.pumpAndSettle();
+
+      verify(
+        () => api.updateCollection(1, collectionType: CollectionType.wish),
+      ).called(1);
     });
   });
 }
