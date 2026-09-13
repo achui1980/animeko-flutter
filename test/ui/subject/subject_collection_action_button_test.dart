@@ -1,5 +1,6 @@
 import 'package:animeko_flutter/data/subject/collection_type.dart';
 import 'package:animeko_flutter/data/subject/subject_api.dart';
+import 'package:animeko_flutter/data/subject/subject_image_cache_repository.dart';
 import 'package:animeko_flutter/data/subject/subject_models.dart';
 import 'package:animeko_flutter/ui/subject/subject_collection_action_button.dart';
 import 'package:flutter/material.dart';
@@ -9,6 +10,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockSubjectApi extends Mock implements SubjectApi {}
+
+class MockSubjectImageCacheRepository extends Mock
+    implements SubjectImageCacheRepository {}
 
 SubjectDetail detailWith(CollectionType? type) => SubjectDetail(
   id: 1,
@@ -30,6 +34,7 @@ Widget wrap(Widget child, {required List<Override> overrides}) {
 
 void main() {
   late MockSubjectApi api;
+  late MockSubjectImageCacheRepository imageCacheRepo;
 
   setUpAll(() {
     registerFallbackValue(CollectionType.wish);
@@ -37,6 +42,15 @@ void main() {
 
   setUp(() {
     api = MockSubjectApi();
+    // `pump` passes `imageUrl: 'u'`, so every successful update also writes
+    // the local cover cache. Without this override that write reaches the
+    // real `AppDatabase`, which both logs a drift "created the database
+    // class multiple times" warning and then fails with
+    // `MissingPluginException` (no `getApplicationDocumentsDirectory` under
+    // `flutter_test`) -- silently exercising the swallowed failure path
+    // instead of the success path.
+    imageCacheRepo = MockSubjectImageCacheRepository();
+    when(() => imageCacheRepo.save(1, 'u')).thenAnswer((_) async {});
   });
 
   Future<void> pump(WidgetTester tester, CollectionType? type) async {
@@ -44,7 +58,10 @@ void main() {
     await tester.pumpWidget(
       wrap(
         const SubjectCollectionActionButton(subjectId: 1, imageUrl: 'u'),
-        overrides: [subjectApiProvider.overrideWithValue(api)],
+        overrides: [
+          subjectApiProvider.overrideWithValue(api),
+          subjectImageCacheRepositoryProvider.overrideWithValue(imageCacheRepo),
+        ],
       ),
     );
     await tester.pumpAndSettle();

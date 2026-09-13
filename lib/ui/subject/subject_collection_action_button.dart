@@ -12,7 +12,11 @@ import '../../domain/subject/subject_collection_controller.dart';
 ///
 /// 取代改版前平铺的 5 个 [ChoiceChip]（旧 `_CollectionButtons`）。菜单项
 /// 的泛型是 `CollectionType?`，`null` 代表「移除」，这样 `onSelected` 只
-/// 需要一个分支判断，不必额外定义一个 sealed 的动作类型。
+/// 需要一个分支判断，不必额外定义一个 sealed 的动作类型。但注意
+/// [PopupMenuButton] 把 `null` 的返回值当成「菜单被取消」交给
+/// `onCanceled`、并不会传给 `onSelected`（framework `popup_menu.dart` 里
+/// `showMenu(...)` 的 `.then`），所以「移除」实际是由它那一项自己的
+/// `onTap` 分发的。
 ///
 /// 乐观更新/回滚与失败重试都由
 /// [SubjectCollectionController.setCollectionType] 负责，本控件只负责在
