@@ -32,6 +32,8 @@
 
 6. **不要在 `lib/domain/` 里 import `package:flutter`。** 只有两个历史例外文件，不要拿它们当先例。
 
+   ⚠️ **次要文字用 `theme.colorScheme.onSurfaceVariant`，不要用 `theme.hintColor`。** 本 App 是 `useMaterial3: true` + `ColorScheme.fromSeed`（`lib/app/theme/app_theme.dart:17-28`），而 `ThemeData` 把 `hintColor` 默认成与 ColorScheme 无关的固定灰（`theme_data.dart:487`：`isDark ? Colors.white60 : Colors.black.withOpacity(0.6)`），且本仓库没有覆写它——用 `hintColor` 的文字不会跟着用户的 seed 色调走，周围的文字却会。仓库现状也是 `colorScheme` 为主（29 处引用，`hintColor` 只有 1 处历史用法，就在本轮要拆掉的 `subject_detail_screen.dart` 里）。
+
 7. **接口返回的真实形状已经实测过**，写在设计文档的「后端接口实测结果」一节。不要凭猜测改模型。特别注意：
    - `/v2/subjects/{id}/characters` 返回**裸 JSON 数组**，没有 `items` 外层。
    - `/v2/subjects/{id}/reviews` 返回 `{total, items}`，但 `total` 是 `limit+1` 哨兵值，**不是真实总数**。
@@ -2541,7 +2543,7 @@ class SubjectTitleBlock extends StatelessWidget {
             child: SelectableText(
               subject.name,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.hintColor,
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
           ),
@@ -2551,7 +2553,7 @@ class SubjectTitleBlock extends StatelessWidget {
             child: Text(
               metaLine,
               style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.hintColor,
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
           ),
@@ -3328,7 +3330,7 @@ class _StatItem extends StatelessWidget {
         const SizedBox(height: 2),
         Text(
           label,
-          style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
+          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
         ),
       ],
     );
@@ -3558,7 +3560,7 @@ class SubjectInfoTable extends StatelessWidget {
                       child: Text(
                         label,
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.hintColor,
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ),
@@ -3878,7 +3880,7 @@ class SubjectCharactersSheet extends ConsumerWidget {
                   Text(
                     '${characters.length}',
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.hintColor,
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ],
@@ -4042,7 +4044,7 @@ class _CharacterCell extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
               style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.hintColor,
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
         ],
@@ -4340,7 +4342,7 @@ class SubjectEpisodesSection extends ConsumerWidget {
                     Text(
                       progress,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.hintColor,
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                 ],
@@ -4957,7 +4959,7 @@ class SubjectRatingCard extends ConsumerWidget {
                   if (total > 0) '$total 人评分',
                 ].join(' · '),
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.hintColor,
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
             ),
@@ -5739,7 +5741,7 @@ class SubjectStaffSheet extends StatelessWidget {
                   Text(
                     '${fields.length}',
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.hintColor,
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ],
@@ -5969,7 +5971,7 @@ class SubjectStaffCard extends StatelessWidget {
                   child: Text(
                     field.key,
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.hintColor,
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ),

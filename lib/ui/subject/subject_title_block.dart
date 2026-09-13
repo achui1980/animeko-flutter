@@ -14,7 +14,7 @@ import 'subject_meta_text.dart';
 /// Takes already-resolved data instead of watching providers, so it stays a
 /// plain [StatelessWidget] that widget tests can pump without a
 /// `ProviderScope`. Its composing parent `subject_detail_main_pane.dart`
-/// stacks 标题块 / 简介 / 选集 / 角色 (design doc line 248), so it needs the
+/// will stack 标题块 / 简介 / 选集 / 角色 (design doc line 248), so it needs the
 /// [SubjectDetail] and the episode list for its other children regardless.
 ///
 /// [now] pins "today" for the 连载至 segment; when omitted,
@@ -63,7 +63,7 @@ class SubjectTitleBlock extends StatelessWidget {
             child: SelectableText(
               subject.name,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.hintColor,
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
           ),
@@ -73,7 +73,7 @@ class SubjectTitleBlock extends StatelessWidget {
             child: Text(
               metaLine,
               style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.hintColor,
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
           ),
