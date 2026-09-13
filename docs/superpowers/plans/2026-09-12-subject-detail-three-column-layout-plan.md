@@ -2329,7 +2329,7 @@ String buildSubjectMetaLine({
 - [ ] **Step 4: 运行测试确认通过**
 
 Run: `flutter test test/ui/subject/subject_meta_text_test.dart`
-Expected: `All tests passed!`（18 个测试）
+Expected: `All tests passed!`（17 个测试）
 
 - [ ] **Step 5: 提交**
 

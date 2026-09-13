@@ -4,7 +4,13 @@ import '../../data/subject/subject_episode_models.dart';
 
 /// Pure text helpers for the subject detail page's meta line
 /// (`2026年7月 · 连载至 09 · 预定全 11 话` — design doc
-/// `2026-09-12-subject-detail-three-column-layout-design.md:320`).
+/// `2026-09-12-subject-detail-three-column-layout-design.md`, the UI
+/// wireframe at line 29 and the conversion rules at lines 322-326).
+///
+/// Note the 年月 segment is unspaced (`2026年7月`, the string literal at
+/// design doc line 322 and the wireframe at line 29). The spaced
+/// `2026 年 7 月` on prose lines 320/322 is that document's Latin/CJK
+/// prose spacing, not a rendering requirement.
 ///
 /// Deliberately free of `package:flutter` imports so these can be unit
 /// tested without widget scaffolding, and so the middle column's title
@@ -19,7 +25,8 @@ import '../../data/subject/subject_episode_models.dart';
 /// string — so the caller can omit the whole segment rather than render a
 /// stray ` · ` separator (design doc line 322: 「解析失败则整段省略」).
 /// Mirrors the existing private `_formatAirDateYearMonth` in
-/// `subject_detail_screen.dart`, which this replaces.
+/// `subject_detail_screen.dart`, which this will replace when that
+/// screen is rewritten (the private copy is still live until then).
 String? formatAirDateYearMonth(String airDate) {
   final date = DateTime.tryParse(airDate);
   if (date == null) return null;
@@ -45,8 +52,13 @@ String formatEpisodeNumber(num sort) {
 /// function counts whatever it is given and has no view of
 /// [SubjectEpisode.isMain].
 ///
-/// Compares date-only, so an episode airing later today still counts as
-/// aired. Episodes whose `airdate` does not parse (it defaults to `''`
+/// Truncates [now] to a date so the comparison is date-only; `airdate`
+/// carries no time-of-day either, so an episode dated today counts as
+/// aired. That same-day inclusion comes from the `!isAfter` (i.e. `<=`)
+/// comparison below, not from the truncation — with a date-only
+/// `airdate` the truncation is a no-op, and it is kept only so the
+/// function stays correct if `airdate` ever gains a time.
+/// Episodes whose `airdate` does not parse (it defaults to `''`
 /// when the key is absent — see `subject_episode_models.dart`) are
 /// skipped rather than guessed at.
 int airedEpisodeCount(List<SubjectEpisode> episodes, {DateTime? now}) {
