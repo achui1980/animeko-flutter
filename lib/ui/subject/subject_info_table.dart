@@ -15,8 +15,9 @@ import 'subject_tags_row.dart';
 /// Bangumi 页面；拿不到时才退回 [SubjectDetail.airDate] /
 /// [SubjectDetail.episodeCount]。
 ///
-/// `别名` 反过来——优先用 [SubjectDetail.aliases]，因为后端已经把 infobox
-/// 里的多个别名拍平成数组，而 [SubjectDetail.infoboxValue] 只取第一个值。
+/// `别名` 反过来——优先用 [SubjectDetail.aliases]：它是一个扁平的
+/// `List<String>`，能把全部别名都展开，而 [SubjectDetail.infoboxValue] 只取
+/// 第一个值；infobox 只作兜底。
 ///
 /// 三行全都拿不到、且没有标签时整块隐藏（不显示一个空的「作品信息」标题）。
 ///

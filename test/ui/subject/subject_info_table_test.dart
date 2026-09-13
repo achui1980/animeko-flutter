@@ -133,5 +133,25 @@ void main() {
       expect(find.text('话数'), findsNothing);
       expect(find.text('别名'), findsNothing);
     });
+
+    testWidgets('话数优先用 infobox 而不是 episodeCount', (tester) async {
+      await pump(
+        tester,
+        detail(
+          episodes: [mainEpisode(1), mainEpisode(2)],
+          infobox: const SubjectInfobox(
+            fields: [
+              InfoboxField(
+                key: '话数',
+                values: [InfoboxValue(v: '11')],
+              ),
+            ],
+          ),
+        ),
+      );
+
+      expect(find.text('11'), findsOneWidget);
+      expect(find.text('2'), findsNothing);
+    });
   });
 }
