@@ -3,6 +3,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../api_client.dart';
 import 'collection_type.dart';
+import 'review_models.dart';
 import 'subject_models.dart';
 
 part 'subject_api.g.dart';
@@ -87,6 +88,24 @@ class SubjectApi {
       },
     );
     return PaginatedCollections.fromJson(response.data!);
+  }
+
+  /// Other users' reviews (热门评价) for a subject. Ordering is whatever
+  /// the backend returns -- it has not been verified, so don't rely on
+  /// it being newest-first or most-liked-first.
+  ///
+  /// The response's `total` is a `limit + 1` sentinel, not a real count
+  /// -- see [PaginatedReviews].
+  Future<PaginatedReviews> getReviews({
+    required int subjectId,
+    required int offset,
+    required int limit,
+  }) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/v2/subjects/$subjectId/reviews',
+      queryParameters: {'offset': offset, 'limit': limit},
+    );
+    return PaginatedReviews.fromJson(response.data!);
   }
 }
 

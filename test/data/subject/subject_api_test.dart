@@ -350,4 +350,61 @@ void main() {
       expect(page.items.single.nameCn, 'A-cn');
     });
   });
+
+  group('getReviews', () {
+    final reviewsJson = {
+      'total': 2,
+      'items': [
+        {
+          'id': 'bangumi:302286:1261526',
+          'subjectId': 302286,
+          'source': 'bangumi',
+          'author': {'id': '1261526', 'nickname': 'Guating'},
+          'contentBbcode': '对比老tv质的飞跃。',
+          'updatedAt': '2026-09-11T13:56:03Z',
+          'rating': 8,
+          'likeCount': 0,
+        },
+      ],
+    };
+
+    test('GETs the reviews path with offset/limit query params', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>(
+          any(),
+          queryParameters: any(named: 'queryParameters'),
+        ),
+      ).thenAnswer((_) async => jsonResponse(reviewsJson));
+
+      await api.getReviews(subjectId: 302286, offset: 20, limit: 20);
+
+      verify(
+        () => dio.get<Map<String, dynamic>>(
+          '/v2/subjects/302286/reviews',
+          queryParameters: {'offset': 20, 'limit': 20},
+        ),
+      ).called(1);
+    });
+
+    test('parses the response into a PaginatedReviews', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>(
+          any(),
+          queryParameters: any(named: 'queryParameters'),
+        ),
+      ).thenAnswer((_) async => jsonResponse(reviewsJson));
+
+      final page = await api.getReviews(
+        subjectId: 302286,
+        offset: 0,
+        limit: 20,
+      );
+
+      expect(page.items, hasLength(1));
+      expect(page.items.single.author.nickname, 'Guating');
+      expect(page.items.single.rating, 8);
+      // total=2 with 1 item is the backend's limit+1 has-more sentinel.
+      expect(page.hasMore, isTrue);
+    });
+  });
 }
