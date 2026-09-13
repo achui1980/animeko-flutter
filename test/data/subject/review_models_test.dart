@@ -209,5 +209,15 @@ void main() {
 
       expect(page.hasMore, isFalse);
     });
+
+    // Deliberate: `total` is load-bearing for `hasMore`, and every probed
+    // response carried it. A missing `total` throwing here degrades to
+    // "the 热门评价 card silently hides" rather than to a wrong hasMore.
+    test('throws when total is absent -- it is load-bearing for hasMore', () {
+      expect(
+        () => PaginatedReviews.fromJson({'items': <dynamic>[]}),
+        throwsA(isA<TypeError>()),
+      );
+    });
   });
 }

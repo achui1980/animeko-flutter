@@ -57,9 +57,10 @@ class SubjectReview {
   /// String because nothing needs it as a `DateTime` yet.
   final String? updatedAt;
 
-  /// The author's own score for the subject. Nullable: not every review
-  /// carries one. The observed value was `8`; the exact range this API
-  /// uses has not been verified, so do not assume one when formatting.
+  /// The review author's own score for the subject. The type permits
+  /// null, but no null was ever observed -- the one review captured
+  /// during API probing carried `rating: 8`. The value range is also
+  /// unverified, so do not assume one when formatting.
   final int? rating;
 
   @JsonKey(defaultValue: 0)
@@ -87,8 +88,20 @@ class PaginatedReviews {
   @JsonKey(defaultValue: <SubjectReview>[])
   final List<SubjectReview> items;
 
-  /// Whether another page exists. See the class doc for why this is the
-  /// only legitimate use of [total].
+  /// Whether another page exists AFTER the page this object represents.
+  /// See the class doc for why this is the only legitimate use of [total].
+  ///
+  /// Valid ONLY for a page exactly as returned by `SubjectApi.getReviews`.
+  /// [total] is a per-request `limit + 1` sentinel while [items] would be
+  /// cumulative, so this comparison silently goes false once pages have
+  /// been concatenated: page 2 of a 100-review subject read 20 at a time
+  /// gives `21 > 40 == false` and load-more stops at 40. A controller
+  /// that accumulates pages must carry the LAST page's [hasMore] forward
+  /// as a field of its own -- `MyCollectionsController` does exactly that
+  /// with `MyCollectionsPage.hasMore` (`hasMore:` at
+  /// `lib/domain/subject/my_collections_controller.dart:52,73`, derived
+  /// from the freshly fetched page alone) -- not recompute it against the
+  /// accumulated list.
   bool get hasMore => total > items.length;
 
   factory PaginatedReviews.fromJson(Map<String, dynamic> json) =>

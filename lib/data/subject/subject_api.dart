@@ -95,7 +95,8 @@ class SubjectApi {
   /// it being newest-first or most-liked-first.
   ///
   /// The response's `total` is a `limit + 1` sentinel, not a real count
-  /// -- see [PaginatedReviews].
+  /// -- see [PaginatedReviews]. Both [offset] and [limit] are required:
+  /// the backend defaults `limit` to 30, but callers own their page size.
   Future<PaginatedReviews> getReviews({
     required int subjectId,
     required int offset,

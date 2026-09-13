@@ -376,12 +376,15 @@ void main() {
         ),
       ).thenAnswer((_) async => jsonResponse(reviewsJson));
 
-      await api.getReviews(subjectId: 302286, offset: 20, limit: 20);
+      await api.getReviews(subjectId: 302286, offset: 40, limit: 5);
 
       verify(
         () => dio.get<Map<String, dynamic>>(
           '/v2/subjects/302286/reviews',
-          queryParameters: {'offset': 20, 'limit': 20},
+          // Deliberately distinct values: with offset == limit a
+          // transposed `{'offset': limit, 'limit': offset}` implementation
+          // would still satisfy this expectation.
+          queryParameters: {'offset': 40, 'limit': 5},
         ),
       ).called(1);
     });
