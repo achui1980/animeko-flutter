@@ -5,8 +5,10 @@ import '../../data/subject/subject_models.dart';
 
 part 'subject_detail_controller.g.dart';
 
-/// Fetches the main subject-detail payload (summary/tags/score/rank/
-/// collection status/self-rating/favorite counters/infobox). Cast
+/// Fetches the main subject-detail payload (summary/tags/aliases/score/
+/// rank/scoreDetails/collection status/self-rating/favorite counters/
+/// infobox/episodes -- note this is the app's only source of episode
+/// data, consumed via `SubjectMainEpisodesController`). Cast
 /// ([SubjectCharacters]) is fetched via a separate provider so it can
 /// fail independently without affecting this one -- see the design
 /// doc's "per-source silent failure" pattern (mirrors how

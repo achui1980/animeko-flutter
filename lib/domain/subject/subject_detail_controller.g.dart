@@ -8,8 +8,10 @@ part of 'subject_detail_controller.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Fetches the main subject-detail payload (summary/tags/score/rank/
-/// collection status/self-rating/favorite counters/infobox). Cast
+/// Fetches the main subject-detail payload (summary/tags/aliases/score/
+/// rank/scoreDetails/collection status/self-rating/favorite counters/
+/// infobox/episodes -- note this is the app's only source of episode
+/// data, consumed via `SubjectMainEpisodesController`). Cast
 /// ([SubjectCharacters]) is fetched via a separate provider so it can
 /// fail independently without affecting this one -- see the design
 /// doc's "per-source silent failure" pattern (mirrors how
@@ -23,8 +25,10 @@ part of 'subject_detail_controller.dart';
 @ProviderFor(SubjectDetailController)
 final subjectDetailControllerProvider = SubjectDetailControllerFamily._();
 
-/// Fetches the main subject-detail payload (summary/tags/score/rank/
-/// collection status/self-rating/favorite counters/infobox). Cast
+/// Fetches the main subject-detail payload (summary/tags/aliases/score/
+/// rank/scoreDetails/collection status/self-rating/favorite counters/
+/// infobox/episodes -- note this is the app's only source of episode
+/// data, consumed via `SubjectMainEpisodesController`). Cast
 /// ([SubjectCharacters]) is fetched via a separate provider so it can
 /// fail independently without affecting this one -- see the design
 /// doc's "per-source silent failure" pattern (mirrors how
@@ -36,8 +40,10 @@ final subjectDetailControllerProvider = SubjectDetailControllerFamily._();
 /// opaque integer `position` code and no human-readable role name.
 final class SubjectDetailControllerProvider
     extends $AsyncNotifierProvider<SubjectDetailController, SubjectDetail> {
-  /// Fetches the main subject-detail payload (summary/tags/score/rank/
-  /// collection status/self-rating/favorite counters/infobox). Cast
+  /// Fetches the main subject-detail payload (summary/tags/aliases/score/
+  /// rank/scoreDetails/collection status/self-rating/favorite counters/
+  /// infobox/episodes -- note this is the app's only source of episode
+  /// data, consumed via `SubjectMainEpisodesController`). Cast
   /// ([SubjectCharacters]) is fetched via a separate provider so it can
   /// fail independently without affecting this one -- see the design
   /// doc's "per-source silent failure" pattern (mirrors how
@@ -87,8 +93,10 @@ final class SubjectDetailControllerProvider
 String _$subjectDetailControllerHash() =>
     r'20c2661d85ddebfb6e0b534bfd822b5f2ff796a6';
 
-/// Fetches the main subject-detail payload (summary/tags/score/rank/
-/// collection status/self-rating/favorite counters/infobox). Cast
+/// Fetches the main subject-detail payload (summary/tags/aliases/score/
+/// rank/scoreDetails/collection status/self-rating/favorite counters/
+/// infobox/episodes -- note this is the app's only source of episode
+/// data, consumed via `SubjectMainEpisodesController`). Cast
 /// ([SubjectCharacters]) is fetched via a separate provider so it can
 /// fail independently without affecting this one -- see the design
 /// doc's "per-source silent failure" pattern (mirrors how
@@ -117,8 +125,10 @@ final class SubjectDetailControllerFamily extends $Family
         isAutoDispose: true,
       );
 
-  /// Fetches the main subject-detail payload (summary/tags/score/rank/
-  /// collection status/self-rating/favorite counters/infobox). Cast
+  /// Fetches the main subject-detail payload (summary/tags/aliases/score/
+  /// rank/scoreDetails/collection status/self-rating/favorite counters/
+  /// infobox/episodes -- note this is the app's only source of episode
+  /// data, consumed via `SubjectMainEpisodesController`). Cast
   /// ([SubjectCharacters]) is fetched via a separate provider so it can
   /// fail independently without affecting this one -- see the design
   /// doc's "per-source silent failure" pattern (mirrors how
@@ -136,8 +146,10 @@ final class SubjectDetailControllerFamily extends $Family
   String toString() => r'subjectDetailControllerProvider';
 }
 
-/// Fetches the main subject-detail payload (summary/tags/score/rank/
-/// collection status/self-rating/favorite counters/infobox). Cast
+/// Fetches the main subject-detail payload (summary/tags/aliases/score/
+/// rank/scoreDetails/collection status/self-rating/favorite counters/
+/// infobox/episodes -- note this is the app's only source of episode
+/// data, consumed via `SubjectMainEpisodesController`). Cast
 /// ([SubjectCharacters]) is fetched via a separate provider so it can
 /// fail independently without affecting this one -- see the design
 /// doc's "per-source silent failure" pattern (mirrors how

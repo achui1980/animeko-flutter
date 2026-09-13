@@ -309,8 +309,8 @@ class SubjectDetail {
 /// the `actors` array inside a character
 /// (`GET /v2/subjects/302286/characters?withActors=true`); the `person`
 /// object on `/v2/subjects/{id}/staff` was observed to have this exact
-/// field set too, though that endpoint is being dropped this round in
-/// favour of `infobox` (its `position` codes are unmappable).
+/// field set too, though that endpoint was dropped in favour of
+/// `infobox` (its `position` codes are unmappable).
 @JsonSerializable()
 class PersonInfo {
   const PersonInfo({
