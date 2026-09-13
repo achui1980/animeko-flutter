@@ -1,7 +1,9 @@
+import 'package:animeko_flutter/data/play/last_played_episode_storage.dart';
 import 'package:animeko_flutter/data/subject/subject_api.dart';
 import 'package:animeko_flutter/data/subject/subject_episode_models.dart';
 import 'package:animeko_flutter/data/subject/subject_models.dart';
 import 'package:animeko_flutter/domain/subject/continue_watching_controller.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:riverpod/riverpod.dart';
@@ -34,9 +36,9 @@ void main() {
   late MockSubjectApi api;
   late ProviderContainer container;
 
-  void createContainer() {
+  void createContainer({List<Override> overrides = const []}) {
     container = ProviderContainer(
-      overrides: [subjectApiProvider.overrideWithValue(api)],
+      overrides: [subjectApiProvider.overrideWithValue(api), ...overrides],
       retry: (retryCount, error) => null,
     );
     addTearDown(container.dispose);
@@ -119,5 +121,66 @@ void main() {
     final result = await read();
 
     expect(result, isNull);
+  });
+
+  // Design doc line 340 (`| continueWatchingProvider 失败 | 按钮退回
+  // 「开始观看」播第一集 |`). The last-played read is the one failure this
+  // provider can absorb: `lastPlayedEpisodeStorageProvider` awaits
+  // `SharedPreferences.getInstance()`
+  // (`lib/data/play/last_played_episode_storage.dart:39`), which can throw
+  // when a good non-empty episode list is already in hand.
+  test(
+    'falls back to the first episode when the last-played read fails',
+    () async {
+      when(() => api.getSubject(1)).thenAnswer(
+        (_) async =>
+            detailWith([episode(id: 11, sort: 1), episode(id: 12, sort: 2)]),
+      );
+      createContainer(
+        overrides: [
+          lastPlayedEpisodeStorageProvider.overrideWith(
+            (ref) async => throw Exception('SharedPreferences unavailable'),
+          ),
+        ],
+      );
+
+      final result = await read();
+
+      expect(result?.episodeId, 11);
+    },
+  );
+
+  // The same fallback, reached by an `Error` rather than an `Exception`:
+  // `LastPlayedEpisodeStorage.get` is an unchecked `as int?` cast
+  // (`shared_preferences_legacy.dart:121`), so a non-int left under the key
+  // throws a `TypeError`. Pins the catch clause's breadth -- narrowing it to
+  // `on Exception` would break this branch.
+  test(
+    'falls back to the first episode when the stored value is not an int',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        'lastPlayedEpisode:1': 'nonsense',
+      });
+      when(() => api.getSubject(1)).thenAnswer(
+        (_) async =>
+            detailWith([episode(id: 11, sort: 1), episode(id: 12, sort: 2)]),
+      );
+      createContainer();
+
+      final result = await read();
+
+      expect(result?.episodeId, 11);
+    },
+  );
+
+  // The storage fallback above must stay narrow. A failure to load the
+  // episode list leaves no episode to fall back *to*, and design doc line
+  // 334 routes that failure to a whole-page `ErrorRetryView` instead, so it
+  // has to keep propagating.
+  test('propagates a failure to load the episode list', () async {
+    when(() => api.getSubject(1)).thenThrow(Exception('detail fetch failed'));
+    createContainer();
+
+    await expectLater(read(), throwsA(isA<Exception>()));
   });
 }

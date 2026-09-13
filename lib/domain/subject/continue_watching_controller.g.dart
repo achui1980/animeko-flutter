@@ -15,10 +15,18 @@ part of 'continue_watching_controller.dart';
 /// * nothing stored, or the stored id no longer exists (the subject's
 ///   episode list changed) -> the first main episode (button reads
 ///   「开始观看」)
+/// * reading the stored id threw -> the first main episode as well, so a
+///   broken 「最近播放」 record degrades to 「开始观看」 instead of failing the
+///   button (the design doc's failure table, line 340:
+///   「`continueWatchingProvider` 失败 → 按钮退回「开始观看」播第一集」)
 /// * no main episodes at all -> null, and the caller hides the button
 ///
-/// (Those three branches are the design doc's 「新增『最近播放集数』」
+/// (The first three branches are the design doc's 「新增『最近播放集数』」
 /// section, `docs/superpowers/specs/2026-09-12-subject-detail-three-column-layout-design.md`.)
+///
+/// A failure to load the episode list itself is deliberately NOT absorbed:
+/// there is no episode to fall back to, and line 334 of the same table
+/// routes that one to a whole-page `ErrorRetryView`.
 ///
 /// The "stale id" fallback matters because [LastPlayedEpisodeStorage] is
 /// never garbage-collected -- it exposes only `get`/`set`, no delete, so a
@@ -39,10 +47,18 @@ final continueWatchingProvider = ContinueWatchingFamily._();
 /// * nothing stored, or the stored id no longer exists (the subject's
 ///   episode list changed) -> the first main episode (button reads
 ///   「开始观看」)
+/// * reading the stored id threw -> the first main episode as well, so a
+///   broken 「最近播放」 record degrades to 「开始观看」 instead of failing the
+///   button (the design doc's failure table, line 340:
+///   「`continueWatchingProvider` 失败 → 按钮退回「开始观看」播第一集」)
 /// * no main episodes at all -> null, and the caller hides the button
 ///
-/// (Those three branches are the design doc's 「新增『最近播放集数』」
+/// (The first three branches are the design doc's 「新增『最近播放集数』」
 /// section, `docs/superpowers/specs/2026-09-12-subject-detail-three-column-layout-design.md`.)
+///
+/// A failure to load the episode list itself is deliberately NOT absorbed:
+/// there is no episode to fall back to, and line 334 of the same table
+/// routes that one to a whole-page `ErrorRetryView`.
 ///
 /// The "stale id" fallback matters because [LastPlayedEpisodeStorage] is
 /// never garbage-collected -- it exposes only `get`/`set`, no delete, so a
@@ -68,10 +84,18 @@ final class ContinueWatchingProvider
   /// * nothing stored, or the stored id no longer exists (the subject's
   ///   episode list changed) -> the first main episode (button reads
   ///   「开始观看」)
+  /// * reading the stored id threw -> the first main episode as well, so a
+  ///   broken 「最近播放」 record degrades to 「开始观看」 instead of failing the
+  ///   button (the design doc's failure table, line 340:
+  ///   「`continueWatchingProvider` 失败 → 按钮退回「开始观看」播第一集」)
   /// * no main episodes at all -> null, and the caller hides the button
   ///
-  /// (Those three branches are the design doc's 「新增『最近播放集数』」
+  /// (The first three branches are the design doc's 「新增『最近播放集数』」
   /// section, `docs/superpowers/specs/2026-09-12-subject-detail-three-column-layout-design.md`.)
+  ///
+  /// A failure to load the episode list itself is deliberately NOT absorbed:
+  /// there is no episode to fall back to, and line 334 of the same table
+  /// routes that one to a whole-page `ErrorRetryView`.
   ///
   /// The "stale id" fallback matters because [LastPlayedEpisodeStorage] is
   /// never garbage-collected -- it exposes only `get`/`set`, no delete, so a
@@ -125,7 +149,7 @@ final class ContinueWatchingProvider
   }
 }
 
-String _$continueWatchingHash() => r'1ae37bfe3d122dc9774bda4831f173099d624cbc';
+String _$continueWatchingHash() => r'ca06688aa6baa291092990e9af1faaaae1377e31';
 
 /// Which episode the detail page's primary button should play.
 ///
@@ -134,10 +158,18 @@ String _$continueWatchingHash() => r'1ae37bfe3d122dc9774bda4831f173099d624cbc';
 /// * nothing stored, or the stored id no longer exists (the subject's
 ///   episode list changed) -> the first main episode (button reads
 ///   「开始观看」)
+/// * reading the stored id threw -> the first main episode as well, so a
+///   broken 「最近播放」 record degrades to 「开始观看」 instead of failing the
+///   button (the design doc's failure table, line 340:
+///   「`continueWatchingProvider` 失败 → 按钮退回「开始观看」播第一集」)
 /// * no main episodes at all -> null, and the caller hides the button
 ///
-/// (Those three branches are the design doc's 「新增『最近播放集数』」
+/// (The first three branches are the design doc's 「新增『最近播放集数』」
 /// section, `docs/superpowers/specs/2026-09-12-subject-detail-three-column-layout-design.md`.)
+///
+/// A failure to load the episode list itself is deliberately NOT absorbed:
+/// there is no episode to fall back to, and line 334 of the same table
+/// routes that one to a whole-page `ErrorRetryView`.
 ///
 /// The "stale id" fallback matters because [LastPlayedEpisodeStorage] is
 /// never garbage-collected -- it exposes only `get`/`set`, no delete, so a
@@ -166,10 +198,18 @@ final class ContinueWatchingFamily extends $Family
   /// * nothing stored, or the stored id no longer exists (the subject's
   ///   episode list changed) -> the first main episode (button reads
   ///   「开始观看」)
+  /// * reading the stored id threw -> the first main episode as well, so a
+  ///   broken 「最近播放」 record degrades to 「开始观看」 instead of failing the
+  ///   button (the design doc's failure table, line 340:
+  ///   「`continueWatchingProvider` 失败 → 按钮退回「开始观看」播第一集」)
   /// * no main episodes at all -> null, and the caller hides the button
   ///
-  /// (Those three branches are the design doc's 「新增『最近播放集数』」
+  /// (The first three branches are the design doc's 「新增『最近播放集数』」
   /// section, `docs/superpowers/specs/2026-09-12-subject-detail-three-column-layout-design.md`.)
+  ///
+  /// A failure to load the episode list itself is deliberately NOT absorbed:
+  /// there is no episode to fall back to, and line 334 of the same table
+  /// routes that one to a whole-page `ErrorRetryView`.
   ///
   /// The "stale id" fallback matters because [LastPlayedEpisodeStorage] is
   /// never garbage-collected -- it exposes only `get`/`set`, no delete, so a
