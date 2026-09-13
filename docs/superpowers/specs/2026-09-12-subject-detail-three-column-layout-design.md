@@ -376,7 +376,7 @@ AppBar（仅返回箭头，无标题）
   - `subject_info_table`：infobox 缺字段时对应行不渲染
   - `subject_collection_stats`：`done`/`doing`/`wish` 分别对应 收藏/在看/想看；`favorite` 为 null 时整块不渲染
   - `subject_title_block`：meta 行三段齐全 / 缺 airDate / 缺 episodeCount / 全部已放送（不显示「连载至」）四种组合
-  - `continue_watching_button`：有记录 → 「继续观看 第N集」；无记录 → 「开始观看」
+  - `continue_watching_button`：有**有效**记录 → 「继续观看 第N集」；无记录 → 「开始观看」；记录已失效（存的 `episodeId` 已不在列表里）→ 「开始观看」（三种情形，与上面 `continueWatchingProvider` 的三条分支一致）
   - `subject_rating_card`：分数 / 排名 / 人数（求和得出）/ 柱状图 / 打分按钮文案随已评分状态变化
 - 删 `test/ui/subject/subject_blurred_header_test.dart`
 

@@ -1711,7 +1711,7 @@ Expected: 生成 `lib/domain/subject/continue_watching_controller.g.dart`。
 - [ ] **Step 5: 跑测试确认通过**
 
 Run: `flutter test test/domain/subject/continue_watching_controller_test.dart`
-Expected: 4 个用例全 PASS。
+Expected: 6 个用例全 PASS。
 
 - [ ] **Step 6: 静态分析 + 全量测试**
 
@@ -1770,12 +1770,17 @@ void main() {
 
   final provider = subjectReviewsControllerProvider(subjectId: 1);
 
+  // Builds a page the way the backend does: `total` is a has-more sentinel
+  // that exceeds the returned row count exactly when more rows exist. (The
+  // real backend returns `limit + 1`; scaled down here so the fixtures stay
+  // short -- see `PaginatedReviews`'s class doc.)
+  PaginatedReviews page(List<SubjectReview> items, {required bool more}) =>
+      PaginatedReviews(total: items.length + (more ? 1 : 0), items: items);
+
   test('loads the first page with offset 0', () async {
     when(
       () => api.getReviews(subjectId: 1, offset: 0, limit: 20),
-    ).thenAnswer(
-      (_) async => PaginatedReviews(total: 21, items: [review('a'), review('b')]),
-    );
+    ).thenAnswer((_) async => page([review('a'), review('b')], more: true));
 
     final result = await container.read(provider.future);
 
@@ -1787,12 +1792,10 @@ void main() {
   test('loadMore appends the next page and advances the offset', () async {
     when(
       () => api.getReviews(subjectId: 1, offset: 0, limit: 20),
-    ).thenAnswer(
-      (_) async => PaginatedReviews(total: 21, items: [review('a'), review('b')]),
-    );
+    ).thenAnswer((_) async => page([review('a'), review('b')], more: true));
     when(
       () => api.getReviews(subjectId: 1, offset: 2, limit: 20),
-    ).thenAnswer((_) async => PaginatedReviews(total: 2, items: [review('c')]));
+    ).thenAnswer((_) async => page([review('c')], more: false));
 
     await container.read(provider.future);
     await container.read(provider.notifier).loadMore();
@@ -1802,16 +1805,52 @@ void main() {
     expect(result.hasMore, isFalse);
   });
 
+  // The regression test this whole task exists for. If the controller kept
+  // an accumulated `PaginatedReviews` and let its `hasMore` getter
+  // recompute, page 2's sentinel of 3 would be compared against the 4
+  // accumulated rows, `hasMore` would silently flip to false, and every
+  // row after page 2 would be unreachable. `hasMore` must come from the
+  // freshly fetched page alone.
+  test('keeps hasMore true when a full second page still has more', () async {
+    when(
+      () => api.getReviews(subjectId: 1, offset: 0, limit: 20),
+    ).thenAnswer((_) async => page([review('a'), review('b')], more: true));
+    when(
+      () => api.getReviews(subjectId: 1, offset: 2, limit: 20),
+    ).thenAnswer((_) async => page([review('c'), review('d')], more: true));
+
+    await container.read(provider.future);
+    await container.read(provider.notifier).loadMore();
+
+    final result = container.read(provider).requireValue;
+    expect(result.items.map((e) => e.id), ['a', 'b', 'c', 'd']);
+    expect(result.hasMore, isTrue);
+  });
+
   test('loadMore is a no-op once hasMore is false', () async {
     when(
       () => api.getReviews(subjectId: 1, offset: 0, limit: 20),
-    ).thenAnswer((_) async => PaginatedReviews(total: 1, items: [review('a')]));
+    ).thenAnswer((_) async => page([review('a')], more: false));
 
     await container.read(provider.future);
     await container.read(provider.notifier).loadMore();
 
     verifyNever(() => api.getReviews(subjectId: 1, offset: 1, limit: 20));
     expect(container.read(provider).requireValue.items.length, 1);
+  });
+
+  test('loadMore is a no-op when the first page failed', () async {
+    when(
+      () => api.getReviews(subjectId: 1, offset: 0, limit: 20),
+    ).thenThrow(Exception('network error'));
+
+    await expectLater(
+      container.read(provider.future),
+      throwsA(isA<Exception>()),
+    );
+    await container.read(provider.notifier).loadMore();
+
+    verifyNever(() => api.getReviews(subjectId: 1, offset: 1, limit: 20));
   });
 
   test('propagates a first-page failure', () async {
@@ -1824,7 +1863,7 @@ void main() {
 }
 ```
 
-第二个用例里第二页返回 `total: 2, items: [c]` —— `2 > 1` 为真，所以**那一页自己**的 `hasMore` 是 true；但累积后的列表有 3 条，`total` 取新页的 2，`2 > 3` 为假，于是整体 `hasMore` 变 false。这正是我们想要的行为：`total` 只是「还有没有下一页」的哨兵，累积后必须重新比对累积长度。实现里因此保留新页的 `total` 而不是相加。
+关键约束：控制器的累积状态是**新类 `SubjectReviewsPage`（`items` + `hasMore`）**，不是累积起来的 `PaginatedReviews`。`PaginatedReviews.hasMore` 是 `total > items.length`，而 `total` 是**单次请求**的 `limit + 1` 哨兵，只对「原样从 `getReviews` 拿到的那一页」成立。一旦把多页拼起来再拿它比对累积长度，`hasMore` 会无声变 false：`pageSize` 20、条目有 100 条评价时，第二页返回 `total: 21`，此时累积 40 条，`21 > 40` 为假，加载更多就停在 40 条，剩下 60 条永远取不到，而且没有任何报错。所以 `hasMore` 必须**只**取自刚拉到的那一页（`next.hasMore`）。`MyCollectionsPage`（`lib/domain/subject/my_collections_controller.dart:34`）把 `hasMore` 存成自己的字段，正是同一个原因。第三个用例（`keeps hasMore true when a full second page still has more`）就是专门锁这一点的回归测试。
 
 - [ ] **Step 2: 跑测试确认失败**
 
@@ -1844,8 +1883,33 @@ import '../../data/subject/subject_api.dart';
 
 part 'subject_reviews_controller.g.dart';
 
+/// The accumulated reviews the UI renders: every row fetched so far, plus
+/// whether another page exists after the last one fetched.
+///
+/// Deliberately NOT an accumulated [PaginatedReviews]. That class's
+/// `hasMore` is `total > items.length`, and `total` is a per-request
+/// has-more sentinel (`limit + 1`) that is only meaningful for a single
+/// page exactly as returned by `SubjectApi.getReviews`. Compare a page-2
+/// sentinel against an accumulated list and it silently goes false: with
+/// [SubjectReviewsController.pageSize] 20 on a subject that has 100
+/// reviews, page 2 reports `total: 21` while 40 rows have accumulated,
+/// `21 > 40` is false, and load-more stops at 40 -- stranding 60 rows with
+/// no error anywhere. So [hasMore] is stored, taken from the freshly
+/// fetched page alone. `MyCollectionsPage`
+/// (`lib/domain/subject/my_collections_controller.dart:34`) keeps a
+/// per-page `hasMore` field for the same reason.
+class SubjectReviewsPage {
+  const SubjectReviewsPage({required this.items, required this.hasMore});
+
+  /// Every review fetched so far, first page first.
+  final List<SubjectReview> items;
+
+  /// Whether another page exists after the last one fetched.
+  final bool hasMore;
+}
+
 /// Other users' short reviews (热门评价). Paginated by offset, accumulating
-/// into a single [PaginatedReviews] so the sheet can just render
+/// into a single [SubjectReviewsPage] so the sheet can just render
 /// `state.items`.
 ///
 /// The detail page's right-column card shows only the first few of these;
@@ -1860,14 +1924,15 @@ class SubjectReviewsController extends _$SubjectReviewsController {
   static const int pageSize = 20;
 
   @override
-  Future<PaginatedReviews> build({required int subjectId}) {
-    return ref
+  Future<SubjectReviewsPage> build({required int subjectId}) async {
+    final page = await ref
         .watch(subjectApiProvider)
         .getReviews(subjectId: subjectId, offset: 0, limit: pageSize);
+    return SubjectReviewsPage(items: page.items, hasMore: page.hasMore);
   }
 
   /// Fetches the next page and appends it. No-op while loading, on error,
-  /// or once [PaginatedReviews.hasMore] is false.
+  /// or once [SubjectReviewsPage.hasMore] is false.
   Future<void> loadMore() async {
     final current = state.valueOrNull;
     if (current == null || !current.hasMore) return;
@@ -1877,14 +1942,12 @@ class SubjectReviewsController extends _$SubjectReviewsController {
       offset: current.items.length,
       limit: pageSize,
     );
-    // Keep the NEW page's `total`: it is a `limit + 1` has-more sentinel,
-    // not a running count, so summing it would be meaningless. Comparing
-    // it against the accumulated item count is what makes `hasMore` flip
-    // to false on the last (short) page.
+    // `hasMore` comes from the freshly fetched page and is never
+    // recomputed against the accumulated list -- see [SubjectReviewsPage].
     state = AsyncData(
-      PaginatedReviews(
-        total: next.total,
+      SubjectReviewsPage(
         items: [...current.items, ...next.items],
+        hasMore: next.hasMore,
       ),
     );
   }
@@ -1899,7 +1962,7 @@ Expected: 生成 `lib/domain/subject/subject_reviews_controller.g.dart`。
 - [ ] **Step 5: 跑测试确认通过**
 
 Run: `flutter test test/domain/subject/subject_reviews_controller_test.dart`
-Expected: 4 个用例全 PASS。
+Expected: 6 个用例全 PASS。
 
 - [ ] **Step 6: 静态分析 + 全量测试**
 
