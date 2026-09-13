@@ -172,8 +172,10 @@ void main() {
       statusCode: 200,
     );
 
-    /// One element of the real `GET /v2/subjects/302286/characters?
-    /// withActors=true` payload.
+    /// A trimmed element of the real `GET /v2/subjects/302286/characters?
+    /// withActors=true` payload -- the actor's `imageLarge`/`imageMedium`/
+    /// `summary` are dropped because nothing here asserts on them. The
+    /// untrimmed element lives in `subject_models_test.dart`.
     Map<String, dynamic> realItem() => {
       'index': 0,
       'character': {
@@ -235,6 +237,7 @@ void main() {
       expect(characters.first.character.primaryActor?.name, '森田成一');
       expect(characters.last.character.imageMedium, isNull);
       expect(characters.last.character.actors, isEmpty);
+      expect(characters.last.character.primaryActor, isNull);
     });
 
     // Defensive branch: keeps working if the backend ever wraps the

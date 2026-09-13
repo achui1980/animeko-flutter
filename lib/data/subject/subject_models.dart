@@ -305,9 +305,11 @@ class SubjectDetail {
   Map<String, dynamic> toJson() => _$SubjectDetailToJson(this);
 }
 
-/// A person (voice actor, staff member, author). Live-verified shape
-/// from the `actors` array inside a character and from the (now unused)
-/// `/staff` endpoint's `person` object.
+/// A person (voice actor, staff member, author). Live-verified against
+/// the `actors` array inside a character
+/// (`GET /v2/subjects/302286/characters?withActors=true`); no other
+/// endpoint's person payload was inspected, so treat reuse elsewhere as
+/// unverified.
 @JsonSerializable()
 class PersonInfo {
   const PersonInfo({
@@ -323,6 +325,11 @@ class PersonInfo {
   final int id;
   final String name;
   final String? nameCn;
+
+  /// Opaque server-side person-category code. The only value observed on
+  /// the wire is `1` (every voice actor in the probed payload); there is
+  /// no code->label mapping available and none is planned, so nothing
+  /// renders this.
   final int? type;
   final String? imageMedium;
   final String? imageLarge;

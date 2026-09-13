@@ -266,6 +266,124 @@ void main() {
       expect(related.character.imageMedium, isNull);
       expect(related.character.imageLarge, isNull);
     });
+
+    test('primaryActor is the first actor', () {
+      final related = RelatedCharacter.fromJson(
+        Map<String, dynamic>.from(realItem),
+      );
+
+      expect(related.character.primaryActor, isNotNull);
+      expect(related.character.primaryActor!.id, 4716);
+    });
+
+    // `actors.first` would throw `Bad state: No element` here. The UI
+    // hides the CV line on null, so this must stay null-not-throw.
+    test('primaryActor is null when there are no actors', () {
+      const character = CharacterInfo(id: 9, name: 'ナメック星人');
+
+      expect(character.primaryActor, isNull);
+    });
+
+    group('displayName', () {
+      test('prefers a non-empty nameCn', () {
+        const character = CharacterInfo(id: 3320, name: '黒崎一護', nameCn: '黑崎一护');
+
+        expect(character.displayName, '黑崎一护');
+      });
+
+      test('falls back to name when nameCn is absent', () {
+        const character = CharacterInfo(id: 3320, name: '黒崎一護');
+
+        expect(character.displayName, '黒崎一護');
+      });
+
+      // The reason `displayName` guards on `isNotEmpty` and not just on
+      // null: the server sends `''` for characters with no Chinese name,
+      // and an empty label would render as a blank line.
+      test('falls back to name when nameCn is an empty string', () {
+        const character = CharacterInfo(id: 3320, name: '黒崎一護', nameCn: '');
+
+        expect(character.displayName, '黒崎一護');
+      });
+    });
+
+    // Same reasoning as the `favorite`/`infobox` round-trips above:
+    // `explicitToJson` is off, so `_$CharacterInfoToJson` emits the
+    // `actors` list as raw `PersonInfo` instances and leaves the nested
+    // conversion to `jsonEncode` calling their `toJson` transitively.
+    test('round-trips the nested actors through toJson', () {
+      final related = RelatedCharacter.fromJson(
+        Map<String, dynamic>.from(realItem),
+      );
+
+      final encoded =
+          jsonDecode(jsonEncode(related.character.toJson()))
+              as Map<String, dynamic>;
+
+      expect(encoded['actors'], [
+        {
+          'id': 4716,
+          'name': '森田成一',
+          'nameCn': '森田成一',
+          'type': 1,
+          'imageMedium': 'https://example.com/medium',
+          'imageLarge': 'https://example.com/large',
+          'summary': '',
+        },
+      ]);
+      expect(CharacterInfo.fromJson(encoded).primaryActor!.name, '森田成一');
+    });
+  });
+
+  group('PersonInfo', () {
+    test('parses the actor shape seen inside a character', () {
+      final person = PersonInfo.fromJson({
+        'id': 4716,
+        'name': '森田成一',
+        'nameCn': '森田成一',
+        'type': 1,
+        'imageLarge': 'https://example.com/large',
+        'imageMedium': 'https://example.com/medium',
+        'summary': '',
+      });
+
+      expect(person.id, 4716);
+      expect(person.type, 1);
+      expect(person.imageLarge, 'https://example.com/large');
+      expect(person.summary, '');
+    });
+
+    test('leaves every optional field null when absent', () {
+      final person = PersonInfo.fromJson({'id': 1, 'name': '某人'});
+
+      expect(person.nameCn, isNull);
+      expect(person.type, isNull);
+      expect(person.imageMedium, isNull);
+      expect(person.imageLarge, isNull);
+      expect(person.summary, isNull);
+    });
+
+    group('displayName', () {
+      test('prefers a non-empty nameCn', () {
+        const person = PersonInfo(id: 1, name: 'かかし', nameCn: '卡卡西');
+
+        expect(person.displayName, '卡卡西');
+      });
+
+      test('falls back to name when nameCn is absent', () {
+        const person = PersonInfo(id: 4716, name: '森田成一');
+
+        expect(person.displayName, '森田成一');
+      });
+
+      // See the sibling CharacterInfo case: `''` is a real wire value,
+      // so the guard has to be `isNotEmpty`, not just a null check.
+      test('falls back to name when nameCn is an empty string', () {
+        const person = PersonInfo(id: 4716, name: '森田成一', nameCn: '');
+
+        expect(person.displayName, '森田成一');
+      });
+    });
   });
 
   group('StaffMember', () {

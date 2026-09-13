@@ -533,13 +533,8 @@ class _RatingSectionState extends ConsumerState<_RatingSection> {
 }
 
 /// Horizontal, scrollable row of character avatars, matching the
-/// Animeko reference layout. Deliberately renders the character name
-/// ONLY -- there is no voice-actor/CV field anywhere on
-/// [CharacterInfo]/[RelatedCharacter] today, so a CV line (present in
-/// the reference screenshot) cannot be shown without adding a new,
-/// unconfirmed API field, which is out of scope for this pass. The
-/// "查看全部" text is a static label with no navigation/expand
-/// behavior, per the approved design.
+/// Animeko reference layout. The "查看全部" text is a static label with
+/// no navigation/expand behavior, per the approved design.
 class _CharacterSection extends ConsumerWidget {
   const _CharacterSection({required this.subjectId});
 
