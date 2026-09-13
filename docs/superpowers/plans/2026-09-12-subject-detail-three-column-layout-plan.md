@@ -2809,7 +2809,9 @@ git commit -m "feat(subject): add continue-watching button for detail page left 
 
 `PopupMenuButton` 的泛型用 `CollectionType?`，`null` 表示「移除」——这样 `onSelected` 只有一个分支判断，不需要引入额外的 sealed class。
 
-> **修订记录（Task 14 实施后回填）**：`null` 只能作为该菜单项的 `value`，不能靠 `onSelected` 的 `null` 分支来分发。`PopupMenuButton` 会把 `null` 的返回值当成「菜单被取消」交给 `onCanceled` 并直接 return，根本不会调用 `onSelected`——见 Flutter 3.44.2 的 `packages/flutter/lib/src/material/popup_menu.dart:1715-1727`。所以「移除」改由它那一项自己的 `onTap` 触发（`PopupMenuItemState.handleTap` 在 `popup_menu.dart:399-404` 里先 `Navigator.pop` 再调 `onTap`，控件此时仍 mounted，`ScaffoldMessenger.of(context)` 照常可用）。本任务原先给出的实现代码里那个 `if (value == null) _remove();` 分支是死代码，会让「移除」点了没反应，下面的实现片段已按实际提交（`8ac6614` / `8eb7e58`）修正；本任务第 6 个测试「菜单里选「移除」调用 deleteCollection」正是抓住这一点的那条测试。「移除」那一项因此不再是 `const`——`onTap: _remove` 是实例方法的 tear-off。另外测试片段里补了 `subjectImageCacheRepositoryProvider` 的 override：`pump` 传了 `imageUrl: 'u'`，成功路径会让 controller 去写本地封面缓存，不 override 就会构造真的 `AppDatabase`，在测试输出里打出一段 drift 的 "created the database class multiple times" 警告，然后以 `MissingPluginException` 失败——那两条测试实际走的是被吞掉的失败分支，而不是成功分支。
+> **修订记录（Task 14 实施后回填）**：`null` 只能作为该菜单项的 `value`，不能靠 `onSelected` 的 `null` 分支来分发。`PopupMenuButton` 会把 `null` 的返回值当成「菜单被取消」交给 `onCanceled` 并直接 return，根本不会调用 `onSelected`——见 Flutter 3.44.2 的 `packages/flutter/lib/src/material/popup_menu.dart:1715-1727`。所以「移除」改由它那一项自己的 `onTap` 触发（`PopupMenuItemState.handleTap` 在 `popup_menu.dart:399-404` 里先 `Navigator.pop` 再调 `onTap`）。**注意这条路径没有 mounted 兜底**：`onSelected` 那边 framework 自己有 `if (!mounted) return null;`（`popup_menu.dart:1716-1718`），`handleTap` 没有，而菜单项活在 Navigator 的 overlay route 里、比本控件活得久。正常路径下 `onTap` 触发时控件仍 mounted、`ScaffoldMessenger.of(context)` 照常可用；但菜单打开期间控件被卸载（窗口宽度跨过三栏断点导致 pane 重建）时不成立，会 `setState() called after dispose()`，所以 `_remove` 必须自己先判一次 `mounted`——转抄实现片段时不要把那个守卫丢掉。本任务原先给出的实现代码里那个 `if (value == null) _remove();` 分支是死代码，会让「移除」点了没反应，下面的实现片段已按实际提交（`8ac6614` / `8eb7e58`）修正；本任务第 6 个测试「菜单里选「移除」调用 deleteCollection」正是抓住这一点的那条测试。「移除」那一项因此不再是 `const`——`onTap: _remove` 是实例方法的 tear-off。另外测试片段里补了 `subjectImageCacheRepositoryProvider` 的 override：`pump` 传了 `imageUrl: 'u'`，成功路径会让 controller 去写本地封面缓存，不 override 就会构造真的 `AppDatabase`，在测试输出里打出一段 drift 的 "created the database class multiple times" 警告，然后以 `MissingPluginException` 失败——那两条测试实际走的是被吞掉的失败分支，而不是成功分支。
+>
+> **修订记录（Task 14 代码评审后回填，`ca82c76`）**：又改了三处，实现片段与测试片段都已同步。① `_remove` 开头加 `if (!mounted) return;`（上一段说明的那个 defect，已复现出真实的 `setState() called after dispose()`）。② `_setType` 开头加 `if (_busy) return;`：`enabled`/`onPressed` 的值是 build 时捕获的，要到下一帧才反映 `_busy`，所以请求进行中的第二次点击照样进得来，会发出第二个 `PATCH`；加了这一行 `_busy` 才真的挡得住重复提交。只加在 `_setType`，`_remove` 不加——一次点击就把菜单 pop 掉了，第二次点击碰不到同一个菜单项，加了是死代码。③ dartdoc 删掉了「与失败重试」这半句：`setCollectionType`（`subject_collection_controller.dart:67-92`）和 `SubjectApi.updateCollection`（`subject_api.dart:32`）都没有任何重试，全仓库只有 `auth_interceptor.dart:71` 的 401 刷新后重放一次；design doc 279 行给这个控件的描述也只有「乐观更新 + 失败回滚」。同时按 `continue_watching_button.dart:16-18` / `subject_title_block.dart:15-18` 的先例，给 dartdoc 补了「本控件目前还没有任何地方构造」的休眠声明 + design doc 行号引用，并把「`null` 代表「移除」所以 `onSelected` 只要一个分支」那句陈旧的理由重写成一段前后一致的说明。测试也从 7 条加到 9 条：两个 defect 各配一条回归测试（`菜单打开期间控件被卸载，再选「移除」不会 setState` / `同一帧内连点两次「追番」只调用一次 updateCollection`）。后者的 stub 必须用挂着不 complete 的 `Completer`——让 stub 立刻返回是观察不到 `_busy` 的，`await tester.tap` 会把 microtask 冲干净，第一次请求在第二次点击之前就已经跑完了。
 
 **Files:**
 - Create: `lib/ui/subject/subject_collection_action_button.dart`
@@ -2820,6 +2822,8 @@ git commit -m "feat(subject): add continue-watching button for detail page left 
 创建 `test/ui/subject/subject_collection_action_button_test.dart`：
 
 ```dart
+import 'dart:async';
+
 import 'package:animeko_flutter/data/subject/collection_type.dart';
 import 'package:animeko_flutter/data/subject/subject_api.dart';
 import 'package:animeko_flutter/data/subject/subject_image_cache_repository.dart';
@@ -2981,6 +2985,65 @@ void main() {
 
       expect(find.textContaining('更新收藏状态失败'), findsOneWidget);
     });
+
+    testWidgets('菜单打开期间控件被卸载，再选「移除」不会 setState', (tester) async {
+      when(
+        () => api.getSubject(1),
+      ).thenAnswer((_) async => detailWith(CollectionType.doing));
+      when(() => api.deleteCollection(1)).thenAnswer((_) async {});
+      final overrides = [
+        subjectApiProvider.overrideWithValue(api),
+        subjectImageCacheRepositoryProvider.overrideWithValue(imageCacheRepo),
+      ];
+      await tester.pumpWidget(
+        wrap(
+          const SubjectCollectionActionButton(subjectId: 1, imageUrl: 'u'),
+          overrides: overrides,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('在看'));
+      await tester.pumpAndSettle();
+
+      // 菜单项活在 Navigator 的 overlay route 里，比本控件活得久：把控件从树上
+      // 摘掉（窗口宽度跨过三栏断点导致 pane 重建就会这样）之后菜单还在，而
+      // `PopupMenuItem.onTap` 不像 `onSelected` 那样有 framework 的 mounted 兜底。
+      await tester.pumpWidget(
+        wrap(const SizedBox.shrink(), overrides: overrides),
+      );
+      await tester.pump();
+
+      await tester.tap(find.text('移除'));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('同一帧内连点两次「追番」只调用一次 updateCollection', (tester) async {
+      // PATCH 故意挂着不完成，这样第二次点击落在请求进行中的那段窗口里 ——
+      // 让 stub 立刻返回是观察不到 [_busy] 的：`await tester.tap` 会把 microtask
+      // 冲干净，第一次请求在第二次点击之前就已经跑完、`_busy` 也已经清掉了。
+      final pending = Completer<void>();
+      when(
+        () => api.updateCollection(
+          any(),
+          collectionType: any(named: 'collectionType'),
+        ),
+      ).thenAnswer((_) => pending.future);
+      await pump(tester, null);
+
+      // 中间不 pump：`_busy` 要到下一帧才会改变 `onPressed`，所以拦第二次点击
+      // 只能靠 `_setType` 自己进门先判一次。
+      await tester.tap(find.text('追番'));
+      await tester.tap(find.text('追番'));
+      pending.complete();
+      await tester.pumpAndSettle();
+
+      verify(
+        () => api.updateCollection(1, collectionType: CollectionType.wish),
+      ).called(1);
+    });
   });
 }
 ```
@@ -3005,15 +3068,21 @@ import '../../domain/subject/subject_collection_controller.dart';
 /// [CollectionType.wish]）；已收藏时是「★ <当前状态> ▾」，点开是一个
 /// [PopupMenuButton]，列出其余四个状态和「移除」。
 ///
-/// 取代改版前平铺的 5 个 [ChoiceChip]（旧 `_CollectionButtons`）。菜单项
-/// 的泛型是 `CollectionType?`，`null` 代表「移除」，这样 `onSelected` 只
-/// 需要一个分支判断，不必额外定义一个 sealed 的动作类型。但注意
-/// [PopupMenuButton] 把 `null` 的返回值当成「菜单被取消」交给
-/// `onCanceled`、并不会传给 `onSelected`（framework `popup_menu.dart` 里
-/// `showMenu(...)` 的 `.then`），所以「移除」实际是由它那一项自己的
-/// `onTap` 分发的。
+/// 取代改版前平铺的 5 个 [ChoiceChip]（旧 `_CollectionButtons`，
+/// `subject_detail_screen.dart`）——真正的替换是后面的任务，目前那些
+/// `ChoiceChip` 仍是 app 里唯一渲染的收藏控件，`lib/` 里还没有任何地方构造
+/// 本控件。它归属左栏那一列纵向按钮（design doc
+/// `2026-09-12-subject-detail-three-column-layout-design.md` 247/252 行，
+/// 行为约定见 272-279 行）。
 ///
-/// 乐观更新/回滚与失败重试都由
+/// [PopupMenuButton] 的泛型是 `CollectionType?`，「移除」那一项的值就是
+/// `null`；但它并不是由 `onSelected` 分发的——framework 把 `null` 的返回值
+/// 当成「菜单被取消」交给 `onCanceled` 后直接 return，`onSelected` 根本收不
+/// 到（`popup_menu.dart` 里 `showMenu(...)` 的 `.then`），所以「移除」由它
+/// 自己那一项的 `onTap` 触发，`onSelected` 只剩「非 null 即状态切换」这一个
+/// 判断，也就不必额外定义一个 sealed 的动作类型。
+///
+/// 乐观更新/回滚都由
 /// [SubjectCollectionController.setCollectionType] 负责，本控件只负责在
 /// 请求进行中禁用交互（[_busy]）并把失败呈现为一次性 [SnackBar]。
 class SubjectCollectionActionButton extends ConsumerStatefulWidget {
@@ -3047,6 +3116,9 @@ class _SubjectCollectionActionButtonState
   bool _busy = false;
 
   Future<void> _setType(CollectionType type) async {
+    // `enabled`/`onPressed` 只在下一帧才反映 [_busy]，所以同一帧里的第二次点击
+    // 还是会走到这里，得自己再拦一次。
+    if (_busy) return;
     setState(() => _busy = true);
     try {
       await ref
@@ -3068,6 +3140,12 @@ class _SubjectCollectionActionButtonState
   }
 
   Future<void> _remove() async {
+    // 「移除」是从菜单项的 `onTap` 进来的，而菜单项活在 Navigator 的 overlay
+    // route 里、比本控件活得久：菜单打开期间本控件被卸载（窗口宽度跨过三栏断点
+    // 导致 pane 重建就会这样），这里仍会被调用。`onSelected` 那条路径有
+    // framework 自己的 `if (!mounted) return null;`（`popup_menu.dart` 里
+    // `showMenu(...)` 的 `.then`）兜底，`PopupMenuItemState.handleTap` 没有。
+    if (!mounted) return;
     setState(() => _busy = true);
     try {
       await ref
