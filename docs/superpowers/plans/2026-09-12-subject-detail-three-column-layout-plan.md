@@ -5252,10 +5252,16 @@ class SubjectReviewsSheet extends ConsumerWidget {
                     );
                   }
                   final review = reviews[index];
+                  // `stripBbcode` already trims, and returns '' for an
+                  // image-only / mask-only review. Pass `null` rather than
+                  // `Text('')` in that case -- an empty `Text` is still a
+                  // full line height and pushes `ListTile` into its
+                  // two-line layout, leaving a visibly blank second row.
+                  final content = stripBbcode(review.contentBbcode ?? '');
                   return ListTile(
                     leading: ReviewAvatar(author: review.author, radius: 18),
                     title: Text(review.author.nickname),
-                    subtitle: Text(stripBbcode(review.contentBbcode ?? '')),
+                    subtitle: content.isEmpty ? null : Text(content),
                     trailing: review.rating == null
                         ? null
                         : Text(
@@ -5532,7 +5538,10 @@ class _ReviewItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final content = stripBbcode(review.contentBbcode ?? '').trim();
+    // `stripBbcode` already trims, so no `.trim()` here. It returns ''
+    // for an image-only / mask-only review, which the `isNotEmpty` guard
+    // below turns into "render no body line at all".
+    final content = stripBbcode(review.contentBbcode ?? '');
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

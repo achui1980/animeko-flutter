@@ -357,7 +357,7 @@ AppBar（仅返回箭头，无标题）
   - `staffFields` 黑名单过滤，**含"没见过的职位仍然保留"这一条**
   - `CharacterInfo` 的 `nameCn` / `imageMedium` / `actors` 解析；`actors` 缺失时为 `[]`
 - `test/data/subject/review_models_test.dart` — 重点测 `hasMore` 的哨兵语义（`total == limit+1` → true；`total == items.length` → false）
-- `test/data/subject/bbcode_test.dart` — `stripBbcode`：嵌套标签、`[img]` 丢弃、未闭合标签、无标签原样返回、空字符串
+- `test/data/subject/bbcode_test.dart` — `stripBbcode`：嵌套标签、`[img]` 丢弃（含多个、跨行、大写）、`[mask]` 丢弃、未闭合标签、字面方括号（`我给[9/10]分`）原样保留、首尾空白被 trim、空字符串
 - `test/data/play/last_played_episode_storage_test.dart` — get/set/未设置时为 null
 - `test/domain/subject/continue_watching_controller_test.dart` — 有记录 / 无记录 / 记录指向已不存在的 episodeId / 集数列表为空
 - `test/domain/subject/subject_reviews_controller_test.dart` — 首屏 + `loadMore()` 追加 + `hasMore` 翻转
