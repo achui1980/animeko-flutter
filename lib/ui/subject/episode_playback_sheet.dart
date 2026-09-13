@@ -12,7 +12,9 @@ import 'episode_source_sheet.dart' show sourceLabel;
 /// opened by tapping a number in `EpisodeNumberGrid`.
 ///
 /// Unlike `EpisodeSourceSheet` (which lists every episode across every
-/// source, and stays unmodified/still used elsewhere), this always
+/// source, and which nothing in `lib/` constructs any more -- only its own
+/// test does; the grid it wrapped, `EpisodeSourceGrid`, is still live in
+/// `lib/ui/player/player_screen.dart:726`), this always
 /// shows exactly one episode's matched candidates (via
 /// [matchEpisodeSources]), even when there's only one -- see the
 /// design doc's Section 3 (Q8: interaction consistency, never

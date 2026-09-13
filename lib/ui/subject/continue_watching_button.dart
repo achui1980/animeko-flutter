@@ -19,10 +19,13 @@ import 'subject_meta_text.dart';
 ///
 /// Which of the two labels shows is decided by comparing the episode
 /// [continueWatchingProvider] resolved to against the id in
-/// [LastPlayedEpisodeStorage]. All three of the provider's branches land
-/// correctly: nothing stored (null) and a stale stored id (the provider
-/// falls back to the first episode) both compare unequal -> 「开始观看」,
-/// while a live record compares equal -> 「继续观看」.
+/// [LastPlayedEpisodeStorage]. All four of the provider's non-null
+/// branches land correctly: nothing stored (null), a stale stored id, and
+/// a failed storage read (the provider falls back to the first episode for
+/// the last two) all compare unequal -> 「开始观看」, while a live record
+/// compares equal -> 「继续观看」. The failed-read case works because this
+/// widget reads the same failing provider through `.value` below, which is
+/// null on an error, exactly like the nothing-stored case.
 ///
 /// Tapping opens the same [EpisodePlaybackSheet] that tapping a number in
 /// the 选集 grid opens (today from `SubjectDetailScreen`'s
@@ -35,11 +38,13 @@ import 'subject_meta_text.dart';
 /// Renders nothing when [continueWatchingProvider] has no value: while it
 /// is still loading, when it errored with no previous data, and when the
 /// subject has no main episodes at all (the provider returns null for
-/// that last one). Note the provider's fallback covers a missing or
-/// stale *stored id*, not a failed fetch -- if the subject detail request
-/// itself fails there is no episode to target, so this hides rather than
-/// showing 「开始观看」 as the design doc's failure table (line 340)
-/// suggests.
+/// that last one).
+///
+/// The design doc's failure table needs nothing extra from this widget. A
+/// failed last-played read is already handled inside the provider, which
+/// falls back to the first episode so the button reads 「开始观看」 (line
+/// 340). A failed subject-detail fetch never reaches this widget at all,
+/// because line 334 routes that one to a page-level `ErrorRetryView`.
 class ContinueWatchingButton extends ConsumerWidget {
   const ContinueWatchingButton({
     super.key,
@@ -66,7 +71,12 @@ class ContinueWatchingButton extends ConsumerWidget {
     // `target` out of this very list. It can miss during a refresh, though:
     // the episode list settles first and only then does the provider that
     // depends on it recompute, so there is a build where a new list is
-    // paired with the previous target.
+    // paired with the previous target. What makes that pairing observable
+    // here is that `AsyncLoading` retains the previous value, so the `.value`
+    // above keeps handing back the stale target instead of null while the
+    // episode list is already fresh -- and it is only observable while
+    // `continueWatching`'s second `await` (the storage provider) is still
+    // pending at a frame boundary.
     final ordinalIndex = episodes.indexWhere(
       (episode) => episode.episodeId == target.episodeId,
     );

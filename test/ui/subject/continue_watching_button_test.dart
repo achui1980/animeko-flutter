@@ -1,11 +1,10 @@
 import 'package:animeko_flutter/data/subject/subject_api.dart';
 import 'package:animeko_flutter/data/subject/subject_episode_models.dart';
 import 'package:animeko_flutter/data/subject/subject_models.dart';
-import 'package:animeko_flutter/domain/media/media_registry.dart';
-import 'package:animeko_flutter/domain/media/media_source.dart';
 import 'package:animeko_flutter/domain/play/subject_episodes_controller.dart';
 import 'package:animeko_flutter/domain/subject/continue_watching_controller.dart';
 import 'package:animeko_flutter/ui/subject/continue_watching_button.dart';
+import 'package:animeko_flutter/ui/subject/episode_playback_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -13,18 +12,6 @@ import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MockSubjectApi extends Mock implements SubjectApi {}
-
-/// Minimal scraper-side episode: [MediaEpisode] is just these two
-/// getters (`lib/domain/media/media_source.dart:21-27`).
-class FakeMediaEpisode implements MediaEpisode {
-  const FakeMediaEpisode(this.sourceId, this.title);
-
-  @override
-  final String sourceId;
-
-  @override
-  final String title;
-}
 
 /// Serves a fixed scraper result set so `EpisodePlaybackSheet` resolves
 /// without touching the network.
@@ -40,8 +27,12 @@ class StubEpisodesController extends SubjectEpisodesController {
   }) async => merged;
 }
 
+/// `episodeId` and `sort` are deliberately given different values: they are
+/// the two fields this widget juggles (it matches the target on `episodeId`
+/// and renders the label from `sort`), so keeping them distinct stops an
+/// assertion that reads the wrong one from passing by coincidence.
 SubjectEpisode ep(int n) => SubjectEpisode(
-  episodeId: n,
+  episodeId: 100 + n,
   sort: n,
   ep: '$n',
   type: 'MAIN',
@@ -92,7 +83,7 @@ void main() {
   });
 
   testWidgets('shows 继续观看 第 N 集 for a stored episode', (tester) async {
-    SharedPreferences.setMockInitialValues({'lastPlayedEpisode:1': 3});
+    SharedPreferences.setMockInitialValues({'lastPlayedEpisode:1': 103});
 
     await pumpButton(tester);
 
@@ -128,7 +119,13 @@ void main() {
 
     await pumpButton(tester);
 
-    expect(find.byType(FilledButton), findsNothing);
+    // Asserted on the labels rather than on the button type: a negative
+    // `find.byType(FilledButton)` is satisfied by anything that is not a
+    // `FilledButton`, so it stays green both when the button is merely
+    // rendered as another widget type and when this guard stops hiding
+    // anything at all.
+    expect(find.text('开始观看'), findsNothing);
+    expect(find.textContaining('继续观看'), findsNothing);
   });
 
   // Covers the stale-target guard: `continueWatchingProvider` normally
@@ -159,44 +156,37 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byType(FilledButton), findsNothing);
+    expect(find.text('开始观看'), findsNothing);
+    expect(find.textContaining('继续观看'), findsNothing);
   });
 
   // Covers what the button hands to `EpisodePlaybackSheet`: the target
   // episode, and its position in the full main-episode list (the
-  // `ordinalIndex` contract playback-source matching keys on).
+  // `ordinalIndex` contract playback-source matching keys on). Asserting on
+  // the widget the button constructs, rather than on how that widget renders,
+  // keeps this test independent of the sheet's own layout.
   //
-  // The fixture makes the index observable: source `wide` lists three
-  // episodes and source `narrow` only one, so position 2 matches `wide`
-  // alone while position 0 would also match `narrow`
-  // (`EpisodeSourceIndex.matchesAt`). `mediaSourcesProvider` is empty so
-  // each row falls back to its raw `sourceId` as its label
-  // (`sourceLabel`).
+  // The stub keeps the real scraper out of this test: the sheet watches
+  // `subjectEpisodesControllerProvider`, whose real implementation fans out
+  // over `mediaSourcesProvider`'s three live sources
+  // (`lib/domain/media/media_registry.dart:147`). The test does still pass
+  // without the override (verified), but only by relying on how those
+  // unstubbed requests happen to behave in the harness. An empty list is
+  // enough because the assertions read the widget's arguments rather than
+  // the rows it renders.
   testWidgets('opens the playback sheet for the target at its ordinal index', (
     tester,
   ) async {
-    SharedPreferences.setMockInitialValues({'lastPlayedEpisode:1': 3});
-    final merged = [
-      for (var i = 1; i <= 3; i++)
-        MergedEpisode(
-          episode: FakeMediaEpisode('wide', 'wide-$i'),
-          sourceId: 'wide',
-        ),
-      const MergedEpisode(
-        episode: FakeMediaEpisode('narrow', 'narrow-1'),
-        sourceId: 'narrow',
-      ),
-    ];
+    SharedPreferences.setMockInitialValues({'lastPlayedEpisode:1': 103});
 
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           subjectApiProvider.overrideWithValue(api),
-          mediaSourcesProvider.overrideWithValue(const []),
           subjectEpisodesControllerProvider(
             subjectId: 1,
             subjectName: 'A-cn',
-          ).overrideWith(() => StubEpisodesController(merged)),
+          ).overrideWith(() => StubEpisodesController(const [])),
         ],
         child: const MaterialApp(
           home: Scaffold(
@@ -210,9 +200,11 @@ void main() {
     await tester.tap(find.text('继续观看 第 3 集'));
     await tester.pumpAndSettle();
 
-    // The sheet headlines the episode it was handed.
-    expect(find.text('第3集'), findsOneWidget);
-    expect(find.text('wide'), findsOneWidget);
-    expect(find.text('narrow'), findsNothing);
+    final sheet = tester.widget<EpisodePlaybackSheet>(
+      find.byType(EpisodePlaybackSheet),
+    );
+    expect(sheet.ordinalIndex, 2);
+    expect(sheet.episode.episodeId, 103);
+    expect(sheet.subjectName, 'A-cn');
   });
 }
