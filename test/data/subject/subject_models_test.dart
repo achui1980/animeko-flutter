@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:animeko_flutter/data/subject/collection_type.dart';
 import 'package:animeko_flutter/data/subject/subject_models.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -354,6 +356,67 @@ void main() {
       expect(subject.favorite!.doing, 0);
       expect(subject.favorite!.onHold, 0);
       expect(subject.favorite!.dropped, 0);
+    });
+
+    // Distinct from the absent case above: an *empty* object means "we
+    // have the counters and they are all zero", so the 收藏统计 block
+    // renders 0/0/0 rather than hiding itself the way a null does.
+    test('favorite is non-null with all-zero counters when the object is '
+        'present but empty', () {
+      final subject = SubjectDetail.fromJson({
+        'id': 1,
+        'name': 'x',
+        'nameCn': 'x',
+        'summary': '',
+        'airDate': '2020-01-01',
+        'tags': <dynamic>[],
+        'selfRating': {'score': 0, 'tags': <dynamic>[], 'isPrivate': false},
+        'favorite': <String, dynamic>{},
+      });
+
+      expect(subject.favorite, isNotNull);
+      expect(subject.favorite!.wish, 0);
+      expect(subject.favorite!.done, 0);
+      expect(subject.favorite!.doing, 0);
+      expect(subject.favorite!.onHold, 0);
+      expect(subject.favorite!.dropped, 0);
+    });
+
+    // `explicitToJson` is off, so `_$SubjectDetailToJson` emits the
+    // `SubjectFavorite` instance as-is and leaves the nested conversion to
+    // `jsonEncode` calling its `toJson` transitively -- exactly like the
+    // pre-existing `selfRating` field. Round-trip through jsonEncode rather
+    // than asserting on the raw map, so this covers what real serialization
+    // actually does.
+    test('round-trips the nested favorite object through toJson', () {
+      final subject = SubjectDetail.fromJson({
+        'id': 302286,
+        'name': 'BLEACH 千年血戦篇',
+        'nameCn': '境·界 千年血战篇',
+        'summary': '',
+        'airDate': '2022-10-10',
+        'tags': <dynamic>[],
+        'selfRating': {'score': 0, 'tags': <dynamic>[], 'isPrivate': false},
+        'favorite': {
+          'wish': 2138,
+          'done': 7420,
+          'doing': 1102,
+          'onHold': 360,
+          'dropped': 177,
+        },
+      });
+
+      final encoded =
+          jsonDecode(jsonEncode(subject.toJson())) as Map<String, dynamic>;
+
+      expect(encoded['favorite'], {
+        'wish': 2138,
+        'done': 7420,
+        'doing': 1102,
+        'onHold': 360,
+        'dropped': 177,
+      });
+      expect(SubjectDetail.fromJson(encoded).favorite!.done, 7420);
     });
   });
 }

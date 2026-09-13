@@ -40,6 +40,13 @@ class SelfRating {
 /// snake_case `on_hold`) and `done` (not Bangumi's `collect`). Every
 /// counter defaults to 0 so a partial object still parses -- the UI
 /// only shows `done`/`doing`/`wish`.
+///
+/// Collapsing "counter absent" into "counter is 0" here is deliberate,
+/// and the opposite of what [SubjectDetail.episodes] and
+/// [SubjectDetail.scoreDetails] do: those keep null distinct from
+/// zero/empty because the UI must omit a line it has no data for,
+/// whereas for a display counter an unreported count and a count of zero
+/// mean the same thing to the reader.
 @JsonSerializable()
 class SubjectFavorite {
   const SubjectFavorite({
@@ -72,9 +79,9 @@ class SubjectFavorite {
 /// -- json_serializable's generated `fromJson` ignores undeclared keys,
 /// so omitting fields is safe.
 ///
-/// the real wire shape also has `type`/`nsfw`/`metaTags`/`relations`/
-/// `platform`/`airingInfo`/`updatedAt`, none of which the UI needs.
-/// `favorite` and `infobox` ARE parsed (see the fields below).
+/// The real wire shape also has `type`/`nsfw`/`metaTags`/`infobox`/
+/// `relations`/`platform`/`airingInfo`/`updatedAt`, none of which the UI
+/// needs. `favorite` IS parsed (see the field below).
 @JsonSerializable()
 class SubjectDetail {
   const SubjectDetail({
