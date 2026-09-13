@@ -419,4 +419,176 @@ void main() {
       expect(SubjectDetail.fromJson(encoded).favorite!.done, 7420);
     });
   });
+
+  group('SubjectInfobox', () {
+    /// Real subset of subject 302286's infobox.
+    SubjectDetail buildWithInfobox(Map<String, dynamic> infobox) {
+      return SubjectDetail.fromJson({
+        'id': 302286,
+        'name': 'BLEACH 千年血戦篇',
+        'nameCn': '境·界 千年血战篇',
+        'summary': '',
+        'airDate': '2022-10-10',
+        'tags': <dynamic>[],
+        'selfRating': {'score': 0, 'tags': <dynamic>[], 'isPrivate': false},
+        'infobox': infobox,
+      });
+    }
+
+    const realInfobox = {
+      'template': 'Infobox animanga/TVAnime',
+      'fields': [
+        {
+          'key': '中文名',
+          'values': [
+            {'v': '境·界 千年血战篇'},
+          ],
+        },
+        {
+          'key': '放送开始',
+          'values': [
+            {'v': '2022年10月10日'},
+          ],
+        },
+        {
+          'key': '话数',
+          'values': [
+            {'v': '13'},
+          ],
+        },
+        {
+          'key': '原作',
+          'values': [
+            {'v': '「BLEACH」久保帯人（集英社「週刊少年ジャンプ」連載）'},
+          ],
+        },
+        {
+          'key': '音乐',
+          'values': [
+            {'v': '鷺巣詩郎'},
+          ],
+        },
+        {
+          'key': '系列构成',
+          'values': [
+            {'v': '田口智久'},
+            {'v': '平松正樹'},
+          ],
+        },
+        {
+          'key': '官方网站',
+          'values': [
+            {'v': 'https://example.com'},
+          ],
+        },
+      ],
+    };
+
+    test('parses template and fields', () {
+      final subject = buildWithInfobox(realInfobox);
+
+      expect(subject.infobox, isNotNull);
+      expect(subject.infobox!.template, 'Infobox animanga/TVAnime');
+      expect(subject.infobox!.fields.length, 7);
+      expect(subject.infobox!.fields.first.key, '中文名');
+      expect(subject.infobox!.fields.first.values.first.v, '境·界 千年血战篇');
+    });
+
+    test('parses a field with multiple values', () {
+      final subject = buildWithInfobox(realInfobox);
+      final field = subject.infobox!.fields.firstWhere((f) => f.key == '系列构成');
+
+      expect(field.values.map((value) => value.v).toList(), ['田口智久', '平松正樹']);
+    });
+
+    test('value k is null when absent', () {
+      final subject = buildWithInfobox(realInfobox);
+
+      expect(subject.infobox!.fields.first.values.first.k, isNull);
+    });
+
+    test('value k is parsed when present', () {
+      final subject = buildWithInfobox({
+        'fields': [
+          {
+            'key': '主题歌',
+            'values': [
+              {'k': 'OP', 'v': 'Scar'},
+            ],
+          },
+        ],
+      });
+
+      expect(subject.infobox!.fields.first.values.first.k, 'OP');
+      expect(subject.infobox!.fields.first.values.first.v, 'Scar');
+    });
+
+    test('infobox is null when the key is absent', () {
+      final subject = SubjectDetail.fromJson({
+        'id': 1,
+        'name': 'x',
+        'nameCn': 'x',
+        'summary': '',
+        'airDate': '2020-01-01',
+        'tags': <dynamic>[],
+        'selfRating': {'score': 0, 'tags': <dynamic>[], 'isPrivate': false},
+      });
+
+      expect(subject.infobox, isNull);
+      expect(subject.infoboxValue('原作'), isNull);
+      expect(subject.staffFields, isEmpty);
+    });
+
+    test('fields defaults to empty when absent', () {
+      final subject = buildWithInfobox({'template': 'x'});
+
+      expect(subject.infobox!.fields, isEmpty);
+    });
+
+    group('infoboxValue', () {
+      test('returns the first value of a matching field', () {
+        final subject = buildWithInfobox(realInfobox);
+
+        expect(subject.infoboxValue('放送开始'), '2022年10月10日');
+        expect(subject.infoboxValue('话数'), '13');
+        expect(subject.infoboxValue('系列构成'), '田口智久');
+      });
+
+      test('returns null for a key that is not present', () {
+        final subject = buildWithInfobox(realInfobox);
+
+        expect(subject.infoboxValue('不存在的键'), isNull);
+      });
+    });
+
+    group('staffFields', () {
+      test('keeps staff roles and drops blocklisted metadata keys', () {
+        final subject = buildWithInfobox(realInfobox);
+        final keys = subject.staffFields.map((field) => field.key).toList();
+
+        expect(keys, ['原作', '音乐', '系列构成']);
+        expect(keys, isNot(contains('中文名')));
+        expect(keys, isNot(contains('放送开始')));
+        expect(keys, isNot(contains('话数')));
+        expect(keys, isNot(contains('官方网站')));
+      });
+
+      test('keeps a role key that was never observed before', () {
+        final subject = buildWithInfobox({
+          'fields': [
+            {
+              'key': '某种全新的没见过的职位',
+              'values': [
+                {'v': '某人'},
+              ],
+            },
+          ],
+        });
+
+        expect(subject.staffFields.map((field) => field.key).toList(), [
+          '某种全新的没见过的职位',
+        ]);
+      });
+    });
+  });
 }

@@ -39,6 +39,37 @@ Map<String, dynamic> _$SubjectFavoriteToJson(SubjectFavorite instance) =>
       'dropped': instance.dropped,
     };
 
+InfoboxValue _$InfoboxValueFromJson(Map<String, dynamic> json) =>
+    InfoboxValue(k: json['k'] as String?, v: json['v'] as String);
+
+Map<String, dynamic> _$InfoboxValueToJson(InfoboxValue instance) =>
+    <String, dynamic>{'k': instance.k, 'v': instance.v};
+
+InfoboxField _$InfoboxFieldFromJson(Map<String, dynamic> json) => InfoboxField(
+  key: json['key'] as String,
+  values:
+      (json['values'] as List<dynamic>?)
+          ?.map((e) => InfoboxValue.fromJson(e as Map<String, dynamic>))
+          .toList() ??
+      [],
+);
+
+Map<String, dynamic> _$InfoboxFieldToJson(InfoboxField instance) =>
+    <String, dynamic>{'key': instance.key, 'values': instance.values};
+
+SubjectInfobox _$SubjectInfoboxFromJson(Map<String, dynamic> json) =>
+    SubjectInfobox(
+      template: json['template'] as String?,
+      fields:
+          (json['fields'] as List<dynamic>?)
+              ?.map((e) => InfoboxField.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
+    );
+
+Map<String, dynamic> _$SubjectInfoboxToJson(SubjectInfobox instance) =>
+    <String, dynamic>{'template': instance.template, 'fields': instance.fields};
+
 SubjectDetail _$SubjectDetailFromJson(
   Map<String, dynamic> json,
 ) => SubjectDetail(
@@ -65,6 +96,9 @@ SubjectDetail _$SubjectDetailFromJson(
   favorite: json['favorite'] == null
       ? null
       : SubjectFavorite.fromJson(json['favorite'] as Map<String, dynamic>),
+  infobox: json['infobox'] == null
+      ? null
+      : SubjectInfobox.fromJson(json['infobox'] as Map<String, dynamic>),
   episodes: (json['episodes'] as List<dynamic>?)
       ?.map((e) => SubjectEpisode.fromJson(e as Map<String, dynamic>))
       .toList(),
@@ -85,6 +119,7 @@ Map<String, dynamic> _$SubjectDetailToJson(SubjectDetail instance) =>
       'selfRating': instance.selfRating,
       'scoreDetails': instance.scoreDetails,
       'favorite': instance.favorite,
+      'infobox': instance.infobox,
       'episodes': instance.episodes,
     };
 

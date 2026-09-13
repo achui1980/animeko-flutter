@@ -74,14 +74,88 @@ class SubjectFavorite {
   Map<String, dynamic> toJson() => _$SubjectFavoriteToJson(this);
 }
 
+/// One value of an infobox field. Bangumi's infobox format allows an
+/// optional sub-key (`k`) -- e.g. `主题歌` fields use `k: "OP"` -- but
+/// most fields only carry `v`, so `k` is nullable.
+@JsonSerializable()
+class InfoboxValue {
+  const InfoboxValue({this.k, required this.v});
+
+  final String? k;
+  final String v;
+
+  factory InfoboxValue.fromJson(Map<String, dynamic> json) =>
+      _$InfoboxValueFromJson(json);
+
+  Map<String, dynamic> toJson() => _$InfoboxValueToJson(this);
+}
+
+/// One infobox row: a Chinese label (`key`) plus one or more values.
+@JsonSerializable()
+class InfoboxField {
+  const InfoboxField({required this.key, this.values = const []});
+
+  final String key;
+  @JsonKey(defaultValue: <InfoboxValue>[])
+  final List<InfoboxValue> values;
+
+  factory InfoboxField.fromJson(Map<String, dynamic> json) =>
+      _$InfoboxFieldFromJson(json);
+
+  Map<String, dynamic> toJson() => _$InfoboxFieldToJson(this);
+}
+
+/// The `infobox` object on `GET /v2/subjects/{id}`. This is the ONLY
+/// source of human-readable Chinese staff role names -- the
+/// `/v2/subjects/{id}/staff` endpoint returns integer `position` codes
+/// (52 distinct codes observed on a single subject) with no label, and
+/// we deliberately do not maintain a code->label mapping table.
+@JsonSerializable()
+class SubjectInfobox {
+  const SubjectInfobox({this.template, this.fields = const []});
+
+  final String? template;
+  @JsonKey(defaultValue: <InfoboxField>[])
+  final List<InfoboxField> fields;
+
+  factory SubjectInfobox.fromJson(Map<String, dynamic> json) =>
+      _$SubjectInfoboxFromJson(json);
+
+  Map<String, dynamic> toJson() => _$SubjectInfoboxToJson(this);
+}
+
+/// Infobox keys that are subject metadata, not staff credits. Used by
+/// [SubjectDetail.staffFields].
+///
+/// This is a BLOCKLIST, not an allowlist, on purpose: staff role keys
+/// are free text and 40+ distinct ones have been observed across
+/// subjects. An allowlist would silently drop any role we hadn't seen
+/// yet, which is worse than occasionally showing one metadata row we
+/// forgot to exclude.
+const subjectInfoboxNonStaffKeys = <String>{
+  '中文名',
+  '别名',
+  '话数',
+  '放送开始',
+  '放送星期',
+  '放送结束',
+  '官方网站',
+  '在线播放平台',
+  '播放电视台',
+  '其他电视台',
+  '链接',
+  '其他',
+  'Copyright',
+};
+
 /// Response of `GET /v2/subjects/{subjectId}` -- verified against the
 /// real `AniSubjectCollection` model. This is a deliberately lean subset
 /// -- json_serializable's generated `fromJson` ignores undeclared keys,
 /// so omitting fields is safe.
 ///
-/// The real wire shape also has `type`/`nsfw`/`metaTags`/`infobox`/
-/// `relations`/`platform`/`airingInfo`/`updatedAt`, none of which the UI
-/// needs. `favorite` IS parsed (see the field below).
+/// The real wire shape also has `type`/`nsfw`/`metaTags`/`relations`/
+/// `platform`/`airingInfo`/`updatedAt`, none of which the UI needs.
+/// `favorite` and `infobox` ARE parsed (see the fields below).
 @JsonSerializable()
 class SubjectDetail {
   const SubjectDetail({
@@ -98,6 +172,7 @@ class SubjectDetail {
     this.aliases = const [],
     this.scoreDetails,
     this.favorite,
+    this.infobox,
     this.episodes,
   });
 
@@ -147,6 +222,9 @@ class SubjectDetail {
   /// on some responses; the 收藏统计 block hides itself when null.
   final SubjectFavorite? favorite;
 
+  /// The raw infobox. Nullable; `staffFields` returns empty when null.
+  final SubjectInfobox? infobox;
+
   /// Every episode of this subject, of every type (`MAIN`/`SPECIAL`/`OP`/
   /// `ED`), exactly as embedded in this same `/v2/subjects/{id}` response.
   ///
@@ -170,6 +248,30 @@ class SubjectDetail {
   /// Null propagates from [episodes] being null so the UI can omit the line
   /// entirely rather than asserting a wrong 话数：0.
   int? get episodeCount => episodes?.where((episode) => episode.isMain).length;
+
+  /// First value of the infobox field named [key], or null when the
+  /// field (or the whole infobox) is absent. Used for the pre-formatted
+  /// Chinese `放送开始` / `话数` / `别名` rows in 作品信息.
+  String? infoboxValue(String key) {
+    final fields = infobox?.fields;
+    if (fields == null) return null;
+    for (final field in fields) {
+      if (field.key == key && field.values.isNotEmpty) {
+        return field.values.first.v;
+      }
+    }
+    return null;
+  }
+
+  /// Infobox fields that represent staff credits -- everything except
+  /// [subjectInfoboxNonStaffKeys]. Drives the 制作人员 card.
+  List<InfoboxField> get staffFields {
+    final fields = infobox?.fields;
+    if (fields == null) return const [];
+    return fields
+        .where((field) => !subjectInfoboxNonStaffKeys.contains(field.key))
+        .toList();
+  }
 
   factory SubjectDetail.fromJson(Map<String, dynamic> json) =>
       _$SubjectDetailFromJson(json);
