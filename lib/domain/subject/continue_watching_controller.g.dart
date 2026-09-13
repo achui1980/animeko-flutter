@@ -22,8 +22,7 @@ part of 'continue_watching_controller.dart';
 ///
 /// The "stale id" fallback matters because [LastPlayedEpisodeStorage] is
 /// never garbage-collected -- it exposes only `get`/`set`, no delete, so a
-/// subject can drop episodes, or the id can come from a different data
-/// revision, and the entry still lingers.
+/// subject can drop episodes and the entry still lingers.
 ///
 /// The result carries no "was this resumed?" flag on purpose: a caller that
 /// needs to pick between the two button labels compares this episode's id
@@ -47,8 +46,7 @@ final continueWatchingProvider = ContinueWatchingFamily._();
 ///
 /// The "stale id" fallback matters because [LastPlayedEpisodeStorage] is
 /// never garbage-collected -- it exposes only `get`/`set`, no delete, so a
-/// subject can drop episodes, or the id can come from a different data
-/// revision, and the entry still lingers.
+/// subject can drop episodes and the entry still lingers.
 ///
 /// The result carries no "was this resumed?" flag on purpose: a caller that
 /// needs to pick between the two button labels compares this episode's id
@@ -77,8 +75,7 @@ final class ContinueWatchingProvider
   ///
   /// The "stale id" fallback matters because [LastPlayedEpisodeStorage] is
   /// never garbage-collected -- it exposes only `get`/`set`, no delete, so a
-  /// subject can drop episodes, or the id can come from a different data
-  /// revision, and the entry still lingers.
+  /// subject can drop episodes and the entry still lingers.
   ///
   /// The result carries no "was this resumed?" flag on purpose: a caller that
   /// needs to pick between the two button labels compares this episode's id
@@ -144,8 +141,7 @@ String _$continueWatchingHash() => r'1ae37bfe3d122dc9774bda4831f173099d624cbc';
 ///
 /// The "stale id" fallback matters because [LastPlayedEpisodeStorage] is
 /// never garbage-collected -- it exposes only `get`/`set`, no delete, so a
-/// subject can drop episodes, or the id can come from a different data
-/// revision, and the entry still lingers.
+/// subject can drop episodes and the entry still lingers.
 ///
 /// The result carries no "was this resumed?" flag on purpose: a caller that
 /// needs to pick between the two button labels compares this episode's id
@@ -177,8 +173,7 @@ final class ContinueWatchingFamily extends $Family
   ///
   /// The "stale id" fallback matters because [LastPlayedEpisodeStorage] is
   /// never garbage-collected -- it exposes only `get`/`set`, no delete, so a
-  /// subject can drop episodes, or the id can come from a different data
-  /// revision, and the entry still lingers.
+  /// subject can drop episodes and the entry still lingers.
   ///
   /// The result carries no "was this resumed?" flag on purpose: a caller that
   /// needs to pick between the two button labels compares this episode's id

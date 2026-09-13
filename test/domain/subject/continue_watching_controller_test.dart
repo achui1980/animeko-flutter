@@ -88,6 +88,30 @@ void main() {
     expect(result?.episodeId, 11);
   });
 
+  // Guards the family argument itself: without this, the provider could
+  // hardcode subject 1 in either `ref.watch` and stay green. Fixture design
+  // is load-bearing -- subject 1's stored id (11) is not an episode of
+  // subject 2, and subject 2's stored id (22) is not subject 2's *first*
+  // episode, so neither a cross-subject read nor a plain first-episode
+  // fallback can produce 22.
+  test('reads the stored id for the requested subject', () async {
+    SharedPreferences.setMockInitialValues({
+      'lastPlayedEpisode:1': 11,
+      'lastPlayedEpisode:2': 22,
+    });
+    when(() => api.getSubject(2)).thenAnswer(
+      (_) async =>
+          detailWith([episode(id: 21, sort: 1), episode(id: 22, sort: 2)]),
+    );
+    createContainer();
+
+    final result = await container.read(
+      continueWatchingProvider(subjectId: 2).future,
+    );
+
+    expect(result?.episodeId, 22);
+  });
+
   test('returns null when the subject has no main episodes', () async {
     when(() => api.getSubject(1)).thenAnswer((_) async => detailWith(const []));
     createContainer();
