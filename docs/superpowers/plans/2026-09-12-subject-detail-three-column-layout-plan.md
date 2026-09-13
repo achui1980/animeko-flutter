@@ -1996,11 +1996,14 @@ git commit -m "feat(subject): add the paginated subject reviews controller"
 /// Width at/above which the subject detail page uses its three-column
 /// desktop layout; below it the same sections stack into one column.
 ///
-/// Chosen so the middle column still fits four 96dp episode buttons at
-/// the breakpoint itself: 1000 - 2*24 (page padding) - 200 (left) - 300
-/// (right) - 2*24 (gaps) = 428dp, and 4*96 + 3*8 = 408dp. Narrower than
-/// this and the episode grid would drop to three columns, which looks
-/// broken next to two fixed sidebars.
+/// At the breakpoint itself the middle column is `1000 - 2*24 (page
+/// padding) - 200 (left) - 300 (right) - 2*24 (gaps) = 404dp`, which fits
+/// three 96dp episode buttons (`3*96 + 2*8 = 304`). A fourth needs
+/// `4*96 + 3*8 = 408dp`, i.e. a window of 1004dp or wider -- so the
+/// bottom 4dp of the wide layout renders a three-wide episode grid.
+/// Accepted rather than moving the breakpoint to 1004: the design doc
+/// lists these widths under 「已知的估算项」, and a round 1000 is easier to
+/// reason about than a number derived from one grid's button size.
 ///
 /// Deliberately unrelated to [pagePadding]'s 600dp compact/wide
 /// breakpoint -- that one mirrors the reference app's `WindowSizeClass`,
