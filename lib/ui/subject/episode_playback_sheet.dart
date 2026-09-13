@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../data/subject/bangumi_episode_models.dart';
+import '../../data/subject/subject_episode_models.dart';
 import '../../domain/media/media_registry.dart';
 import '../../domain/play/episode_source_matcher.dart';
 import '../../domain/play/subject_episodes_controller.dart';
 import 'episode_source_sheet.dart' show sourceLabel;
 
-/// Modal bottom sheet for exactly one Bangumi episode's playback
-/// sources -- opened by tapping a number in `BangumiEpisodeGrid`.
+/// Modal bottom sheet for exactly one episode's playback sources --
+/// opened by tapping a number in `EpisodeNumberGrid`.
 ///
 /// Unlike `EpisodeSourceSheet` (which lists every episode across every
 /// source, and stays unmodified/still used elsewhere), this always
@@ -25,13 +25,13 @@ class EpisodePlaybackSheet extends ConsumerWidget {
     required this.subjectId,
     required this.subjectName,
     required this.ordinalIndex,
-    required this.bangumiEpisode,
+    required this.episode,
   });
 
   final int subjectId;
   final String subjectName;
   final int ordinalIndex;
-  final BangumiEpisode bangumiEpisode;
+  final SubjectEpisode episode;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -51,7 +51,7 @@ class EpisodePlaybackSheet extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              bangumiEpisode.displayName,
+              episode.displayName,
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 12),

@@ -44,7 +44,9 @@ SubjectDetail _$SubjectDetailFromJson(
   scoreDetails: (json['scoreDetails'] as Map<String, dynamic>?)?.map(
     (k, e) => MapEntry(k, (e as num).toInt()),
   ),
-  episodeCount: _mainEpisodeCountFromRaw(json['episodes']),
+  episodes: (json['episodes'] as List<dynamic>?)
+      ?.map((e) => SubjectEpisode.fromJson(e as Map<String, dynamic>))
+      .toList(),
 );
 
 Map<String, dynamic> _$SubjectDetailToJson(SubjectDetail instance) =>
@@ -61,6 +63,7 @@ Map<String, dynamic> _$SubjectDetailToJson(SubjectDetail instance) =>
       'collectionType': collectionTypeToWireNullable(instance.collectionType),
       'selfRating': instance.selfRating,
       'scoreDetails': instance.scoreDetails,
+      'episodes': instance.episodes,
     };
 
 CharacterInfo _$CharacterInfoFromJson(Map<String, dynamic> json) =>

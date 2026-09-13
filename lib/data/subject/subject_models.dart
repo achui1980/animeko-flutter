@@ -3,6 +3,7 @@ import 'package:json_annotation/json_annotation.dart';
 
 import '../search/search_models.dart' show SubjectTag;
 import 'collection_type.dart';
+import 'subject_episode_models.dart';
 
 part 'subject_models.g.dart';
 
@@ -52,7 +53,7 @@ class SubjectDetail {
     required this.selfRating,
     this.aliases = const [],
     this.scoreDetails,
-    this.episodeCount,
+    this.episodes,
   });
 
   final int id;
@@ -97,43 +98,34 @@ class SubjectDetail {
   /// responses that predate this field being added).
   final Map<String, int>? scoreDetails;
 
-  /// Count of "main" episodes (`type == "MAIN"`), derived client-side by
-  /// counting entries in the raw `episodes` array that's already
-  /// embedded directly inside this same `/v2/subjects/{id}` response
-  /// (confirmed live: entries also carry `type` values `"OP"`/`"ED"`/
-  /// `"SPECIAL"`, which are deliberately excluded from this count).
+  /// Every episode of this subject, of every type (`MAIN`/`SPECIAL`/`OP`/
+  /// `ED`), exactly as embedded in this same `/v2/subjects/{id}` response.
   ///
-  /// This exists so the "作品信息" block's episode-count line can render
-  /// immediately from data that's already being fetched here, instead of
-  /// depending on the separate, slower, and sometimes-unreachable direct
-  /// call to Bangumi's own `https://api.bgm.tv/v0/episodes` endpoint
-  /// (`SubjectBangumiEpisodesController`) purely to show a count.
+  /// This array is the app's *only* source of episode data. It used to be
+  /// parsed purely to derive [episodeCount] while the episode grid itself
+  /// called Bangumi's own `https://api.bgm.tv/v0/episodes`; that endpoint is
+  /// DNS-poisoned and SNI-blocked from mainland networks, so the grid was
+  /// the one part of this screen that could not load without a proxy. Using
+  /// the embedded array instead makes it work proxy-free, and incidentally
+  /// removes the old `limit=100` truncation.
   ///
-  /// Null when the response omits the `episodes` key (or for older
-  /// cached responses that predate this field).
-  @JsonKey(
-    name: 'episodes',
-    fromJson: _mainEpisodeCountFromRaw,
-    includeToJson: false,
-  )
-  final int? episodeCount;
+  /// Null when the response omits the `episodes` key (or for older cached
+  /// responses that predate this field) -- deliberately distinct from an
+  /// empty list, which means "this subject genuinely has no episodes". See
+  /// [episodeCount].
+  final List<SubjectEpisode>? episodes;
+
+  /// Count of "main" episodes (`type == "MAIN"`) in [episodes], for the
+  /// "作品信息" block's 话数 line.
+  ///
+  /// Null propagates from [episodes] being null so the UI can omit the line
+  /// entirely rather than asserting a wrong 话数：0.
+  int? get episodeCount => episodes?.where((episode) => episode.isMain).length;
 
   factory SubjectDetail.fromJson(Map<String, dynamic> json) =>
       _$SubjectDetailFromJson(json);
 
   Map<String, dynamic> toJson() => _$SubjectDetailToJson(this);
-}
-
-/// Counts the entries in the raw `episodes` JSON array (as embedded in
-/// `GET /v2/subjects/{subjectId}`'s response) whose `type` is `"MAIN"`.
-/// Returns null if [raw] isn't a list (i.e. the key was absent from the
-/// response, in which case json_serializable passes `null` through).
-int? _mainEpisodeCountFromRaw(dynamic raw) {
-  if (raw is! List) return null;
-  return raw
-      .whereType<Map<String, dynamic>>()
-      .where((episode) => episode['type'] == 'MAIN')
-      .length;
 }
 
 /// A single character (with its voice actor's info, since

@@ -118,4 +118,111 @@ void main() {
       expect(matches.single.episode.title, 'Episode B');
     });
   });
+
+  group('EpisodeSourceIndex', () {
+    test('matchesAt agrees with matchEpisodeSources for every ordinal', () {
+      final merged = [
+        const MergedEpisode(episode: _FakeEpisode('a', 'A第1集'), sourceId: 'a'),
+        const MergedEpisode(episode: _FakeEpisode('a', 'A第2集'), sourceId: 'a'),
+        const MergedEpisode(episode: _FakeEpisode('b', 'B第1集'), sourceId: 'b'),
+        MergedEpisode(
+          episode: RssEpisode(
+            sourceId: 'mikan',
+            title: '第 3 集',
+            episodeNumber: 3,
+            releases: const [],
+          ),
+          sourceId: 'mikan',
+        ),
+      ];
+      final index = EpisodeSourceIndex.from(merged);
+
+      for (var ordinalIndex = 0; ordinalIndex < 6; ordinalIndex++) {
+        expect(
+          index.matchesAt(ordinalIndex).map((e) => e.episode.title),
+          matchEpisodeSources(
+            ordinalIndex: ordinalIndex,
+            allMerged: merged,
+          ).map((e) => e.episode.title),
+          reason: 'mismatch at ordinalIndex $ordinalIndex',
+        );
+      }
+    });
+
+    // The grid calls this once per rendered button, so the index must be
+    // reusable rather than consumed by the first lookup.
+    test('stays correct across repeated lookups of the same index', () {
+      final index = EpisodeSourceIndex.from([
+        const MergedEpisode(episode: _FakeEpisode('a', 'A第1集'), sourceId: 'a'),
+        const MergedEpisode(episode: _FakeEpisode('a', 'A第2集'), sourceId: 'a'),
+      ]);
+
+      expect(index.matchesAt(1).single.episode.title, 'A第2集');
+      expect(index.matchesAt(1).single.episode.title, 'A第2集');
+      expect(index.matchesAt(0).single.episode.title, 'A第1集');
+      expect(index.matchesAt(1).single.episode.title, 'A第2集');
+    });
+
+    test('matches an RssEpisode by episodeNumber, not by position', () {
+      final index = EpisodeSourceIndex.from([
+        MergedEpisode(
+          episode: RssEpisode(
+            sourceId: 'mikan',
+            title: '第 11 集',
+            episodeNumber: 11,
+            releases: const [],
+          ),
+          sourceId: 'mikan',
+        ),
+        MergedEpisode(
+          episode: RssEpisode(
+            sourceId: 'mikan',
+            title: '第 10 集',
+            episodeNumber: 10,
+            releases: const [],
+          ),
+          sourceId: 'mikan',
+        ),
+      ]);
+
+      expect(
+        (index.matchesAt(9).single.episode as RssEpisode).episodeNumber,
+        10,
+      );
+    });
+
+    // Preserves the pre-index behaviour of a linear first-match scan: when a
+    // feed publishes the same episode number twice, the earlier entry wins.
+    test('keeps the first entry when a source repeats an episode number', () {
+      final index = EpisodeSourceIndex.from([
+        MergedEpisode(
+          episode: RssEpisode(
+            sourceId: 'mikan',
+            title: 'first 第 1 集',
+            episodeNumber: 1,
+            releases: const [],
+          ),
+          sourceId: 'mikan',
+        ),
+        MergedEpisode(
+          episode: RssEpisode(
+            sourceId: 'mikan',
+            title: 'duplicate 第 1 集',
+            episodeNumber: 1,
+            releases: const [],
+          ),
+          sourceId: 'mikan',
+        ),
+      ]);
+
+      expect(index.matchesAt(0).single.episode.title, 'first 第 1 集');
+    });
+
+    test('an index over an empty list matches nothing', () {
+      final index = EpisodeSourceIndex.from(const []);
+
+      expect(index.matchesAt(0), isEmpty);
+      expect(index.matchesAt(99), isEmpty);
+    });
+  });
 }
