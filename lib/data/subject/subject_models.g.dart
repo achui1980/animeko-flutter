@@ -40,7 +40,7 @@ Map<String, dynamic> _$SubjectFavoriteToJson(SubjectFavorite instance) =>
     };
 
 InfoboxValue _$InfoboxValueFromJson(Map<String, dynamic> json) =>
-    InfoboxValue(k: json['k'] as String?, v: json['v'] as String);
+    InfoboxValue(k: json['k'] as String?, v: json['v'] as String? ?? '');
 
 Map<String, dynamic> _$InfoboxValueToJson(InfoboxValue instance) =>
     <String, dynamic>{'k': instance.k, 'v': instance.v};

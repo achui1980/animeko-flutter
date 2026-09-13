@@ -75,13 +75,21 @@ class SubjectFavorite {
 }
 
 /// One value of an infobox field. Bangumi's infobox format allows an
-/// optional sub-key (`k`) -- e.g. `主题歌` fields use `k: "OP"` -- but
-/// most fields only carry `v`, so `k` is nullable.
+/// optional sub-key (`k`), so it is modeled as nullable -- but every
+/// value observed on this backend so far carries only `v`. Do not assume
+/// `k` is ever populated in production until it is seen live.
+///
+/// [v] defaults to `''` rather than being a hard requirement: a single
+/// malformed value object would otherwise throw out of
+/// `SubjectDetail.fromJson` and blank the entire subject page over one
+/// unrenderable infobox row (the same class of crash that earned
+/// [MyCollectionSubject] its hand-written factory).
 @JsonSerializable()
 class InfoboxValue {
   const InfoboxValue({this.k, required this.v});
 
   final String? k;
+  @JsonKey(defaultValue: '')
   final String v;
 
   factory InfoboxValue.fromJson(Map<String, dynamic> json) =>
@@ -222,7 +230,13 @@ class SubjectDetail {
   /// on some responses; the 收藏统计 block hides itself when null.
   final SubjectFavorite? favorite;
 
-  /// The raw infobox. Nullable; `staffFields` returns empty when null.
+  /// The raw infobox. Nullable; [infoboxValue] returns null and
+  /// [staffFields] returns empty when absent.
+  ///
+  /// Note that a field whose only value degraded to [InfoboxValue.v] ==
+  /// `''` still counts as having values, so it survives [staffFields]
+  /// and [infoboxValue] returns `''` for it -- absent and blank are not
+  /// collapsed here.
   final SubjectInfobox? infobox;
 
   /// Every episode of this subject, of every type (`MAIN`/`SPECIAL`/`OP`/
@@ -250,8 +264,13 @@ class SubjectDetail {
   int? get episodeCount => episodes?.where((episode) => episode.isMain).length;
 
   /// First value of the infobox field named [key], or null when the
-  /// field (or the whole infobox) is absent. Used for the pre-formatted
-  /// Chinese `放送开始` / `话数` / `别名` rows in 作品信息.
+  /// field is absent, the whole infobox is absent, or the field is
+  /// present with no values. Used for the pre-formatted Chinese
+  /// `放送开始` / `话数` / `别名` rows in 作品信息.
+  ///
+  /// Duplicate keys are realistic on a wiki-sourced infobox: the first
+  /// match that actually has a value wins, so an empty duplicate is
+  /// skipped rather than shadowing a later populated one.
   String? infoboxValue(String key) {
     final fields = infobox?.fields;
     if (fields == null) return null;
@@ -265,10 +284,16 @@ class SubjectDetail {
 
   /// Infobox fields that represent staff credits -- everything except
   /// [subjectInfoboxNonStaffKeys]. Drives the 制作人员 card.
+  ///
+  /// Fields with an empty `values` list are excluded, matching
+  /// [infoboxValue]'s treatment of the same shape, so a renderer can
+  /// join `field.values` unguarded without producing a row that shows a
+  /// role label next to nothing.
   List<InfoboxField> get staffFields {
     final fields = infobox?.fields;
     if (fields == null) return const [];
     return fields
+        .where((field) => field.values.isNotEmpty)
         .where((field) => !subjectInfoboxNonStaffKeys.contains(field.key))
         .toList();
   }

@@ -421,7 +421,6 @@ void main() {
   });
 
   group('SubjectInfobox', () {
-    /// Real subset of subject 302286's infobox.
     SubjectDetail buildWithInfobox(Map<String, dynamic> infobox) {
       return SubjectDetail.fromJson({
         'id': 302286,
@@ -435,6 +434,19 @@ void main() {
       });
     }
 
+    /// Subject 302286's infobox. The `原作` / `音乐` / `系列构成` /
+    /// `放送开始` entries are verbatim from the live capture recorded in
+    /// the design doc (`原作` including that doc's own `…` elision).
+    ///
+    /// Note `系列构成` arrives as ONE `、`-joined string, not one value
+    /// per person -- the backend pre-joins multi-person credits, so a
+    /// consumer rendering this shape does not have to join anything.
+    ///
+    /// `中文名` / `话数` / `官方网站` are keys the capture confirms exist
+    /// on this subject, but it records only their names, so the values
+    /// here are illustrative placeholders. Nothing asserts on them
+    /// except via [SubjectDetail.infoboxValue], which is exercising the
+    /// lookup, not the payload.
     const realInfobox = {
       'template': 'Infobox animanga/TVAnime',
       'fields': [
@@ -459,7 +471,7 @@ void main() {
         {
           'key': '原作',
           'values': [
-            {'v': '「BLEACH」久保帯人（集英社「週刊少年ジャンプ」連載）'},
+            {'v': '「BLEACH」久保帯人（集英社…）'},
           ],
         },
         {
@@ -471,14 +483,31 @@ void main() {
         {
           'key': '系列构成',
           'values': [
-            {'v': '田口智久'},
-            {'v': '平松正樹'},
+            {'v': '田口智久、平松正樹'},
           ],
         },
         {
           'key': '官方网站',
           'values': [
             {'v': 'https://example.com'},
+          ],
+        },
+      ],
+    };
+
+    /// SYNTHETIC, not observed: no field with more than one value has
+    /// turned up on this backend yet (see [realInfobox] -- multi-person
+    /// credits arrive pre-joined). Bangumi's infobox format permits a
+    /// value list, so the parser has to cope with one; this fixture pins
+    /// that and nothing more. Do not read it as evidence that the
+    /// backend ever sends this shape.
+    const multiValueInfobox = {
+      'fields': [
+        {
+          'key': '系列构成',
+          'values': [
+            {'v': '田口智久'},
+            {'v': '平松正樹'},
           ],
         },
       ],
@@ -495,7 +524,7 @@ void main() {
     });
 
     test('parses a field with multiple values', () {
-      final subject = buildWithInfobox(realInfobox);
+      final subject = buildWithInfobox(multiValueInfobox);
       final field = subject.infobox!.fields.firstWhere((f) => f.key == '系列构成');
 
       expect(field.values.map((value) => value.v).toList(), ['田口智久', '平松正樹']);
@@ -523,6 +552,26 @@ void main() {
       expect(subject.infobox!.fields.first.values.first.v, 'Scar');
     });
 
+    // A value object with no `v` at all would otherwise fail the whole
+    // `SubjectDetail.fromJson`, blanking the entire subject page over one
+    // malformed infobox row. Degrading to '' keeps the page alive; see the
+    // hand-written `MyCollectionSubject.fromJson` for the precedent.
+    test('value v defaults to empty string when the wire omits it', () {
+      final subject = buildWithInfobox({
+        'fields': [
+          {
+            'key': '主题歌',
+            'values': [
+              {'k': 'OP'},
+            ],
+          },
+        ],
+      });
+
+      expect(subject.infobox!.fields.first.values.first.k, 'OP');
+      expect(subject.infobox!.fields.first.values.first.v, '');
+    });
+
     test('infobox is null when the key is absent', () {
       final subject = SubjectDetail.fromJson({
         'id': 1,
@@ -545,12 +594,86 @@ void main() {
       expect(subject.infobox!.fields, isEmpty);
     });
 
+    // Same reasoning as the sibling `favorite` round-trip: `explicitToJson`
+    // is off, so `_$SubjectDetailToJson` emits the `SubjectInfobox` instance
+    // as-is and leaves nested conversion to `jsonEncode` calling `toJson`
+    // transitively. Go through jsonEncode so this covers real serialization.
+    test('round-trips the nested infobox through toJson', () {
+      final subject = buildWithInfobox(realInfobox);
+
+      final encoded =
+          jsonDecode(jsonEncode(subject.toJson())) as Map<String, dynamic>;
+
+      expect(encoded['infobox'], {
+        'template': 'Infobox animanga/TVAnime',
+        'fields': [
+          {
+            'key': '中文名',
+            'values': [
+              {'k': null, 'v': '境·界 千年血战篇'},
+            ],
+          },
+          {
+            'key': '放送开始',
+            'values': [
+              {'k': null, 'v': '2022年10月10日'},
+            ],
+          },
+          {
+            'key': '话数',
+            'values': [
+              {'k': null, 'v': '13'},
+            ],
+          },
+          {
+            'key': '原作',
+            'values': [
+              {'k': null, 'v': '「BLEACH」久保帯人（集英社…）'},
+            ],
+          },
+          {
+            'key': '音乐',
+            'values': [
+              {'k': null, 'v': '鷺巣詩郎'},
+            ],
+          },
+          {
+            'key': '系列构成',
+            'values': [
+              {'k': null, 'v': '田口智久、平松正樹'},
+            ],
+          },
+          {
+            'key': '官方网站',
+            'values': [
+              {'k': null, 'v': 'https://example.com'},
+            ],
+          },
+        ],
+      });
+      final reparsed = SubjectDetail.fromJson(encoded);
+      expect(reparsed.infoboxValue('放送开始'), '2022年10月10日');
+      expect(reparsed.staffFields.map((field) => field.key).toList(), [
+        '原作',
+        '音乐',
+        '系列构成',
+      ]);
+    });
+
     group('infoboxValue', () {
       test('returns the first value of a matching field', () {
         final subject = buildWithInfobox(realInfobox);
 
         expect(subject.infoboxValue('放送开始'), '2022年10月10日');
         expect(subject.infoboxValue('话数'), '13');
+        // Pre-joined by the backend -- this is the whole credit, not a
+        // truncation. A consumer needs no `join` for this shape.
+        expect(subject.infoboxValue('系列构成'), '田口智久、平松正樹');
+      });
+
+      test('returns only the first value when a field has several', () {
+        final subject = buildWithInfobox(multiValueInfobox);
+
         expect(subject.infoboxValue('系列构成'), '田口智久');
       });
 
@@ -558,6 +681,57 @@ void main() {
         final subject = buildWithInfobox(realInfobox);
 
         expect(subject.infoboxValue('不存在的键'), isNull);
+      });
+
+      test('returns null when the only matching field has no values', () {
+        final subject = buildWithInfobox({
+          'fields': [
+            {'key': '别名', 'values': <dynamic>[]},
+          ],
+        });
+
+        expect(subject.infoboxValue('别名'), isNull);
+      });
+
+      // Duplicate keys are realistic on a wiki-sourced infobox, so which
+      // one wins is pinned rather than left to chance: an empty field is
+      // skipped and the scan continues.
+      test('skips a matching field with no values and returns a later '
+          'duplicate', () {
+        final subject = buildWithInfobox({
+          'fields': [
+            {'key': '别名', 'values': <dynamic>[]},
+            {
+              'key': '别名',
+              'values': [
+                {'v': 'Thousand-Year Blood War'},
+              ],
+            },
+          ],
+        });
+
+        expect(subject.infoboxValue('别名'), 'Thousand-Year Blood War');
+      });
+
+      test('returns the first of two non-empty duplicate keys', () {
+        final subject = buildWithInfobox({
+          'fields': [
+            {
+              'key': '别名',
+              'values': [
+                {'v': '第一个'},
+              ],
+            },
+            {
+              'key': '别名',
+              'values': [
+                {'v': '第二个'},
+              ],
+            },
+          ],
+        });
+
+        expect(subject.infoboxValue('别名'), '第一个');
       });
     });
 
@@ -588,6 +762,25 @@ void main() {
         expect(subject.staffFields.map((field) => field.key).toList(), [
           '某种全新的没见过的职位',
         ]);
+      });
+
+      // Matches `infoboxValue`'s treatment of an empty `values`, and
+      // spares the 制作人员 renderer from emitting a role label with a
+      // blank value next to it.
+      test('drops a staff role whose values list is empty', () {
+        final subject = buildWithInfobox({
+          'fields': [
+            {'key': '原作', 'values': <dynamic>[]},
+            {
+              'key': '音乐',
+              'values': [
+                {'v': '鷺巣詩郎'},
+              ],
+            },
+          ],
+        });
+
+        expect(subject.staffFields.map((field) => field.key).toList(), ['音乐']);
       });
     });
   });
