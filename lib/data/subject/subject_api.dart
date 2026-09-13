@@ -47,18 +47,25 @@ class SubjectApi {
     await _dio.delete<void>('/v2/subjects/$subjectId');
   }
 
-  /// GET /v2/subjects/{subjectId}/characters?withActors=true -- always
-  /// requested with voice-actor info included (the UI's cast row shows
-  /// both). Response wrapped in an `items` envelope, matching every
-  /// other list endpoint in this codebase.
+  /// Characters (cast). Always requested with `withActors=true` so the
+  /// UI can show each character's voice actor.
+  ///
+  /// The endpoint returns a BARE JSON ARRAY, not an `{items: [...]}`
+  /// envelope -- an earlier version of this method declared
+  /// `get<Map<String, dynamic>>` and read `data['items']`, which threw
+  /// on every single call. The `data is List` branch below is
+  /// defensive in case the backend ever adds an envelope.
   Future<List<RelatedCharacter>> getCharacters(int subjectId) async {
-    final response = await _dio.get<Map<String, dynamic>>(
+    final response = await _dio.get<dynamic>(
       '/v2/subjects/$subjectId/characters',
       queryParameters: {'withActors': true},
     );
-    final items = response.data!['items'] as List<dynamic>;
+    final data = response.data;
+    final items = data is List<dynamic>
+        ? data
+        : (data as Map<String, dynamic>)['items'] as List<dynamic>;
     return items
-        .map((e) => RelatedCharacter.fromJson(e as Map<String, dynamic>))
+        .map((item) => RelatedCharacter.fromJson(item as Map<String, dynamic>))
         .toList();
   }
 

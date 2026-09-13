@@ -587,10 +587,10 @@ class _CharacterSection extends ConsumerWidget {
                             CircleAvatar(
                               radius: 32,
                               backgroundImage:
-                                  related.character.imageUrl != null
-                                  ? NetworkImage(related.character.imageUrl!)
+                                  related.character.imageMedium != null
+                                  ? NetworkImage(related.character.imageMedium!)
                                   : null,
-                              child: related.character.imageUrl == null
+                              child: related.character.imageMedium == null
                                   ? const Icon(Icons.person)
                                   : null,
                             ),
@@ -598,7 +598,7 @@ class _CharacterSection extends ConsumerWidget {
                             SizedBox(
                               width: 72,
                               child: Text(
-                                related.character.name,
+                                related.character.displayName,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 textAlign: TextAlign.center,

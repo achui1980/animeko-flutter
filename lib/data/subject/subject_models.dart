@@ -305,20 +305,72 @@ class SubjectDetail {
   Map<String, dynamic> toJson() => _$SubjectDetailToJson(this);
 }
 
-/// A single character (with its voice actor's info, since
-/// `getCharacters` is always called with `withActors=true`).
+/// A person (voice actor, staff member, author). Live-verified shape
+/// from the `actors` array inside a character and from the (now unused)
+/// `/staff` endpoint's `person` object.
+@JsonSerializable()
+class PersonInfo {
+  const PersonInfo({
+    required this.id,
+    required this.name,
+    this.nameCn,
+    this.type,
+    this.imageMedium,
+    this.imageLarge,
+    this.summary,
+  });
+
+  final int id;
+  final String name;
+  final String? nameCn;
+  final int? type;
+  final String? imageMedium;
+  final String? imageLarge;
+  final String? summary;
+
+  /// Chinese name when it is present and non-empty, else the original.
+  String get displayName =>
+      (nameCn != null && nameCn!.isNotEmpty) ? nameCn! : name;
+
+  factory PersonInfo.fromJson(Map<String, dynamic> json) =>
+      _$PersonInfoFromJson(json);
+
+  Map<String, dynamic> toJson() => _$PersonInfoToJson(this);
+}
+
+/// A single character plus its voice actors.
 ///
-/// NOTE: `imageUrl`'s real field name is *inferred*, not confirmed
-/// against the real `AniCharacter` Kotlin model (only the wrapper
-/// `AniRelatedCharacter{index,character,role}` shape was actually read
-/// during this plan's design phase) -- verify against a live
-/// `GET .../characters?withActors=true` response before trusting this.
+/// Live-verified against `GET /v2/subjects/{id}/characters?withActors=true`
+/// (subject 302286). NOTE: an earlier version of this model declared an
+/// `imageUrl` field that does not exist on the wire -- the real keys are
+/// `imageMedium` / `imageLarge`. `actors` was also being silently
+/// dropped even though the request always sends `withActors=true`.
 @JsonSerializable()
 class CharacterInfo {
-  const CharacterInfo({required this.name, this.imageUrl});
+  const CharacterInfo({
+    required this.id,
+    required this.name,
+    this.nameCn,
+    this.imageMedium,
+    this.imageLarge,
+    this.actors = const [],
+  });
 
+  final int id;
   final String name;
-  final String? imageUrl;
+  final String? nameCn;
+  final String? imageMedium;
+  final String? imageLarge;
+  @JsonKey(defaultValue: <PersonInfo>[])
+  final List<PersonInfo> actors;
+
+  /// Chinese name when it is present and non-empty, else the original.
+  String get displayName =>
+      (nameCn != null && nameCn!.isNotEmpty) ? nameCn! : name;
+
+  /// The character's primary voice actor, or null when unknown. The UI
+  /// hides the CV line entirely when this is null.
+  PersonInfo? get primaryActor => actors.isEmpty ? null : actors.first;
 
   factory CharacterInfo.fromJson(Map<String, dynamic> json) =>
       _$CharacterInfoFromJson(json);

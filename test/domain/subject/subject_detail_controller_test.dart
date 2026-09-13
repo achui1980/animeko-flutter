@@ -55,7 +55,7 @@ void main() {
     test('returns the list from SubjectApi.getCharacters', () async {
       const character = RelatedCharacter(
         index: 0,
-        character: CharacterInfo(name: 'X'),
+        character: CharacterInfo(id: 3320, name: 'X'),
         role: 1,
       );
       when(() => api.getCharacters(1)).thenAnswer((_) async => [character]);

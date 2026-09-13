@@ -192,26 +192,79 @@ void main() {
     });
   });
 
-  group('CharacterInfo / RelatedCharacter', () {
-    test('parses a related character with a voice actor image', () {
-      final related = RelatedCharacter.fromJson({
-        'index': 0,
-        'character': {'name': '芙莉莲', 'imageUrl': 'https://example.com/f.jpg'},
-        'role': 1,
-      });
+  group('CharacterInfo', () {
+    /// Real item shape from `GET /v2/subjects/302286/characters?withActors=true`
+    /// (a bare JSON array, one element shown).
+    const realItem = {
+      'index': 0,
+      'character': {
+        'id': 3320,
+        'name': '黒崎一護',
+        'nameCn': '黑崎一护',
+        'imageLarge':
+            'https://api.animeko.org/v2/characters/3320/image?size=large',
+        'imageMedium':
+            'https://api.animeko.org/v2/characters/3320/image?size=medium',
+        'actors': [
+          {
+            'id': 4716,
+            'name': '森田成一',
+            'nameCn': '森田成一',
+            'type': 1,
+            'imageLarge': 'https://example.com/large',
+            'imageMedium': 'https://example.com/medium',
+            'summary': '',
+          },
+        ],
+      },
+      'role': 1,
+    };
+
+    test('parses the real wire shape', () {
+      final related = RelatedCharacter.fromJson(
+        Map<String, dynamic>.from(realItem),
+      );
+
       expect(related.index, 0);
-      expect(related.character.name, '芙莉莲');
-      expect(related.character.imageUrl, 'https://example.com/f.jpg');
       expect(related.role, 1);
+      expect(related.character.name, '黒崎一護');
+      expect(related.character.nameCn, '黑崎一护');
+      expect(
+        related.character.imageMedium,
+        'https://api.animeko.org/v2/characters/3320/image?size=medium',
+      );
+      expect(
+        related.character.imageLarge,
+        'https://api.animeko.org/v2/characters/3320/image?size=large',
+      );
     });
 
-    test('parses a character with a null image', () {
+    test('parses the voice actors', () {
+      final related = RelatedCharacter.fromJson(
+        Map<String, dynamic>.from(realItem),
+      );
+
+      expect(related.character.actors, hasLength(1));
+      expect(related.character.actors.first.id, 4716);
+      expect(related.character.actors.first.name, '森田成一');
+      expect(related.character.actors.first.nameCn, '森田成一');
+      expect(
+        related.character.actors.first.imageMedium,
+        'https://example.com/medium',
+      );
+    });
+
+    test('actors defaults to empty when the key is absent', () {
       final related = RelatedCharacter.fromJson({
-        'index': 1,
-        'character': {'name': '费伦', 'imageUrl': null},
+        'index': 3,
+        'character': {'id': 9, 'name': 'ナメック星人'},
         'role': 2,
       });
-      expect(related.character.imageUrl, isNull);
+
+      expect(related.character.actors, isEmpty);
+      expect(related.character.nameCn, isNull);
+      expect(related.character.imageMedium, isNull);
+      expect(related.character.imageLarge, isNull);
     });
   });
 

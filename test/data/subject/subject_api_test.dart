@@ -163,68 +163,108 @@ void main() {
   });
 
   group('getCharacters', () {
+    /// `/characters` is declared as `get<dynamic>` because the endpoint
+    /// answers with a bare JSON array, so its stubs cannot reuse the
+    /// `Response<Map<String, dynamic>>`-typed [jsonResponse] helper.
+    Response<dynamic> characterResponse(dynamic body) => Response<dynamic>(
+      data: body,
+      requestOptions: RequestOptions(path: '/'),
+      statusCode: 200,
+    );
+
+    /// One element of the real `GET /v2/subjects/302286/characters?
+    /// withActors=true` payload.
+    Map<String, dynamic> realItem() => {
+      'index': 0,
+      'character': {
+        'id': 3320,
+        'name': '黒崎一護',
+        'nameCn': '黑崎一护',
+        'imageLarge':
+            'https://api.animeko.org/v2/characters/3320/image?size=large',
+        'imageMedium':
+            'https://api.animeko.org/v2/characters/3320/image?size=medium',
+        'actors': [
+          {'id': 4716, 'name': '森田成一', 'nameCn': '森田成一', 'type': 1},
+        ],
+      },
+      'role': 1,
+    };
+
     test('GETs with withActors=true query param', () async {
       when(
-        () => dio.get<Map<String, dynamic>>(
+        () => dio.get<dynamic>(
           any(),
           queryParameters: any(named: 'queryParameters'),
         ),
-      ).thenAnswer(
-        (_) async => jsonResponse({'items': <Map<String, dynamic>>[]}),
-      );
+      ).thenAnswer((_) async => characterResponse(<dynamic>[]));
 
       await api.getCharacters(400602);
 
       verify(
-        () => dio.get<Map<String, dynamic>>(
+        () => dio.get<dynamic>(
           '/v2/subjects/400602/characters',
           queryParameters: {'withActors': true},
         ),
       ).called(1);
     });
 
-    test('parses a list of related characters', () async {
+    // The real endpoint returns a BARE ARRAY -- no `items` envelope.
+    // Parsing it as one used to throw on every single call.
+    test('parses a bare JSON array of related characters', () async {
       when(
-        () => dio.get<Map<String, dynamic>>(
+        () => dio.get<dynamic>(
           any(),
           queryParameters: any(named: 'queryParameters'),
         ),
       ).thenAnswer(
-        (_) async => jsonResponse({
-          'items': [
-            {
-              'index': 0,
-              'character': {
-                'name': '芙莉莲',
-                'imageUrl': 'https://example.com/f.jpg',
-              },
-              'role': 1,
-            },
-            {
-              'index': 1,
-              'character': {'name': '费伦', 'imageUrl': null},
-              'role': 2,
-            },
-          ],
-        }),
+        (_) async => characterResponse(<dynamic>[
+          realItem(),
+          {
+            'index': 1,
+            'character': {'id': 3321, 'name': '朽木ルキア'},
+            'role': 2,
+          },
+        ]),
       );
 
       final characters = await api.getCharacters(400602);
 
       expect(characters, hasLength(2));
-      expect(characters.first.character.name, '芙莉莲');
-      expect(characters.last.character.imageUrl, isNull);
+      expect(characters.first.character.name, '黒崎一護');
+      expect(characters.first.character.primaryActor?.name, '森田成一');
+      expect(characters.last.character.imageMedium, isNull);
+      expect(characters.last.character.actors, isEmpty);
     });
 
-    test('returns an empty list when the response has no items', () async {
+    // Defensive branch: keeps working if the backend ever wraps the
+    // array in the `{items: [...]}` envelope every other list endpoint
+    // in this codebase uses.
+    test('still parses an items envelope if the backend adds one', () async {
       when(
-        () => dio.get<Map<String, dynamic>>(
+        () => dio.get<dynamic>(
           any(),
           queryParameters: any(named: 'queryParameters'),
         ),
       ).thenAnswer(
-        (_) async => jsonResponse({'items': <Map<String, dynamic>>[]}),
+        (_) async => characterResponse(<String, dynamic>{
+          'items': <dynamic>[realItem()],
+        }),
       );
+
+      final characters = await api.getCharacters(400602);
+
+      expect(characters, hasLength(1));
+      expect(characters.single.character.nameCn, '黑崎一护');
+    });
+
+    test('returns an empty list when the array is empty', () async {
+      when(
+        () => dio.get<dynamic>(
+          any(),
+          queryParameters: any(named: 'queryParameters'),
+        ),
+      ).thenAnswer((_) async => characterResponse(<dynamic>[]));
 
       expect(await api.getCharacters(400602), isEmpty);
     });

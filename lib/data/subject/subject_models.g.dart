@@ -123,14 +123,50 @@ Map<String, dynamic> _$SubjectDetailToJson(SubjectDetail instance) =>
       'episodes': instance.episodes,
     };
 
+PersonInfo _$PersonInfoFromJson(Map<String, dynamic> json) => PersonInfo(
+  id: (json['id'] as num).toInt(),
+  name: json['name'] as String,
+  nameCn: json['nameCn'] as String?,
+  type: (json['type'] as num?)?.toInt(),
+  imageMedium: json['imageMedium'] as String?,
+  imageLarge: json['imageLarge'] as String?,
+  summary: json['summary'] as String?,
+);
+
+Map<String, dynamic> _$PersonInfoToJson(PersonInfo instance) =>
+    <String, dynamic>{
+      'id': instance.id,
+      'name': instance.name,
+      'nameCn': instance.nameCn,
+      'type': instance.type,
+      'imageMedium': instance.imageMedium,
+      'imageLarge': instance.imageLarge,
+      'summary': instance.summary,
+    };
+
 CharacterInfo _$CharacterInfoFromJson(Map<String, dynamic> json) =>
     CharacterInfo(
+      id: (json['id'] as num).toInt(),
       name: json['name'] as String,
-      imageUrl: json['imageUrl'] as String?,
+      nameCn: json['nameCn'] as String?,
+      imageMedium: json['imageMedium'] as String?,
+      imageLarge: json['imageLarge'] as String?,
+      actors:
+          (json['actors'] as List<dynamic>?)
+              ?.map((e) => PersonInfo.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
     );
 
 Map<String, dynamic> _$CharacterInfoToJson(CharacterInfo instance) =>
-    <String, dynamic>{'name': instance.name, 'imageUrl': instance.imageUrl};
+    <String, dynamic>{
+      'id': instance.id,
+      'name': instance.name,
+      'nameCn': instance.nameCn,
+      'imageMedium': instance.imageMedium,
+      'imageLarge': instance.imageLarge,
+      'actors': instance.actors,
+    };
 
 RelatedCharacter _$RelatedCharacterFromJson(Map<String, dynamic> json) =>
     RelatedCharacter(
