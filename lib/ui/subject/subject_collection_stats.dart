@@ -20,7 +20,7 @@ String formatCount(int value) {
 
 /// 左栏的收藏统计三联块：`收藏 / 在看 / 想看`。
 ///
-/// 字段映射（spec「收藏统计字段映射」）：收藏 = [SubjectFavorite.done]、
+/// 字段映射（spec「收藏统计的字段映射」）：收藏 = [SubjectFavorite.done]、
 /// 在看 = [SubjectFavorite.doing]、想看 = [SubjectFavorite.wish]。
 /// `onHold`/`dropped` 拿得到但不展示——设计文档那一节的映射表只列了这三项，
 /// 给出的理由是「`favorite` 有 5 个数字，参考图只显示 3 个」。
