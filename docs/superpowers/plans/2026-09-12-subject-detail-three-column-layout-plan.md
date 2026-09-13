@@ -2809,6 +2809,8 @@ git commit -m "feat(subject): add continue-watching button for detail page left 
 
 `PopupMenuButton` 的泛型用 `CollectionType?`，`null` 表示「移除」——这样 `onSelected` 只有一个分支判断，不需要引入额外的 sealed class。
 
+> **修订记录（Task 14 实施后回填）**：`null` 只能作为该菜单项的 `value`，不能靠 `onSelected` 的 `null` 分支来分发。`PopupMenuButton` 会把 `null` 的返回值当成「菜单被取消」交给 `onCanceled` 并直接 return，根本不会调用 `onSelected`——见 Flutter 3.44.2 的 `packages/flutter/lib/src/material/popup_menu.dart:1715-1727`。所以「移除」改由它那一项自己的 `onTap` 触发（`PopupMenuItemState.handleTap` 在 `popup_menu.dart:399-404` 里先 `Navigator.pop` 再调 `onTap`，控件此时仍 mounted，`ScaffoldMessenger.of(context)` 照常可用）。本任务原先给出的实现代码里那个 `if (value == null) _remove();` 分支是死代码，会让「移除」点了没反应，下面的实现片段已按实际提交（`8ac6614` / `8eb7e58`）修正；本任务第 6 个测试「菜单里选「移除」调用 deleteCollection」正是抓住这一点的那条测试。「移除」那一项因此不再是 `const`——`onTap: _remove` 是实例方法的 tear-off。另外测试片段里补了 `subjectImageCacheRepositoryProvider` 的 override：`pump` 传了 `imageUrl: 'u'`，成功路径会让 controller 去写本地封面缓存，不 override 就会构造真的 `AppDatabase`，在测试输出里打出一段 drift 的 "created the database class multiple times" 警告，然后以 `MissingPluginException` 失败——那两条测试实际走的是被吞掉的失败分支，而不是成功分支。
+
 **Files:**
 - Create: `lib/ui/subject/subject_collection_action_button.dart`
 - Test: `test/ui/subject/subject_collection_action_button_test.dart`
@@ -2820,6 +2822,7 @@ git commit -m "feat(subject): add continue-watching button for detail page left 
 ```dart
 import 'package:animeko_flutter/data/subject/collection_type.dart';
 import 'package:animeko_flutter/data/subject/subject_api.dart';
+import 'package:animeko_flutter/data/subject/subject_image_cache_repository.dart';
 import 'package:animeko_flutter/data/subject/subject_models.dart';
 import 'package:animeko_flutter/ui/subject/subject_collection_action_button.dart';
 import 'package:flutter/material.dart';
@@ -2829,6 +2832,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockSubjectApi extends Mock implements SubjectApi {}
+
+class MockSubjectImageCacheRepository extends Mock
+    implements SubjectImageCacheRepository {}
 
 SubjectDetail detailWith(CollectionType? type) => SubjectDetail(
   id: 1,
@@ -2850,6 +2856,7 @@ Widget wrap(Widget child, {required List<Override> overrides}) {
 
 void main() {
   late MockSubjectApi api;
+  late MockSubjectImageCacheRepository imageCacheRepo;
 
   setUpAll(() {
     registerFallbackValue(CollectionType.wish);
@@ -2857,6 +2864,15 @@ void main() {
 
   setUp(() {
     api = MockSubjectApi();
+    // `pump` passes `imageUrl: 'u'`, so every successful update also writes
+    // the local cover cache. Without this override that write reaches the
+    // real `AppDatabase`, which both logs a drift "created the database
+    // class multiple times" warning and then fails with
+    // `MissingPluginException` (no `getApplicationDocumentsDirectory` under
+    // `flutter_test`) -- silently exercising the swallowed failure path
+    // instead of the success path.
+    imageCacheRepo = MockSubjectImageCacheRepository();
+    when(() => imageCacheRepo.save(1, 'u')).thenAnswer((_) async {});
   });
 
   Future<void> pump(WidgetTester tester, CollectionType? type) async {
@@ -2864,7 +2880,10 @@ void main() {
     await tester.pumpWidget(
       wrap(
         const SubjectCollectionActionButton(subjectId: 1, imageUrl: 'u'),
-        overrides: [subjectApiProvider.overrideWithValue(api)],
+        overrides: [
+          subjectApiProvider.overrideWithValue(api),
+          subjectImageCacheRepositoryProvider.overrideWithValue(imageCacheRepo),
+        ],
       ),
     );
     await tester.pumpAndSettle();
@@ -2988,7 +3007,11 @@ import '../../domain/subject/subject_collection_controller.dart';
 ///
 /// 取代改版前平铺的 5 个 [ChoiceChip]（旧 `_CollectionButtons`）。菜单项
 /// 的泛型是 `CollectionType?`，`null` 代表「移除」，这样 `onSelected` 只
-/// 需要一个分支判断，不必额外定义一个 sealed 的动作类型。
+/// 需要一个分支判断，不必额外定义一个 sealed 的动作类型。但注意
+/// [PopupMenuButton] 把 `null` 的返回值当成「菜单被取消」交给
+/// `onCanceled`、并不会传给 `onSelected`（framework `popup_menu.dart` 里
+/// `showMenu(...)` 的 `.then`），所以「移除」实际是由它那一项自己的
+/// `onTap` 分发的。
 ///
 /// 乐观更新/回滚与失败重试都由
 /// [SubjectCollectionController.setCollectionType] 负责，本控件只负责在
@@ -3092,12 +3115,13 @@ class _SubjectCollectionActionButtonState
         enabled: !_busy,
         tooltip: '修改收藏状态',
         position: PopupMenuPosition.under,
+        // 这里只可能收到非 null 值：[PopupMenuButton] 把 `null` 的返回值当作
+        // 「菜单被取消」处理（framework `popup_menu.dart` 里 `showMenu(...)`
+        // 的 `.then` 对 `newValue == null` 直接调 `onCanceled` 并 return），
+        // 所以「移除」不能挂在这里的 `null` 分支上，改由该菜单项自己的
+        // `onTap` 触发 [_remove]。
         onSelected: (value) {
-          if (value == null) {
-            _remove();
-          } else {
-            _setType(value);
-          }
+          if (value != null) _setType(value);
         },
         itemBuilder: (context) => [
           for (final type in CollectionType.values)
@@ -3107,7 +3131,11 @@ class _SubjectCollectionActionButtonState
                 child: Text(labels[type]!),
               ),
           const PopupMenuDivider(),
-          const PopupMenuItem<CollectionType?>(value: null, child: Text('移除')),
+          PopupMenuItem<CollectionType?>(
+            value: null,
+            onTap: _remove,
+            child: const Text('移除'),
+          ),
         ],
         child: Container(
           height: 40,
