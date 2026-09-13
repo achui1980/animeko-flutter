@@ -267,11 +267,24 @@ void main() {
       expect(related.character.imageLarge, isNull);
     });
 
+    // Two actors, because a character can have several CVs (different
+    // eras/dubs) and the design pins the displayed one to `actors.first`
+    // -- with a single-actor fixture `actors.last` would pass too.
     test('primaryActor is the first actor', () {
-      final related = RelatedCharacter.fromJson(
-        Map<String, dynamic>.from(realItem),
-      );
+      final related = RelatedCharacter.fromJson({
+        'index': 0,
+        'character': {
+          'id': 3320,
+          'name': '黒崎一護',
+          'actors': [
+            {'id': 4716, 'name': '森田成一'},
+            {'id': 9999, 'name': '別の声優'},
+          ],
+        },
+        'role': 1,
+      });
 
+      expect(related.character.actors, hasLength(2));
       expect(related.character.primaryActor, isNotNull);
       expect(related.character.primaryActor!.id, 4716);
     });
@@ -297,9 +310,11 @@ void main() {
         expect(character.displayName, '黒崎一護');
       });
 
-      // The reason `displayName` guards on `isNotEmpty` and not just on
-      // null: the server sends `''` for characters with no Chinese name,
-      // and an empty label would render as a blank line.
+      // `''` has not been observed on this payload -- the guard is
+      // `isNotEmpty` rather than a plain null check because it follows
+      // the repo-wide display convention, whose precedent
+      // (`subject_detail_screen.dart:283`) guards a non-nullable
+      // `nameCn` on emptiness. Defensive, and pinned so it stays that way.
       test('falls back to name when nameCn is an empty string', () {
         const character = CharacterInfo(id: 3320, name: '黒崎一護', nameCn: '');
 
@@ -376,8 +391,8 @@ void main() {
         expect(person.displayName, '森田成一');
       });
 
-      // See the sibling CharacterInfo case: `''` is a real wire value,
-      // so the guard has to be `isNotEmpty`, not just a null check.
+      // See the sibling CharacterInfo case: `''` is not an observed wire
+      // value, the guard just follows the repo-wide display convention.
       test('falls back to name when nameCn is an empty string', () {
         const person = PersonInfo(id: 4716, name: '森田成一', nameCn: '');
 

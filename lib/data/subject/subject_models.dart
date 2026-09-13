@@ -307,9 +307,10 @@ class SubjectDetail {
 
 /// A person (voice actor, staff member, author). Live-verified against
 /// the `actors` array inside a character
-/// (`GET /v2/subjects/302286/characters?withActors=true`); no other
-/// endpoint's person payload was inspected, so treat reuse elsewhere as
-/// unverified.
+/// (`GET /v2/subjects/302286/characters?withActors=true`); the `person`
+/// object on `/v2/subjects/{id}/staff` was observed to have this exact
+/// field set too, though that endpoint is being dropped this round in
+/// favour of `infobox` (its `position` codes are unmappable).
 @JsonSerializable()
 class PersonInfo {
   const PersonInfo({
