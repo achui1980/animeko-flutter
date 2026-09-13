@@ -287,8 +287,9 @@ class SubjectDetail {
   ///
   /// Fields with an empty `values` list are excluded, matching
   /// [infoboxValue]'s treatment of the same shape, so a renderer can
-  /// join `field.values` unguarded without producing a row that shows a
-  /// role label next to nothing.
+  /// join `field.values` unguarded. A value whose `v` degraded to `''`
+  /// is NOT excluded (see [infobox]) -- that path is a malformed payload
+  /// we chose to render blank rather than reject.
   List<InfoboxField> get staffFields {
     final fields = infobox?.fields;
     if (fields == null) return const [];

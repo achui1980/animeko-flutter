@@ -444,9 +444,9 @@ void main() {
     ///
     /// `中文名` / `话数` / `官方网站` are keys the capture confirms exist
     /// on this subject, but it records only their names, so the values
-    /// here are illustrative placeholders. Nothing asserts on them
-    /// except via [SubjectDetail.infoboxValue], which is exercising the
-    /// lookup, not the payload.
+    /// here are illustrative placeholders. Tests do assert on those
+    /// values, but only to prove parsing/serialization round-trip --
+    /// never as a claim about what the backend actually sends.
     const realInfobox = {
       'template': 'Infobox animanga/TVAnime',
       'fields': [
