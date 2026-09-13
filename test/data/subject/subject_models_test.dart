@@ -295,4 +295,65 @@ void main() {
       expect(page.items.last.collectionType, isNull);
     });
   });
+
+  group('SubjectFavorite', () {
+    test('parses the favorite object from the wire', () {
+      final subject = SubjectDetail.fromJson({
+        'id': 302286,
+        'name': 'BLEACH 千年血戦篇',
+        'nameCn': '境·界 千年血战篇',
+        'summary': '',
+        'airDate': '2022-10-10',
+        'tags': <dynamic>[],
+        'selfRating': {'score': 0, 'tags': <dynamic>[], 'isPrivate': false},
+        'favorite': {
+          'wish': 2138,
+          'done': 7420,
+          'doing': 1102,
+          'onHold': 360,
+          'dropped': 177,
+        },
+      });
+
+      expect(subject.favorite, isNotNull);
+      expect(subject.favorite!.wish, 2138);
+      expect(subject.favorite!.done, 7420);
+      expect(subject.favorite!.doing, 1102);
+      expect(subject.favorite!.onHold, 360);
+      expect(subject.favorite!.dropped, 177);
+    });
+
+    test('favorite is null when the key is absent', () {
+      final subject = SubjectDetail.fromJson({
+        'id': 1,
+        'name': 'x',
+        'nameCn': 'x',
+        'summary': '',
+        'airDate': '2020-01-01',
+        'tags': <dynamic>[],
+        'selfRating': {'score': 0, 'tags': <dynamic>[], 'isPrivate': false},
+      });
+
+      expect(subject.favorite, isNull);
+    });
+
+    test('missing counters default to zero', () {
+      final subject = SubjectDetail.fromJson({
+        'id': 1,
+        'name': 'x',
+        'nameCn': 'x',
+        'summary': '',
+        'airDate': '2020-01-01',
+        'tags': <dynamic>[],
+        'selfRating': {'score': 0, 'tags': <dynamic>[], 'isPrivate': false},
+        'favorite': {'done': 5},
+      });
+
+      expect(subject.favorite!.done, 5);
+      expect(subject.favorite!.wish, 0);
+      expect(subject.favorite!.doing, 0);
+      expect(subject.favorite!.onHold, 0);
+      expect(subject.favorite!.dropped, 0);
+    });
+  });
 }

@@ -32,12 +32,49 @@ class SelfRating {
   Map<String, dynamic> toJson() => _$SelfRatingToJson(this);
 }
 
+/// Aggregate collection counters for a subject, from `SubjectDetail`'s
+/// `favorite` object. Live-verified shape (subject 302286):
+/// `{"wish":2138,"done":7420,"doing":1102,"onHold":360,"dropped":177}`.
+///
+/// Note the backend uses camelCase `onHold` (not Bangumi's official
+/// snake_case `on_hold`) and `done` (not Bangumi's `collect`). Every
+/// counter defaults to 0 so a partial object still parses -- the UI
+/// only shows `done`/`doing`/`wish`.
+@JsonSerializable()
+class SubjectFavorite {
+  const SubjectFavorite({
+    required this.wish,
+    required this.done,
+    required this.doing,
+    required this.onHold,
+    required this.dropped,
+  });
+
+  @JsonKey(defaultValue: 0)
+  final int wish;
+  @JsonKey(defaultValue: 0)
+  final int done;
+  @JsonKey(defaultValue: 0)
+  final int doing;
+  @JsonKey(defaultValue: 0)
+  final int onHold;
+  @JsonKey(defaultValue: 0)
+  final int dropped;
+
+  factory SubjectFavorite.fromJson(Map<String, dynamic> json) =>
+      _$SubjectFavoriteFromJson(json);
+
+  Map<String, dynamic> toJson() => _$SubjectFavoriteToJson(this);
+}
+
 /// Response of `GET /v2/subjects/{subjectId}` -- verified against the
 /// real `AniSubjectCollection` model. This is a deliberately lean subset
-/// (the real wire shape also has `type`/`nsfw`/`favorite`/`metaTags`/
-/// `relations`/`infobox`/`platform`/`airingInfo`/`updatedAt`, none of
-/// which the UI needs) -- json_serializable's generated `fromJson`
-/// ignores undeclared keys, so omitting fields is safe.
+/// -- json_serializable's generated `fromJson` ignores undeclared keys,
+/// so omitting fields is safe.
+///
+/// the real wire shape also has `type`/`nsfw`/`metaTags`/`relations`/
+/// `platform`/`airingInfo`/`updatedAt`, none of which the UI needs.
+/// `favorite` and `infobox` ARE parsed (see the fields below).
 @JsonSerializable()
 class SubjectDetail {
   const SubjectDetail({
@@ -53,6 +90,7 @@ class SubjectDetail {
     required this.selfRating,
     this.aliases = const [],
     this.scoreDetails,
+    this.favorite,
     this.episodes,
   });
 
@@ -97,6 +135,10 @@ class SubjectDetail {
   /// Null when the response omits this key (or for older cached
   /// responses that predate this field being added).
   final Map<String, int>? scoreDetails;
+
+  /// Aggregate collection counters. Nullable because the field is absent
+  /// on some responses; the 收藏统计 block hides itself when null.
+  final SubjectFavorite? favorite;
 
   /// Every episode of this subject, of every type (`MAIN`/`SPECIAL`/`OP`/
   /// `ED`), exactly as embedded in this same `/v2/subjects/{id}` response.

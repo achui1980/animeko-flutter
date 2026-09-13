@@ -21,6 +21,24 @@ Map<String, dynamic> _$SelfRatingToJson(SelfRating instance) =>
       'comment': instance.comment,
     };
 
+SubjectFavorite _$SubjectFavoriteFromJson(Map<String, dynamic> json) =>
+    SubjectFavorite(
+      wish: (json['wish'] as num?)?.toInt() ?? 0,
+      done: (json['done'] as num?)?.toInt() ?? 0,
+      doing: (json['doing'] as num?)?.toInt() ?? 0,
+      onHold: (json['onHold'] as num?)?.toInt() ?? 0,
+      dropped: (json['dropped'] as num?)?.toInt() ?? 0,
+    );
+
+Map<String, dynamic> _$SubjectFavoriteToJson(SubjectFavorite instance) =>
+    <String, dynamic>{
+      'wish': instance.wish,
+      'done': instance.done,
+      'doing': instance.doing,
+      'onHold': instance.onHold,
+      'dropped': instance.dropped,
+    };
+
 SubjectDetail _$SubjectDetailFromJson(
   Map<String, dynamic> json,
 ) => SubjectDetail(
@@ -44,6 +62,9 @@ SubjectDetail _$SubjectDetailFromJson(
   scoreDetails: (json['scoreDetails'] as Map<String, dynamic>?)?.map(
     (k, e) => MapEntry(k, (e as num).toInt()),
   ),
+  favorite: json['favorite'] == null
+      ? null
+      : SubjectFavorite.fromJson(json['favorite'] as Map<String, dynamic>),
   episodes: (json['episodes'] as List<dynamic>?)
       ?.map((e) => SubjectEpisode.fromJson(e as Map<String, dynamic>))
       .toList(),
@@ -63,6 +84,7 @@ Map<String, dynamic> _$SubjectDetailToJson(SubjectDetail instance) =>
       'collectionType': collectionTypeToWireNullable(instance.collectionType),
       'selfRating': instance.selfRating,
       'scoreDetails': instance.scoreDetails,
+      'favorite': instance.favorite,
       'episodes': instance.episodes,
     };
 
