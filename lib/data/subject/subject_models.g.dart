@@ -184,19 +184,6 @@ Map<String, dynamic> _$RelatedCharacterToJson(RelatedCharacter instance) =>
       'role': instance.role,
     };
 
-StaffMember _$StaffMemberFromJson(Map<String, dynamic> json) => StaffMember(
-  name: json['name'] as String,
-  imageUrl: json['imageUrl'] as String?,
-  role: json['role'] as String?,
-);
-
-Map<String, dynamic> _$StaffMemberToJson(StaffMember instance) =>
-    <String, dynamic>{
-      'name': instance.name,
-      'imageUrl': instance.imageUrl,
-      'role': instance.role,
-    };
-
 Map<String, dynamic> _$MyCollectionSubjectToJson(
   MyCollectionSubject instance,
 ) => <String, dynamic>{

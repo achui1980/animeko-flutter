@@ -407,27 +407,6 @@ class RelatedCharacter {
   Map<String, dynamic> toJson() => _$RelatedCharacterToJson(this);
 }
 
-/// Response item of `GET /v2/subjects/{subjectId}/staff`.
-///
-/// NOTE: this entire shape is an **unconfirmed best guess** -- the real
-/// Kotlin model for this endpoint was never read during this plan's
-/// design phase (flagged explicitly rather than silently assumed
-/// correct). Verify against a live `GET .../staff` response before
-/// trusting `name`/`imageUrl`/`role` as the real field names.
-@JsonSerializable()
-class StaffMember {
-  const StaffMember({required this.name, this.imageUrl, this.role});
-
-  final String name;
-  final String? imageUrl;
-  final String? role;
-
-  factory StaffMember.fromJson(Map<String, dynamic> json) =>
-      _$StaffMemberFromJson(json);
-
-  Map<String, dynamic> toJson() => _$StaffMemberToJson(this);
-}
-
 /// One item of `GET /v2/subjects/list` (the "My Collection" library
 /// page). A deliberately lean subset of `AniSubjectCollection` for list
 /// display -- notably, `AniSubjectCollection` has no image field of its

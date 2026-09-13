@@ -69,21 +69,6 @@ class SubjectApi {
         .toList();
   }
 
-  /// GET /v2/subjects/{subjectId}/staff.
-  ///
-  /// NOTE: `StaffMember`'s wire shape is an unconfirmed best guess (see
-  /// the plan's Global Constraints and `StaffMember`'s own doc comment
-  /// in `subject_models.dart`).
-  Future<List<StaffMember>> getStaff(int subjectId) async {
-    final response = await _dio.get<Map<String, dynamic>>(
-      '/v2/subjects/$subjectId/staff',
-    );
-    final items = response.data!['items'] as List<dynamic>;
-    return items
-        .map((e) => StaffMember.fromJson(e as Map<String, dynamic>))
-        .toList();
-  }
-
   /// GET /v2/subjects/list -- the "My Collection" library page, filtered
   /// by [type] (null = all 5 states, though the UI always passes a
   /// concrete type -- see `MyCollectionsController`). Pagination is

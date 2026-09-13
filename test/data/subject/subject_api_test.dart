@@ -273,40 +273,6 @@ void main() {
     });
   });
 
-  group('getStaff', () {
-    test('GETs the exact staff path', () async {
-      when(() => dio.get<Map<String, dynamic>>(any())).thenAnswer(
-        (_) async => jsonResponse({'items': <Map<String, dynamic>>[]}),
-      );
-
-      await api.getStaff(400602);
-
-      verify(
-        () => dio.get<Map<String, dynamic>>('/v2/subjects/400602/staff'),
-      ).called(1);
-    });
-
-    test('parses a list of staff members', () async {
-      when(() => dio.get<Map<String, dynamic>>(any())).thenAnswer(
-        (_) async => jsonResponse({
-          'items': [
-            {
-              'name': '渡边步',
-              'imageUrl': 'https://example.com/s.jpg',
-              'role': '导演',
-            },
-          ],
-        }),
-      );
-
-      final staff = await api.getStaff(400602);
-
-      expect(staff, hasLength(1));
-      expect(staff.single.name, '渡边步');
-      expect(staff.single.role, '导演');
-    });
-  });
-
   group('getMyCollections', () {
     test(
       'GETs with type/offset/limit query params when type is given',

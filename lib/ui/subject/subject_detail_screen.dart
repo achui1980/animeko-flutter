@@ -63,10 +63,7 @@ class SubjectDetailScreen extends ConsumerWidget {
                   flex: 1,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _RatingHistogramSection(subjectId: subjectId),
-                      _StaffSection(subjectId: subjectId),
-                    ],
+                    children: [_RatingHistogramSection(subjectId: subjectId)],
                   ),
                 ),
               ],
@@ -617,7 +614,7 @@ class _CharacterSection extends ConsumerWidget {
 /// right sidebar, using [SubjectDetail.scoreDetails] -- data the app's
 /// own backend already returns inside the same response
 /// [subjectDetailControllerProvider] already fetches, so this needs no
-/// new API call/provider. Silently hides (matching [_StaffSection]'s
+/// new API call/provider. Silently hides (matching [_CharacterSection]'s
 /// convention) while loading, on error, or when `scoreDetails` is null
 /// or empty (e.g. a subject with too few ratings to have a breakdown).
 class _RatingHistogramSection extends ConsumerWidget {
@@ -708,68 +705,6 @@ class _HistogramBar extends StatelessWidget {
         const SizedBox(height: 4),
         Text('$score', style: Theme.of(context).textTheme.labelSmall),
       ],
-    );
-  }
-}
-
-/// Right-column "制作人员" (staff) table: a flat, two-column
-/// key/value list of every (role, name) pair from the API response, in
-/// original order. Deliberately NOT deduplicated by role -- if two
-/// staff members share the same role (e.g. two "音乐" credits), both
-/// render as separate rows. No avatars (the reference screenshot's
-/// staff table is text-only) and no "查看全部" link (unlike the
-/// 角色 section), per the approved design.
-class _StaffSection extends ConsumerWidget {
-  const _StaffSection({required this.subjectId});
-
-  final int subjectId;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final staffAsync = ref.watch(subjectStaffProvider(subjectId: subjectId));
-
-    return staffAsync.when(
-      loading: () => const SizedBox.shrink(),
-      error: (error, stack) => const SizedBox.shrink(),
-      data: (staff) {
-        if (staff.isEmpty) return const SizedBox.shrink();
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('制作人员', style: Theme.of(context).textTheme.titleSmall),
-              const SizedBox(height: 8),
-              Table(
-                columnWidths: const {
-                  0: IntrinsicColumnWidth(),
-                  1: FlexColumnWidth(),
-                },
-                children: [
-                  for (final member in staff)
-                    TableRow(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.only(right: 12, bottom: 6),
-                          child: Text(
-                            member.role ?? '',
-                            style: TextStyle(
-                              color: Theme.of(context).hintColor,
-                            ),
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 6),
-                          child: Text(member.name),
-                        ),
-                      ],
-                    ),
-                ],
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 }

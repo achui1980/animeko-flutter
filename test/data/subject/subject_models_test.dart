@@ -401,29 +401,6 @@ void main() {
     });
   });
 
-  group('StaffMember', () {
-    test('parses a staff member with a role and image', () {
-      final staff = StaffMember.fromJson({
-        'name': '渡边步',
-        'imageUrl': 'https://example.com/s.jpg',
-        'role': '导演',
-      });
-      expect(staff.name, '渡边步');
-      expect(staff.imageUrl, 'https://example.com/s.jpg');
-      expect(staff.role, '导演');
-    });
-
-    test('parses a staff member with null role and image', () {
-      final staff = StaffMember.fromJson({
-        'name': '某人',
-        'imageUrl': null,
-        'role': null,
-      });
-      expect(staff.imageUrl, isNull);
-      expect(staff.role, isNull);
-    });
-  });
-
   group('MyCollectionSubject / PaginatedCollections', () {
     test('parses a collection-list item with a collectionType', () {
       final item = MyCollectionSubject.fromJson({
