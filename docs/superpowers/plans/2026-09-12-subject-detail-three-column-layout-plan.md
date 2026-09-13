@@ -3391,7 +3391,14 @@ String formatCount(int value) {
 ///
 /// 字段映射（spec「收藏统计字段映射」）：收藏 = [SubjectFavorite.done]、
 /// 在看 = [SubjectFavorite.doing]、想看 = [SubjectFavorite.wish]。
-/// `onHold`/`dropped` 拿得到但不展示——参考应用的详情页也只显示这三项。
+/// `onHold`/`dropped` 拿得到但不展示——设计文档那一节的映射表只列了这三项，
+/// 给出的理由是「`favorite` 有 5 个数字，参考图只显示 3 个」。
+///
+/// 「收藏 = `done`」目前仍是暂定的：设计文档同一节要求「实施时用一个真实
+/// subject 与 Bangumi 网页上的数字对照一次，确认「收藏」确实对应 `done`
+/// 而不是五项求和」，这次核对挂在 plan 的 Task 25 Step 5 第 8 项；若网页的
+/// 「收藏」等于五项之和，这里要改成五项求和，
+/// `test/ui/subject/subject_collection_stats_test.dart` 的期望值也要跟着改。
 ///
 /// [favorite] 为 `null`（接口没返回 `favorite`）时整块隐藏，而不是显示
 /// 三个 `0`。
@@ -3436,7 +3443,9 @@ class _StatItem extends StatelessWidget {
         const SizedBox(height: 2),
         Text(
           label,
-          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
         ),
       ],
     );
