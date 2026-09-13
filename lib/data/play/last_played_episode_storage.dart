@@ -1,3 +1,5 @@
+// lib/data/play/last_played_episode_storage.dart
+
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -25,6 +27,8 @@ class LastPlayedEpisodeStorage {
   /// this subject has never been played on this device.
   int? get(int subjectId) => _prefs.getInt('$_keyPrefix$subjectId');
 
+  /// Records [episodeId] as the last episode started for [subjectId],
+  /// overwriting any previous value.
   Future<void> set(int subjectId, int episodeId) async {
     await _prefs.setInt('$_keyPrefix$subjectId', episodeId);
   }
