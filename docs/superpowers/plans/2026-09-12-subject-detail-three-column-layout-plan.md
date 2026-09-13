@@ -3631,6 +3631,26 @@ void main() {
       expect(find.text('话数'), findsNothing);
       expect(find.text('别名'), findsNothing);
     });
+
+    testWidgets('话数优先用 infobox 而不是 episodeCount', (tester) async {
+      await pump(
+        tester,
+        detail(
+          episodes: [mainEpisode(1), mainEpisode(2)],
+          infobox: const SubjectInfobox(
+            fields: [
+              InfoboxField(
+                key: '话数',
+                values: [InfoboxValue(v: '11')],
+              ),
+            ],
+          ),
+        ),
+      );
+
+      expect(find.text('11'), findsOneWidget);
+      expect(find.text('2'), findsNothing);
+    });
   });
 }
 ```
@@ -3638,7 +3658,7 @@ void main() {
 - [ ] **Step 2: 运行测试确认失败**
 
 Run: `flutter test test/ui/subject/subject_info_table_test.dart`
-Expected: FAIL — `Target of URI doesn't exist: 'package:animeko_flutter/ui/subject/subject_info_table.dart'`。
+Expected: FAIL — 编译失败：``Error when reading 'lib/ui/subject/subject_info_table.dart': No such file or directory``，外加 `Method not found: 'SubjectInfoTable'.`。
 
 - [ ] **Step 3: 实现**
 
@@ -3660,8 +3680,9 @@ import 'subject_tags_row.dart';
 /// Bangumi 页面；拿不到时才退回 [SubjectDetail.airDate] /
 /// [SubjectDetail.episodeCount]。
 ///
-/// `别名` 反过来——优先用 [SubjectDetail.aliases]，因为后端已经把 infobox
-/// 里的多个别名拍平成数组，而 [SubjectDetail.infoboxValue] 只取第一个值。
+/// `别名` 反过来——优先用 [SubjectDetail.aliases]：它是一个扁平的
+/// `List<String>`，能把全部别名都展开，而 [SubjectDetail.infoboxValue] 只取
+/// 第一个值；infobox 只作兜底。
 ///
 /// 三行全都拿不到、且没有标签时整块隐藏（不显示一个空的「作品信息」标题）。
 ///
@@ -3738,7 +3759,7 @@ class SubjectInfoTable extends StatelessWidget {
 - [ ] **Step 4: 运行测试确认通过**
 
 Run: `flutter test test/ui/subject/subject_info_table_test.dart`
-Expected: PASS（8 个测试全部通过）。
+Expected: PASS（9 个测试全部通过）。
 
 - [ ] **Step 5: 提交**
 
