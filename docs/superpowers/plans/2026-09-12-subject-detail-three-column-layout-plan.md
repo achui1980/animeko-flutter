@@ -5481,8 +5481,30 @@ git commit -m "feat(subject): add rating card with histogram and rating dialog"
 - Create: `lib/ui/subject/subject_reviews_sheet.dart`
 - Create: `lib/ui/subject/subject_reviews_card.dart`
 - Test: `test/ui/subject/subject_reviews_card_test.dart`
+- Test: `test/ui/subject/subject_reviews_sheet_test.dart`（新增；见下方 PLAN EDIT 说明）
 
 依赖：Task 5（`stripBbcode`）、Task 6（`SubjectReview` / `PaginatedReviews` / `getReviews`）、Task 9（`subjectReviewsControllerProvider` + `loadMore`）、Task 19（`SubjectSideCard`）。
+
+> **PLAN EDIT（本轮修订，非原始设计）**：`ReviewAvatar` 和 `SubjectReviewsSheet` 的
+> 下方代码已经改过，修的是两个真实缺陷（不是风格调整）：(1) `ReviewAvatar` 原稿的
+> `onBackgroundImageError: (_, _) {}` 只吞异常、不换占位图标，与 Task 17 里
+> `CharacterAvatar` 修过的是同一个缺陷（design doc 「加载 / 错误 / 空态」明写
+> 「角色头像 / 评价者头像 加载失败 → 占位图标」）——现在 `ReviewAvatar` 改成了和
+> `CharacterAvatar` 一样的 `StatefulWidget` + `_failedUrl` 写法；(2) 「加载更多」
+> 按钮原稿用 `async.isLoading ? null : ...` disable，但 `loadMore()`
+> （`subject_reviews_controller.dart:60`）从不经过 `AsyncValue.guard`、也不吞
+> 异常，所以 `isLoading` 在整个 `loadMore` 期间一直是 `false`（按钮从未真正被
+> disable），失败会直接从 `onPressed` 抛出去——现在 `SubjectReviewsSheet` 改成
+> `ConsumerStatefulWidget`，用局部 `bool _loadingMore` + `try/catch` +
+> 失败 SnackBar（`加载更多评价失败：$e`）。**实施者必须在
+> `test/ui/subject/subject_reviews_sheet_test.dart` 里补至少 3 个测试**：
+> 「加载中按钮 disabled」（`Completer` 挂住 `loadMore` 的下一页请求，断言按钮
+> `onPressed == null`）、「失败时弹 SnackBar 且按钮恢复可点」（mock `loadMore`
+> 触发的 `getReviews` 第二页请求 `thenThrow`，断言 SnackBar 文案 + 按钮恢复）、
+> 「`ReviewAvatar` 加载失败退占位图标」（真实 URL + `flutter_test` 的常态 400
+> 拦截，断言 `Icon(Icons.person)` 出现，镜像 Task 17 `CharacterAvatar` 那个
+> 测试的写法）。这三条不在原 plan 的 Step 3 测试列表里，是本次 PLAN EDIT 新增的
+> 强制要求，不算实施者自由发挥的范围扩张。
 
 和 Task 17 一样，头像单独成文件，避免 card ↔ sheet 循环 import。
 
@@ -5494,24 +5516,46 @@ import 'package:flutter/material.dart';
 
 import '../../data/subject/review_models.dart';
 
-/// A commenter's avatar. `avatarUrl` is often present but may 404, so
-/// `onBackgroundImageError` is mandatory -- `CircleAvatar.backgroundImage`
-/// has no `errorBuilder`, and an unhandled image error fails widget tests
-/// (same reasoning as `CharacterAvatar`).
-class ReviewAvatar extends StatelessWidget {
+/// A commenter's avatar. `avatarUrl` is often present but may 404, so a
+/// bare `onBackgroundImageError` callback is not enough to satisfy the
+/// design doc's 「加载 / 错误 / 空态」 table (「封面 / 角色头像 / 评价者头像
+/// 加载失败 → 占位图标」) -- an empty callback only swallows the exception,
+/// it does not swap in the placeholder icon. `CircleAvatar.backgroundImage`
+/// has no `errorBuilder`, so the swap can only happen via `setState`,
+/// which is why this is a [StatefulWidget], mirroring `CharacterAvatar`
+/// (`character_avatar.dart`) exactly -- same defect, same fix, same
+/// `mounted` guard (the image stream's callback is async and the widget
+/// may already be gone), same URL-not-bool tracking (unkeyed cells in a
+/// scrollable list recycle `State` across different authors; a bool would
+/// leak one author's failure onto the next author rendered in that slot).
+class ReviewAvatar extends StatefulWidget {
   const ReviewAvatar({super.key, required this.author, this.radius = 14});
 
   final ReviewAuthor author;
   final double radius;
 
   @override
+  State<ReviewAvatar> createState() => _ReviewAvatarState();
+}
+
+class _ReviewAvatarState extends State<ReviewAvatar> {
+  /// The URL that most recently failed to load. Tracked by value, not a
+  /// bool, for the State-recycling reason in the class dartdoc.
+  String? _failedUrl;
+
+  @override
   Widget build(BuildContext context) {
-    final url = author.avatarUrl;
+    final source = widget.author.avatarUrl;
+    final url = source == _failedUrl ? null : source;
     return CircleAvatar(
-      radius: radius,
+      radius: widget.radius,
       backgroundImage: url == null ? null : NetworkImage(url),
-      onBackgroundImageError: url == null ? null : (_, _) {},
-      child: url == null ? Icon(Icons.person, size: radius) : null,
+      onBackgroundImageError: url == null
+          ? null
+          : (_, _) {
+              if (mounted) setState(() => _failedUrl = url);
+            },
+      child: url == null ? Icon(Icons.person, size: widget.radius) : null,
     );
   }
 }
@@ -5534,15 +5578,62 @@ import 'review_avatar.dart';
 ///
 /// The backend's `total` is a `limit + 1` sentinel, NOT a real count, so
 /// this sheet never renders a 「共 N 条」 header -- see `PaginatedReviews`.
-class SubjectReviewsSheet extends ConsumerWidget {
+///
+/// This is a [ConsumerStatefulWidget], not a [ConsumerWidget], because
+/// `SubjectReviewsController.loadMore` (`subject_reviews_controller.dart`)
+/// appends into the *existing* `AsyncData` and only ever calls
+/// `state = AsyncData(...)` on success -- it never routes through
+/// `AsyncValue.guard`, so `ref.watch(provider).isLoading` stays `false`
+/// for the button's entire in-flight duration and `async.isLoading
+/// ? null : ...` never actually disables the button (a double-tap during
+/// the request re-enters `loadMore`, which just re-appends the same next
+/// page onto whatever `current` it captures). It also never catches: an
+/// error thrown by the `getReviews` call inside `loadMore` propagates
+/// straight out of the button's `onPressed`, uncaught. So the button
+/// needs its own local `_loadingMore` flag around the `await`, plus a
+/// `try/catch` with a failure `SnackBar` (loadMore() deliberately doesn't
+/// swallow failures itself). Note a latent, currently-unreachable
+/// interaction: a failed `loadMore` leaves `state` exactly as it was
+/// (the first page's `AsyncData`), so nothing here can overwrite an error
+/// state -- that only becomes possible if a future task adds a
+/// pull-to-refresh path that can put this provider into `AsyncError`
+/// while `loadMore` is in flight.
+class SubjectReviewsSheet extends ConsumerStatefulWidget {
   const SubjectReviewsSheet({super.key, required this.subjectId});
 
   final int subjectId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SubjectReviewsSheet> createState() =>
+      _SubjectReviewsSheetState();
+}
+
+class _SubjectReviewsSheetState extends ConsumerState<SubjectReviewsSheet> {
+  bool _loadingMore = false;
+
+  Future<void> _loadMore() async {
+    final provider = subjectReviewsControllerProvider(
+      subjectId: widget.subjectId,
+    );
+    setState(() => _loadingMore = true);
+    try {
+      await ref.read(provider.notifier).loadMore();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('加载更多评价失败：$e')),
+      );
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final provider = subjectReviewsControllerProvider(subjectId: subjectId);
+    final provider = subjectReviewsControllerProvider(
+      subjectId: widget.subjectId,
+    );
     final async = ref.watch(provider);
     final page = async.value;
     final reviews = page?.items ?? const [];
@@ -5576,9 +5667,7 @@ class SubjectReviewsSheet extends ConsumerWidget {
                       padding: const EdgeInsets.all(16),
                       child: Center(
                         child: TextButton(
-                          onPressed: async.isLoading
-                              ? null
-                              : () => ref.read(provider.notifier).loadMore(),
+                          onPressed: _loadingMore ? null : _loadMore,
                           child: const Text('加载更多'),
                         ),
                       ),
