@@ -5702,7 +5702,141 @@ class _SubjectReviewsSheetState extends ConsumerState<SubjectReviewsSheet> {
 }
 ```
 
-- [ ] **Step 3: 写失败的 card 测试**
+- [ ] **Step 3: 写 `subject_reviews_sheet_test.dart`，确认通过（PLAN EDIT 新增的 3 个测试）**
+
+`SubjectReviewsSheet` 和 `ReviewAvatar` 的生产代码已经在 Step 1-2 写好，所以这里补的
+3 个测试预期**直接 PASS**，不是 TDD 的 RED 步骤——和 Task 17 补的 loading-frame/
+cache-reuse 测试是同一种「针对已实现行为补回归测试」的模式。
+
+```dart
+// test/ui/subject/subject_reviews_sheet_test.dart
+import 'dart:async';
+
+import 'package:animeko_flutter/data/subject/review_models.dart';
+import 'package:animeko_flutter/data/subject/subject_api.dart';
+import 'package:animeko_flutter/ui/subject/subject_reviews_sheet.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
+
+class MockSubjectApi extends Mock implements SubjectApi {}
+
+SubjectReview review({
+  required String id,
+  required String nickname,
+  String? avatarUrl,
+}) => SubjectReview(
+  id: id,
+  subjectId: 1,
+  source: 'bangumi',
+  author: ReviewAuthor(id: id, nickname: nickname, avatarUrl: avatarUrl),
+);
+
+Widget wrap(Widget child, {required List<Override> overrides}) {
+  return ProviderScope(
+    overrides: overrides,
+    child: MaterialApp(home: Scaffold(body: child)),
+  );
+}
+
+void main() {
+  late MockSubjectApi api;
+  late List<Override> overrides;
+
+  setUp(() {
+    api = MockSubjectApi();
+    overrides = [subjectApiProvider.overrideWithValue(api)];
+  });
+
+  testWidgets('disables 加载更多 while the next page is in flight', (
+    tester,
+  ) async {
+    when(() => api.getReviews(subjectId: 1, offset: 0, limit: 20)).thenAnswer(
+      (_) async =>
+          PaginatedReviews(total: 2, items: [review(id: 'r1', nickname: 'A')]),
+    );
+    final completer = Completer<PaginatedReviews>();
+    when(
+      () => api.getReviews(subjectId: 1, offset: 1, limit: 20),
+    ).thenAnswer((_) => completer.future);
+
+    await tester.pumpWidget(
+      wrap(const SubjectReviewsSheet(subjectId: 1), overrides: overrides),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('加载更多'));
+    await tester.pump();
+
+    final button = tester.widget<TextButton>(
+      find.widgetWithText(TextButton, '加载更多'),
+    );
+    expect(button.onPressed, isNull);
+
+    completer.complete(const PaginatedReviews(total: 2, items: []));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('shows a failure SnackBar and re-enables 加载更多 on error', (
+    tester,
+  ) async {
+    when(() => api.getReviews(subjectId: 1, offset: 0, limit: 20)).thenAnswer(
+      (_) async =>
+          PaginatedReviews(total: 2, items: [review(id: 'r1', nickname: 'A')]),
+    );
+    when(
+      () => api.getReviews(subjectId: 1, offset: 1, limit: 20),
+    ).thenThrow(Exception('network'));
+
+    await tester.pumpWidget(
+      wrap(const SubjectReviewsSheet(subjectId: 1), overrides: overrides),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('加载更多'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('加载更多评价失败'), findsOneWidget);
+    final button = tester.widget<TextButton>(
+      find.widgetWithText(TextButton, '加载更多'),
+    );
+    expect(button.onPressed, isNotNull);
+  });
+
+  testWidgets(
+    'falls back to the placeholder icon when an avatar fails to load',
+    (tester) async {
+      when(
+        () => api.getReviews(subjectId: 1, offset: 0, limit: 20),
+      ).thenAnswer(
+        (_) async => PaginatedReviews(
+          total: 1,
+          items: [
+            review(
+              id: 'r1',
+              nickname: 'A',
+              avatarUrl: 'https://example.com/a.png',
+            ),
+          ],
+        ),
+      );
+
+      await tester.pumpWidget(
+        wrap(const SubjectReviewsSheet(subjectId: 1), overrides: overrides),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.person), findsOneWidget);
+    },
+  );
+}
+```
+
+Run: `flutter test test/ui/subject/subject_reviews_sheet_test.dart`
+Expected: PASS（3 个测试）。
+
+- [ ] **Step 4: 写失败的 card 测试**
 
 ```dart
 // test/ui/subject/subject_reviews_card_test.dart
@@ -5872,12 +6006,12 @@ void main() {
 }
 ```
 
-- [ ] **Step 4: 运行测试，确认失败**
+- [ ] **Step 5: 运行测试，确认失败**
 
 Run: `flutter test test/ui/subject/subject_reviews_card_test.dart`
 Expected: FAIL —— `Error: Couldn't resolve the package 'animeko_flutter' ... subject_reviews_card.dart` / `Undefined name 'SubjectReviewsCard'`。
 
-- [ ] **Step 5: 写 `subject_reviews_card.dart`**
+- [ ] **Step 6: 写 `subject_reviews_card.dart`**
 
 ```dart
 // lib/ui/subject/subject_reviews_card.dart
@@ -5997,7 +6131,7 @@ class _ReviewItem extends StatelessWidget {
 }
 ```
 
-- [ ] **Step 6: 写 `subject_reviews_card_frame.dart`**
+- [ ] **Step 7: 写 `subject_reviews_card_frame.dart`**
 
 `SubjectReviewsCard` 的 loading 分支和 data 分支要共用同一个卡壳（标题 + 可选「查看全部 ›」），抽成一个薄封装，避免在两个分支里重复写 `SubjectSideCard` 的参数。
 
@@ -6032,15 +6166,15 @@ class SubjectReviewsCardFrame extends StatelessWidget {
 }
 ```
 
-- [ ] **Step 7: 运行测试，确认通过**
+- [ ] **Step 8: 运行测试，确认通过**
 
-Run: `flutter test test/ui/subject/subject_reviews_card_test.dart`
-Expected: PASS（6 个测试）。
+Run: `flutter test test/ui/subject/subject_reviews_card_test.dart test/ui/subject/subject_reviews_sheet_test.dart`
+Expected: PASS（6 + 3 个测试）。
 
-- [ ] **Step 8: 提交**
+- [ ] **Step 9: 提交**
 
 ```bash
-git add lib/ui/subject/review_avatar.dart lib/ui/subject/subject_reviews_card_frame.dart lib/ui/subject/subject_reviews_card.dart lib/ui/subject/subject_reviews_sheet.dart test/ui/subject/subject_reviews_card_test.dart
+git add lib/ui/subject/review_avatar.dart lib/ui/subject/subject_reviews_card_frame.dart lib/ui/subject/subject_reviews_card.dart lib/ui/subject/subject_reviews_sheet.dart test/ui/subject/subject_reviews_card_test.dart test/ui/subject/subject_reviews_sheet_test.dart
 git commit -m "feat(subject): add popular reviews card and full reviews sheet"
 ```
 
