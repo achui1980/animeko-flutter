@@ -3788,6 +3788,8 @@ git commit -m "feat(subject): add infobox-driven work info table"
 创建 `test/ui/subject/subject_character_row_test.dart`：
 
 ```dart
+import 'dart:async';
+
 import 'package:animeko_flutter/data/subject/subject_api.dart';
 import 'package:animeko_flutter/data/subject/subject_models.dart';
 import 'package:animeko_flutter/ui/subject/subject_character_row.dart';
@@ -3799,17 +3801,26 @@ import 'package:mocktail/mocktail.dart';
 
 class MockSubjectApi extends Mock implements SubjectApi {}
 
-/// 所有 fixture 的头像字段都留 null，避免 `NetworkImage` 在
-/// `flutter_test` 里发起被拦截的 HTTP 请求并把异常报到测试上。
+/// `imageMedium` 默认留 null，这样绝大多数 fixture 都不会让 `NetworkImage`
+/// 在 `flutter_test` 里发起被拦截的 HTTP 请求并把异常报到测试上。只有
+/// 「头像加载失败」那个测试显式传 URL —— 它要的正是那个被拦截的请求
+/// (`statusCode: 400`) 触发 `onBackgroundImageError`。
 RelatedCharacter related({
   required int id,
   required String name,
   String? nameCn,
+  String? imageMedium,
   List<PersonInfo> actors = const [],
 }) {
   return RelatedCharacter(
     index: id,
-    character: CharacterInfo(id: id, name: name, nameCn: nameCn, actors: actors),
+    character: CharacterInfo(
+      id: id,
+      name: name,
+      nameCn: nameCn,
+      imageMedium: imageMedium,
+      actors: actors,
+    ),
     role: 1,
   );
 }
@@ -3858,11 +3869,7 @@ void main() {
   ) async {
     when(() => api.getCharacters(1)).thenAnswer(
       (_) async => [
-        related(
-          id: 1,
-          name: '黑崎一护',
-          actors: [actor('森田成一'), actor('ignored')],
-        ),
+        related(id: 1, name: '黑崎一护', actors: [actor('森田成一'), actor('ignored')]),
       ],
     );
 
@@ -3888,6 +3895,16 @@ void main() {
     // 只有角色名一个 Text 在 cell 里（外加 header 的「角色」和按钮文字）。
     expect(find.text('黑崎一护'), findsOneWidget);
     expect(find.byIcon(Icons.person), findsOneWidget);
+    // 并且 cell 里除了角色名没有第二个 `Text`：`actors` 为空时 CV 行必须
+    // 整行不存在，而不是渲染成一个空/占位字符串。上一个测试证明 CV 行在
+    // `actors` 非空时确实会渲染，所以这里断言的是真实的「缺席」。
+    final cell = find
+        .ancestor(of: find.text('黑崎一护'), matching: find.byType(Column))
+        .first;
+    expect(
+      find.descendant(of: cell, matching: find.byType(Text)),
+      findsOneWidget,
+    );
   });
 
   testWidgets('renders the fallback icon when there is no avatar url', (
@@ -3903,6 +3920,45 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byIcon(Icons.person), findsOneWidget);
+  });
+
+  testWidgets('renders the fallback icon when the avatar fails to load', (
+    tester,
+  ) async {
+    when(() => api.getCharacters(1)).thenAnswer(
+      (_) async => [
+        related(
+          id: 1,
+          name: 'A',
+          imageMedium: 'https://api.animeko.org/v2/characters/3320/image',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      wrap(const SubjectCharacterRow(subjectId: 1), overrides: overrides),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.person), findsOneWidget);
+  });
+
+  testWidgets('keeps the card frame and shows a spinner while loading', (
+    tester,
+  ) async {
+    final pending = Completer<List<RelatedCharacter>>();
+    when(() => api.getCharacters(1)).thenAnswer((_) => pending.future);
+
+    await tester.pumpWidget(
+      wrap(const SubjectCharacterRow(subjectId: 1), overrides: overrides),
+    );
+    await tester.pump();
+
+    expect(find.text('角色'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    pending.complete(const []);
+    await tester.pumpAndSettle();
   });
 
   testWidgets('hides the whole section on error', (tester) async {
@@ -3961,6 +4017,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('全部角色'), findsOneWidget);
+    // sheet 复用横向行已经填好的 provider 缓存，不会再打一次接口。
+    verify(() => api.getCharacters(1)).called(1);
   });
 }
 ```
@@ -3968,8 +4026,12 @@ void main() {
 - [ ] **Step 2: 运行测试确认失败**
 
 Run: `flutter test test/ui/subject/subject_character_row_test.dart`
-Expected: FAIL，`Error: Couldn't resolve the package 'animeko_flutter' ... subject_character_row.dart` 或
-`Target of URI doesn't exist: 'package:animeko_flutter/ui/subject/subject_character_row.dart'`。
+Expected: FAIL。实测的 RED 是 CFE 的
+`test/ui/subject/subject_character_row_test.dart:5:8: Error: Error when reading 'lib/ui/subject/subject_character_row.dart': No such file or directory`
+外加每个引用点的 `Error: Undefined name 'SubjectCharacterRow'.` /
+`Error: Couldn't find constructor 'SubjectCharacterRow'.`，最后
+`Compilation failed for testPath=...`。**不是** `Target of URI doesn't exist`
+—— 那是 analyzer 的措辞，`flutter test` 不走 analyzer。
 
 - [ ] **Step 3: 实现 `character_avatar.dart`**
 
@@ -3980,29 +4042,54 @@ import 'package:flutter/material.dart';
 
 import '../../data/subject/subject_models.dart';
 
-/// 圆形角色头像，缺图时退回一个人形占位图标。
+/// 圆形角色头像，缺图或加载失败时退回一个人形占位图标。
 ///
 /// 后端返回的是 `imageMedium` / `imageLarge` 两个字段（不存在 `imageUrl`，
-/// 见数据层 Task 3 的说明）。这里优先用 `imageMedium`：行内头像直径只有
-/// 64dp，medium 尺寸足够。
+/// 见 [CharacterInfo] 的文档注释）。这里优先用 `imageMedium`：设计文档
+/// `2026-09-12-subject-detail-three-column-layout-design.md` 的「修
+/// `CharacterInfo`」一节写的是「头像用 `imageMedium`（横向头像行只有 64px
+/// 直径，不需要 large）」—— 默认 [radius] 32 正好是那个 64。
 ///
-/// `onBackgroundImageError` 必须给：`CircleAvatar.backgroundImage` 没有
-/// `errorBuilder`，不接这个回调时加载失败会把异常抛到 `FlutterError`，
-/// 在 widget 测试里会直接把测试判成失败。
-class CharacterAvatar extends StatelessWidget {
+/// 加载失败退占位图标同样出自设计文档，「加载 / 错误 / 空态」一节：「封面 /
+/// 角色头像 / 评价者头像 加载失败 → 占位图标」。所以这是个
+/// [StatefulWidget]：`CircleAvatar.backgroundImage` 没有 `errorBuilder`，
+/// 想换成占位图标只能靠 `onBackgroundImageError` 回调 + `setState`。
+/// 这个回调还必须给：不接它时加载失败会把异常抛到 `FlutterError`，在 widget
+/// 测试里会直接把测试判成失败。
+///
+/// 注意 `CircleAvatar` 把 `child` 画在 `backgroundImage` **之上**，所以占位
+/// 图标只能在没有可用 URL 时才渲染，不能无条件塞进 `child`。
+class CharacterAvatar extends StatefulWidget {
   const CharacterAvatar({super.key, required this.character, this.radius = 32});
 
   final CharacterInfo character;
   final double radius;
 
   @override
+  State<CharacterAvatar> createState() => _CharacterAvatarState();
+}
+
+class _CharacterAvatarState extends State<CharacterAvatar> {
+  /// 已经加载失败过的那张图的 URL。记 URL 而不是一个 bool，是因为横向行的
+  /// cell 没有 key：Flutter 会把这个 [State] 复用到同一位置的另一个角色上，
+  /// 存 bool 会把上一个角色的失败状态带过去，让新角色也只显示占位图标。
+  String? _failedUrl;
+
+  @override
   Widget build(BuildContext context) {
-    final url = character.imageMedium ?? character.imageLarge;
+    final source = widget.character.imageMedium ?? widget.character.imageLarge;
+    final url = source == _failedUrl ? null : source;
     return CircleAvatar(
-      radius: radius,
+      radius: widget.radius,
       backgroundImage: url == null ? null : NetworkImage(url),
-      onBackgroundImageError: url == null ? null : (_, _) {},
-      child: url == null ? Icon(Icons.person, size: radius) : null,
+      onBackgroundImageError: url == null
+          ? null
+          // 图片流是异步回调的，widget 可能已经被移除了 —— 不加 `mounted`
+          // 守卫就是一个 `setState() called after dispose` 崩溃。
+          : (_, _) {
+              if (mounted) setState(() => _failedUrl = url);
+            },
+      child: url == null ? Icon(Icons.person, size: widget.radius) : null,
     );
   }
 }
@@ -4099,14 +4186,19 @@ import 'subject_characters_sheet.dart';
 /// 中栏的「角色」横向头像行：头像 + 角色名 + 声优名。
 ///
 /// 加载中时渲染带标题的外框 + 一个小 spinner（不是整块隐藏），这样数据到
-/// 位时页面不会跳动 —— 见设计文档「加载/错误/空态」一节。失败和空列表都
-/// 整块静默隐藏：角色不是详情页的主线信息，缺了不该显示报错。
+/// 位时页面不会跳动 —— 见设计文档
+/// `2026-09-12-subject-detail-three-column-layout-design.md` 的
+/// 「加载 / 错误 / 空态」一节。失败和空列表都整块静默隐藏：角色不是详情页
+/// 的主线信息，缺了不该显示报错。
 class SubjectCharacterRow extends ConsumerWidget {
   const SubjectCharacterRow({super.key, required this.subjectId});
 
   /// 行内最多显示多少个角色，其余交给「查看全部」sheet。
-  /// 估算值：参考应用一屏显示 8 个，这里给到 12 留一点横向滚动余量；
-  /// 全量渲染不可行（BLEACH 千年血战篇有 104 个角色）。
+  ///
+  /// 12 是本计划引入的估算值：设计文档的「已知的估算项」一节里没有它，别处
+  /// 也没有规定这个数，所以调它不需要改设计文档。全量渲染不可行 —— 设计文档
+  /// 「后端接口实测结果」一节记录 subject 302286 的 characters 接口返回
+  /// 104 项。
   static const int maxVisible = 12;
 
   final int subjectId;
@@ -4175,10 +4267,7 @@ class SubjectCharacterRow extends ConsumerWidget {
               Text('角色', style: theme.textTheme.titleSmall),
               const Spacer(),
               if (onSeeAll != null)
-                TextButton(
-                  onPressed: onSeeAll,
-                  child: const Text('查看全部 ›'),
-                ),
+                TextButton(onPressed: onSeeAll, child: const Text('查看全部 ›')),
             ],
           ),
           const SizedBox(height: 8),
@@ -4231,7 +4320,7 @@ class _CharacterCell extends StatelessWidget {
 - [ ] **Step 6: 运行测试确认通过**
 
 Run: `flutter test test/ui/subject/subject_character_row_test.dart`
-Expected: PASS，8 个测试全绿。
+Expected: PASS，10 个测试全绿。
 
 - [ ] **Step 7: 提交**
 
