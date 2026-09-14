@@ -6,10 +6,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/subject/subject_episode_models.dart';
 import '../../domain/play/episode_source_matcher.dart';
 import '../../domain/play/subject_episodes_controller.dart';
+import 'subject_meta_text.dart' show formatEpisodeNumber;
 
-/// Compact grid of episode-number buttons (01/02/03/...), replacing the old
-/// single "开始观看" button. Tapping a number opens a per-episode
-/// source-selection sheet (see `EpisodePlaybackSheet`).
+/// Compact grid of episode-number buttons (01/02/03/...). Tapping a number
+/// opens a per-episode source-selection sheet (see `EpisodePlaybackSheet`).
+///
+/// Renders no section header and no page-level padding of its own: the
+/// enclosing `SubjectEpisodesSection` owns the 「选集」 header row and the
+/// page's left/right gutter comes from `pagePadding`.
 ///
 /// Each button's visual state depends on the *scraper* episode list
 /// ([mergedEpisodesAsync]), matched positionally via [EpisodeSourceIndex]:
@@ -91,13 +95,9 @@ class _EpisodeNumberGridState extends State<EpisodeNumberGrid> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-          child: Text('剧集', style: Theme.of(context).textTheme.titleSmall),
-        ),
         if (_chunkCount > 1)
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            padding: const EdgeInsets.only(bottom: 8),
             child: Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -111,27 +111,24 @@ class _EpisodeNumberGridState extends State<EpisodeNumberGrid> {
               ],
             ),
           ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (var i = start; i < end; i++)
-                _EpisodeNumberButton(
-                  episode: widget.episodes[i],
-                  // sourceIndex == null means either the scraper fetch is
-                  // still in flight (neutral state, not yet has/no-source)
-                  // or it settled with an error and no source will ever be
-                  // found (dimmed, same as an empty match) -- see
-                  // isStillLoading above.
-                  hasSource: sourceIndex == null
-                      ? (isStillLoading ? null : false)
-                      : sourceIndex.matchesAt(i).isNotEmpty,
-                  onTap: () => widget.onEpisodeTap(i, widget.episodes[i]),
-                ),
-            ],
-          ),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (var i = start; i < end; i++)
+              _EpisodeNumberButton(
+                episode: widget.episodes[i],
+                // sourceIndex == null means either the scraper fetch is
+                // still in flight (neutral state, not yet has/no-source)
+                // or it settled with an error and no source will ever be
+                // found (dimmed, same as an empty match) -- see
+                // isStillLoading above.
+                hasSource: sourceIndex == null
+                    ? (isStillLoading ? null : false)
+                    : sourceIndex.matchesAt(i).isNotEmpty,
+                onTap: () => widget.onEpisodeTap(i, widget.episodes[i]),
+              ),
+          ],
         ),
       ],
     );
@@ -167,7 +164,16 @@ class _EpisodeNumberButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final numberLabel = Text(episode.sort.round().toString().padLeft(2, '0'));
+    // A half-episode sort (e.g. 1.5) must never round to the same 2-digit
+    // label as a neighboring integer sort (e.g. 2 -> "02") -- that would be
+    // an unresolvable visual collision between two distinct episodes. The
+    // two branches below are provably collision-free: every non-integer
+    // output contains a literal '.' (from formatEpisodeNumber), and every
+    // integer-branch output is exactly 2 digits with no '.'.
+    final numberText = episode.sort % 1 == 0
+        ? episode.sort.toInt().toString().padLeft(2, '0')
+        : formatEpisodeNumber(episode.sort);
+    final numberLabel = Text(numberText);
     final title = episode.displayName;
     final Widget child = title.isEmpty
         ? numberLabel
