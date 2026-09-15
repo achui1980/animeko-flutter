@@ -11,9 +11,10 @@ import '../../domain/subject/subject_collection_controller.dart';
 /// [PopupMenuButton]，列出其余四个状态和「移除」。
 ///
 /// 取代改版前平铺的 5 个 [ChoiceChip]（旧 `_CollectionButtons`，
-/// `subject_detail_screen.dart`）——真正的替换是后面的任务，目前那些
-/// `ChoiceChip` 仍是 app 里唯一渲染的收藏控件，`lib/` 里还没有任何地方构造
-/// 本控件。它归属左栏那一列纵向按钮（design doc
+/// `subject_detail_screen.dart`）——Task 23 已经把那些 `ChoiceChip` 删掉，
+/// 本控件现在是详情页（subject detail page）上唯一渲染的收藏控件；
+/// `lib/ui/collection/my_collection_screen.dart` 里的 `_StatusMenuButton`
+/// 是收藏列表页另一个独立的收藏控件，不受这里影响。它归属左栏那一列纵向按钮（design doc
 /// `2026-09-12-subject-detail-three-column-layout-design.md` 247/252 行，
 /// 行为约定见 272-279 行）。
 ///
