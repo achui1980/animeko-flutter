@@ -46,9 +46,15 @@ class SubjectCollectionStats extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
-        _StatItem(value: favorite.done, label: '收藏'),
-        _StatItem(value: favorite.doing, label: '在看'),
-        _StatItem(value: favorite.wish, label: '想看'),
+        Expanded(
+          child: _StatItem(value: favorite.done, label: '收藏'),
+        ),
+        Expanded(
+          child: _StatItem(value: favorite.doing, label: '在看'),
+        ),
+        Expanded(
+          child: _StatItem(value: favorite.wish, label: '想看'),
+        ),
       ],
     );
   }
