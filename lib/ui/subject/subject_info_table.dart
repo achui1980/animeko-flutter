@@ -21,9 +21,7 @@ import 'subject_tags_row.dart';
 ///
 /// 三行全都拿不到、且没有标签时整块隐藏（不显示一个空的「作品信息」标题）。
 ///
-/// 目标位置是 `subject_detail_left_pane.dart` 里「封面 / 继续观看 / 追番 /
-/// 收藏统计 / 作品信息」的纵向组合（设计文档「UI 结构设计」一节的文件职责
-/// 表），那个 pane 是后面的任务，所以目前还没有任何地方构造这个 widget。
+/// Used by `SubjectDetailLeftPane` and `SubjectDetailScreen`'s narrow layout.
 class SubjectInfoTable extends StatelessWidget {
   const SubjectInfoTable({super.key, required this.subject});
 

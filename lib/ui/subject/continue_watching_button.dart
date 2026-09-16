@@ -13,9 +13,9 @@ import 'subject_meta_text.dart';
 /// otherwise 「开始观看」, which targets the main-episode list's first
 /// entry (design doc
 /// `2026-09-12-subject-detail-three-column-layout-design.md` lines
-/// 234-235). Destined for the left column's top button stack (design doc
-/// lines 247/251) -- that pane is a later task, so nothing constructs
-/// this widget yet.
+/// 234-235). Sits in the left column's top button stack (design doc
+/// lines 247/251), constructed by `SubjectDetailLeftPane` and by
+/// `SubjectDetailScreen`'s narrow layout.
 ///
 /// Which of the two labels shows is decided by comparing the episode
 /// [continueWatchingProvider] resolved to against the id in
@@ -28,9 +28,8 @@ import 'subject_meta_text.dart';
 /// null on an error, exactly like the nothing-stored case.
 ///
 /// Tapping opens the same [EpisodePlaybackSheet] that tapping a number in
-/// the 选集 grid opens (today from `SubjectDetailScreen`'s
-/// `EpisodeNumberGrid.onEpisodeTap` handler; that screen gets rewritten
-/// later in this plan), with the same `ordinalIndex` contract -- the
+/// the 选集 grid opens (via `EpisodeNumberGrid.onEpisodeTap` in
+/// `SubjectEpisodesSection`), with the same `ordinalIndex` contract -- the
 /// episode's position in the full main-episode list, which is what
 /// playback-source matching keys on (`EpisodeSourceIndex.matchesAt`). So
 /// this button adds no second source-picking path of its own.

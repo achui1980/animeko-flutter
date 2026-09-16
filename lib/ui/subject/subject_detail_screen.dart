@@ -19,7 +19,7 @@ import 'subject_title_block.dart';
 
 /// The subject detail page.
 ///
-/// This widget owns ONLY three things:
+/// This widget owns three things:
 ///
 /// 1. the `Scaffold` and a deliberately title-less `AppBar` (the title now
 ///    lives in the middle column, so repeating it in the bar wastes a row
@@ -30,8 +30,13 @@ import 'subject_title_block.dart';
 /// 3. the wide-vs-narrow layout branch at
 ///    [subjectDetailThreeColumnBreakpoint].
 ///
-/// All section content lives in the pane widgets and the leaf widgets they
-/// compose. Do not add section markup here.
+/// The wide branch delegates all section content to the pane widgets and
+/// the leaf widgets they compose -- do not add section markup there. The
+/// narrow branch (`_narrow`) is the one exception: it re-arranges the same
+/// leaf widgets (`SubjectCover`, `SubjectTitleBlock`,
+/// `ContinueWatchingButton`, `SubjectCollectionActionButton`,
+/// `SubjectCollectionStats`, `SubjectInfoTable`) directly, since the
+/// narrow layout's ordering differs from `SubjectDetailLeftPane`'s.
 ///
 /// [imageUrl] arrives as a route query parameter because no subject
 /// endpoint returns a cover image (verified against the backend).
