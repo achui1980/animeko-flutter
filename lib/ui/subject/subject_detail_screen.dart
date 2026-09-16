@@ -7,12 +7,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/subject/collection_type.dart';
 import '../../data/subject/subject_models.dart';
 import '../../domain/play/subject_episodes_controller.dart';
-import '../../domain/subject/subject_bangumi_episodes_controller.dart';
+import '../../domain/subject/subject_main_episodes_controller.dart';
 import '../../domain/subject/subject_collection_controller.dart';
 import '../../domain/subject/subject_detail_controller.dart';
 import '../common/error_retry_view.dart';
 import '../common/rating_stars.dart';
-import 'bangumi_episode_grid.dart';
+import 'episode_number_grid.dart';
 import 'episode_playback_sheet.dart';
 import 'expandable_summary.dart';
 import 'subject_blurred_header.dart';
@@ -50,7 +50,7 @@ class SubjectDetailScreen extends ConsumerWidget {
                     children: [
                       _WorkInfoSection(subjectId: subjectId),
                       _SubjectInfoSection(subjectId: subjectId),
-                      _BangumiEpisodesSection(
+                      _EpisodesSection(
                         subjectId: subjectId,
                         subjectName: subjectName,
                       ),
@@ -83,21 +83,23 @@ class SubjectDetailScreen extends ConsumerWidget {
 /// before [_SubjectInfoSection] (design doc Section 1). Tapping a
 /// number opens [EpisodePlaybackSheet] for that one episode -- see
 /// Section 3.
-class _BangumiEpisodesSection extends ConsumerWidget {
-  const _BangumiEpisodesSection({
-    required this.subjectId,
-    required this.subjectName,
-  });
+class _EpisodesSection extends ConsumerWidget {
+  const _EpisodesSection({required this.subjectId, required this.subjectName});
 
   final int subjectId;
   final String subjectName;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final bangumiProvider = subjectBangumiEpisodesControllerProvider(
+    // Derived from subjectDetailControllerProvider (the episode data is
+    // embedded in the same /v2/subjects/{id} response), so this section now
+    // shares the detail request's failure domain instead of making its own
+    // proxy-requiring call to api.bgm.tv -- see
+    // SubjectMainEpisodesController.
+    final episodesProvider = subjectMainEpisodesControllerProvider(
       subjectId: subjectId,
     );
-    final bangumiEpisodes = ref.watch(bangumiProvider);
+    final mainEpisodes = ref.watch(episodesProvider);
     final mergedEpisodesAsync = ref.watch(
       subjectEpisodesControllerProvider(
         subjectId: subjectId,
@@ -105,18 +107,22 @@ class _BangumiEpisodesSection extends ConsumerWidget {
       ),
     );
 
-    return bangumiEpisodes.when(
+    return mainEpisodes.when(
       loading: () => const Padding(
         padding: EdgeInsets.all(24),
         child: Center(child: CircularProgressIndicator()),
       ),
       error: (error, stack) => ErrorRetryView(
         message: '加载剧集列表失败：$error',
-        onRetry: () => ref.invalidate(bangumiProvider),
+        // Invalidating the derived provider alone would just re-read the
+        // cached (failed) detail request, so refresh the source.
+        onRetry: () => ref.invalidate(
+          subjectDetailControllerProvider(subjectId: subjectId),
+        ),
       ),
       data: (episodes) {
         if (episodes.isEmpty) return const SizedBox.shrink();
-        return BangumiEpisodeGrid(
+        return EpisodeNumberGrid(
           episodes: episodes,
           mergedEpisodesAsync: mergedEpisodesAsync,
           onEpisodeTap: (ordinalIndex, episode) => showModalBottomSheet(
@@ -125,7 +131,7 @@ class _BangumiEpisodesSection extends ConsumerWidget {
               subjectId: subjectId,
               subjectName: subjectName,
               ordinalIndex: ordinalIndex,
-              bangumiEpisode: episode,
+              episode: episode,
             ),
           ),
         );

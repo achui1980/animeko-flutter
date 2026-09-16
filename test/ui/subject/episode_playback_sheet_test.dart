@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:animeko_flutter/data/subject/bangumi_episode_models.dart';
+import 'package:animeko_flutter/data/subject/subject_episode_models.dart';
 import 'package:animeko_flutter/domain/media/media_registry.dart';
 import 'package:animeko_flutter/domain/media/media_source.dart';
 import 'package:animeko_flutter/ui/subject/episode_playback_sheet.dart';
@@ -33,13 +33,14 @@ void main() {
     registerFallbackValue(const _FakeCandidate('fallback', 'fallback'));
   });
 
-  const bangumiEpisode = BangumiEpisode(
-    id: 1,
+  const episode = SubjectEpisode(
+    episodeId: 1,
     sort: 1,
+    ep: '1',
+    type: 'MAIN',
     name: 'EN',
     nameCn: '第1集',
     airdate: '2023-09-29',
-    type: 0,
   );
 
   Widget wrap(Widget child, {required List<Override> overrides}) {
@@ -68,7 +69,7 @@ void main() {
             subjectId: 1,
             subjectName: '目标番剧',
             ordinalIndex: 0,
-            bangumiEpisode: bangumiEpisode,
+            episode: episode,
           ),
           overrides: [
             mediaSourcesProvider.overrideWithValue([source]),
@@ -96,7 +97,7 @@ void main() {
           subjectId: 1,
           subjectName: '目标番剧',
           ordinalIndex: 0,
-          bangumiEpisode: bangumiEpisode,
+          episode: episode,
         ),
         overrides: [
           mediaSourcesProvider.overrideWithValue([source]),
@@ -127,7 +128,7 @@ void main() {
           subjectId: 1,
           subjectName: '目标番剧',
           ordinalIndex: 0,
-          bangumiEpisode: bangumiEpisode,
+          episode: episode,
         ),
         overrides: [
           mediaSourcesProvider.overrideWithValue([source]),

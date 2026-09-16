@@ -141,6 +141,28 @@ void main() {
       expect(detail.scoreDetails, isNull);
     });
 
+    test('parses the embedded episodes array into SubjectEpisode models', () {
+      final json = baseJson()
+        ..['episodes'] = [
+          {'episodeId': 1, 'type': 'MAIN', 'sort': '1', 'nameCn': '第一话'},
+          {'episodeId': 3, 'type': 'OP', 'sort': '1'},
+        ];
+
+      final detail = SubjectDetail.fromJson(json);
+
+      expect(detail.episodes, hasLength(2));
+      expect(detail.episodes![0].episodeId, 1);
+      expect(detail.episodes![0].sort, 1);
+      expect(detail.episodes![0].displayName, '第一话');
+      expect(detail.episodes![0].isMain, isTrue);
+      expect(detail.episodes![1].isMain, isFalse);
+    });
+
+    test('episodes is null when absent from JSON', () {
+      final detail = SubjectDetail.fromJson(baseJson());
+      expect(detail.episodes, isNull);
+    });
+
     test('counts only MAIN-type entries in the embedded episodes array', () {
       final json = baseJson()
         ..['episodes'] = [
@@ -157,6 +179,14 @@ void main() {
     test('episodeCount is null when episodes is absent from JSON', () {
       final detail = SubjectDetail.fromJson(baseJson());
       expect(detail.episodeCount, isNull);
+    });
+
+    // Distinct from the null case above: an *empty* array means "we know
+    // there are no episodes", which must render as 话数：0 rather than
+    // silently omitting the line the way a null does.
+    test('episodeCount is 0 when the episodes array is present but empty', () {
+      final detail = SubjectDetail.fromJson(baseJson()..['episodes'] = []);
+      expect(detail.episodeCount, 0);
     });
   });
 
