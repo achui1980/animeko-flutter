@@ -263,4 +263,33 @@ void main() {
       expect(find.byType(ChoiceChip), findsNothing);
     });
   });
+
+  testWidgets('a half-episode sort (1.5) does not collide with a neighboring '
+      'integer sort (2) -- both render distinguishably', (tester) async {
+    final half = SubjectEpisode(
+      episodeId: 100,
+      sort: 1.5,
+      ep: '1.5',
+      type: 'MAIN',
+      name: 'E1.5',
+      nameCn: '',
+      airdate: '',
+    );
+
+    await tester.pumpWidget(grid([half, ep(2)]));
+
+    // The half-episode keeps its fractional label (not rounded away),
+    // and the integer-sort episode keeps its normal 2-digit label --
+    // the old `.round().toString().padLeft(2, '0')` collapsed both to
+    // "02", making them visually indistinguishable.
+    expect(find.text('1.5'), findsOneWidget);
+    expect(find.text('02'), findsOneWidget);
+    // The private _EpisodeNumberButton type blocks widget-type-scoped
+    // finders, so assert the total button count rather than trying to
+    // disambiguate "the sort:2 button" from "the sort:1.5 button" by type.
+    expect(
+      find.byWidgetPredicate((w) => w is FilledButton || w is OutlinedButton),
+      findsNWidgets(2),
+    );
+  });
 }

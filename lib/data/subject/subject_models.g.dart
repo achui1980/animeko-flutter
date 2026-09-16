@@ -21,6 +21,55 @@ Map<String, dynamic> _$SelfRatingToJson(SelfRating instance) =>
       'comment': instance.comment,
     };
 
+SubjectFavorite _$SubjectFavoriteFromJson(Map<String, dynamic> json) =>
+    SubjectFavorite(
+      wish: (json['wish'] as num?)?.toInt() ?? 0,
+      done: (json['done'] as num?)?.toInt() ?? 0,
+      doing: (json['doing'] as num?)?.toInt() ?? 0,
+      onHold: (json['onHold'] as num?)?.toInt() ?? 0,
+      dropped: (json['dropped'] as num?)?.toInt() ?? 0,
+    );
+
+Map<String, dynamic> _$SubjectFavoriteToJson(SubjectFavorite instance) =>
+    <String, dynamic>{
+      'wish': instance.wish,
+      'done': instance.done,
+      'doing': instance.doing,
+      'onHold': instance.onHold,
+      'dropped': instance.dropped,
+    };
+
+InfoboxValue _$InfoboxValueFromJson(Map<String, dynamic> json) =>
+    InfoboxValue(k: json['k'] as String?, v: json['v'] as String? ?? '');
+
+Map<String, dynamic> _$InfoboxValueToJson(InfoboxValue instance) =>
+    <String, dynamic>{'k': instance.k, 'v': instance.v};
+
+InfoboxField _$InfoboxFieldFromJson(Map<String, dynamic> json) => InfoboxField(
+  key: json['key'] as String,
+  values:
+      (json['values'] as List<dynamic>?)
+          ?.map((e) => InfoboxValue.fromJson(e as Map<String, dynamic>))
+          .toList() ??
+      [],
+);
+
+Map<String, dynamic> _$InfoboxFieldToJson(InfoboxField instance) =>
+    <String, dynamic>{'key': instance.key, 'values': instance.values};
+
+SubjectInfobox _$SubjectInfoboxFromJson(Map<String, dynamic> json) =>
+    SubjectInfobox(
+      template: json['template'] as String?,
+      fields:
+          (json['fields'] as List<dynamic>?)
+              ?.map((e) => InfoboxField.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
+    );
+
+Map<String, dynamic> _$SubjectInfoboxToJson(SubjectInfobox instance) =>
+    <String, dynamic>{'template': instance.template, 'fields': instance.fields};
+
 SubjectDetail _$SubjectDetailFromJson(
   Map<String, dynamic> json,
 ) => SubjectDetail(
@@ -44,6 +93,12 @@ SubjectDetail _$SubjectDetailFromJson(
   scoreDetails: (json['scoreDetails'] as Map<String, dynamic>?)?.map(
     (k, e) => MapEntry(k, (e as num).toInt()),
   ),
+  favorite: json['favorite'] == null
+      ? null
+      : SubjectFavorite.fromJson(json['favorite'] as Map<String, dynamic>),
+  infobox: json['infobox'] == null
+      ? null
+      : SubjectInfobox.fromJson(json['infobox'] as Map<String, dynamic>),
   episodes: (json['episodes'] as List<dynamic>?)
       ?.map((e) => SubjectEpisode.fromJson(e as Map<String, dynamic>))
       .toList(),
@@ -63,17 +118,55 @@ Map<String, dynamic> _$SubjectDetailToJson(SubjectDetail instance) =>
       'collectionType': collectionTypeToWireNullable(instance.collectionType),
       'selfRating': instance.selfRating,
       'scoreDetails': instance.scoreDetails,
+      'favorite': instance.favorite,
+      'infobox': instance.infobox,
       'episodes': instance.episodes,
+    };
+
+PersonInfo _$PersonInfoFromJson(Map<String, dynamic> json) => PersonInfo(
+  id: (json['id'] as num).toInt(),
+  name: json['name'] as String,
+  nameCn: json['nameCn'] as String?,
+  type: (json['type'] as num?)?.toInt(),
+  imageMedium: json['imageMedium'] as String?,
+  imageLarge: json['imageLarge'] as String?,
+  summary: json['summary'] as String?,
+);
+
+Map<String, dynamic> _$PersonInfoToJson(PersonInfo instance) =>
+    <String, dynamic>{
+      'id': instance.id,
+      'name': instance.name,
+      'nameCn': instance.nameCn,
+      'type': instance.type,
+      'imageMedium': instance.imageMedium,
+      'imageLarge': instance.imageLarge,
+      'summary': instance.summary,
     };
 
 CharacterInfo _$CharacterInfoFromJson(Map<String, dynamic> json) =>
     CharacterInfo(
+      id: (json['id'] as num).toInt(),
       name: json['name'] as String,
-      imageUrl: json['imageUrl'] as String?,
+      nameCn: json['nameCn'] as String?,
+      imageMedium: json['imageMedium'] as String?,
+      imageLarge: json['imageLarge'] as String?,
+      actors:
+          (json['actors'] as List<dynamic>?)
+              ?.map((e) => PersonInfo.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
     );
 
 Map<String, dynamic> _$CharacterInfoToJson(CharacterInfo instance) =>
-    <String, dynamic>{'name': instance.name, 'imageUrl': instance.imageUrl};
+    <String, dynamic>{
+      'id': instance.id,
+      'name': instance.name,
+      'nameCn': instance.nameCn,
+      'imageMedium': instance.imageMedium,
+      'imageLarge': instance.imageLarge,
+      'actors': instance.actors,
+    };
 
 RelatedCharacter _$RelatedCharacterFromJson(Map<String, dynamic> json) =>
     RelatedCharacter(
@@ -88,19 +181,6 @@ Map<String, dynamic> _$RelatedCharacterToJson(RelatedCharacter instance) =>
     <String, dynamic>{
       'index': instance.index,
       'character': instance.character,
-      'role': instance.role,
-    };
-
-StaffMember _$StaffMemberFromJson(Map<String, dynamic> json) => StaffMember(
-  name: json['name'] as String,
-  imageUrl: json['imageUrl'] as String?,
-  role: json['role'] as String?,
-);
-
-Map<String, dynamic> _$StaffMemberToJson(StaffMember instance) =>
-    <String, dynamic>{
-      'name': instance.name,
-      'imageUrl': instance.imageUrl,
       'role': instance.role,
     };
 

@@ -3,6 +3,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../api_client.dart';
 import 'collection_type.dart';
+import 'review_models.dart';
 import 'subject_models.dart';
 
 part 'subject_api.g.dart';
@@ -47,33 +48,25 @@ class SubjectApi {
     await _dio.delete<void>('/v2/subjects/$subjectId');
   }
 
-  /// GET /v2/subjects/{subjectId}/characters?withActors=true -- always
-  /// requested with voice-actor info included (the UI's cast row shows
-  /// both). Response wrapped in an `items` envelope, matching every
-  /// other list endpoint in this codebase.
+  /// Characters (cast). Always requested with `withActors=true` so the
+  /// UI can show each character's voice actor.
+  ///
+  /// The endpoint returns a BARE JSON ARRAY, not an `{items: [...]}`
+  /// envelope -- an earlier version of this method declared
+  /// `get<Map<String, dynamic>>` and read `data['items']`, which threw
+  /// on every single call. The `data is List` branch below is
+  /// defensive in case the backend ever adds an envelope.
   Future<List<RelatedCharacter>> getCharacters(int subjectId) async {
-    final response = await _dio.get<Map<String, dynamic>>(
+    final response = await _dio.get<dynamic>(
       '/v2/subjects/$subjectId/characters',
       queryParameters: {'withActors': true},
     );
-    final items = response.data!['items'] as List<dynamic>;
+    final data = response.data;
+    final items = data is List<dynamic>
+        ? data
+        : (data as Map<String, dynamic>)['items'] as List<dynamic>;
     return items
-        .map((e) => RelatedCharacter.fromJson(e as Map<String, dynamic>))
-        .toList();
-  }
-
-  /// GET /v2/subjects/{subjectId}/staff.
-  ///
-  /// NOTE: `StaffMember`'s wire shape is an unconfirmed best guess (see
-  /// the plan's Global Constraints and `StaffMember`'s own doc comment
-  /// in `subject_models.dart`).
-  Future<List<StaffMember>> getStaff(int subjectId) async {
-    final response = await _dio.get<Map<String, dynamic>>(
-      '/v2/subjects/$subjectId/staff',
-    );
-    final items = response.data!['items'] as List<dynamic>;
-    return items
-        .map((e) => StaffMember.fromJson(e as Map<String, dynamic>))
+        .map((item) => RelatedCharacter.fromJson(item as Map<String, dynamic>))
         .toList();
   }
 
@@ -95,6 +88,25 @@ class SubjectApi {
       },
     );
     return PaginatedCollections.fromJson(response.data!);
+  }
+
+  /// Other users' reviews (热门评价) for a subject. Ordering is whatever
+  /// the backend returns -- it has not been verified, so don't rely on
+  /// it being newest-first or most-liked-first.
+  ///
+  /// The response's `total` is a `limit + 1` sentinel, not a real count
+  /// -- see [PaginatedReviews]. Both [offset] and [limit] are required:
+  /// the backend defaults `limit` to 30, but callers own their page size.
+  Future<PaginatedReviews> getReviews({
+    required int subjectId,
+    required int offset,
+    required int limit,
+  }) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/v2/subjects/$subjectId/reviews',
+      queryParameters: {'offset': offset, 'limit': limit},
+    );
+    return PaginatedReviews.fromJson(response.data!);
   }
 }
 

@@ -22,6 +22,8 @@
 
 2. **Riverpod 是 3.x**，不是 2.x。写新 provider 前先看 `lib/domain/subject/subject_detail_controller.dart` 里的现成写法（`@riverpod class Foo extends _$Foo`，函数式 provider 第一个参数类型是 `Ref`，不是 `FooRef`）。
 
+   ⚠️ **Riverpod 3 里 `AsyncValue` 没有 `valueOrNull`**，只有可空的 `value`（`riverpod-3.2.1/lib/src/core/async_value.dart`：`ValueT? get value => _value?.$1;`）。2.x 的 `value` 会在 error 态抛异常、要用 `valueOrNull` 规避——3.x 已经把 `value` 本身改成可空，`valueOrNull` 整个被删掉了。本文档里凡是读「有值就用、没值就退化」的地方统一写 `.value`。
+
 3. **测试的 import 前缀是 `package:animeko_flutter/`。**
 
 4. **验收门：** `flutter analyze` 不能有 error（info 是历史遗留，可以有），`flutter test` 必须全绿。每个 Task 结束都要跑。
@@ -29,6 +31,8 @@
 5. **提交风格：** Conventional Commits 带 scope，例如 `fix(subject): ...`、`feat(subject): ...`、`refactor(subject): ...`。
 
 6. **不要在 `lib/domain/` 里 import `package:flutter`。** 只有两个历史例外文件，不要拿它们当先例。
+
+   ⚠️ **次要文字用 `theme.colorScheme.onSurfaceVariant`，不要用 `theme.hintColor`。** 本 App 是 `useMaterial3: true` + `ColorScheme.fromSeed`（`lib/app/theme/app_theme.dart:17-28`），而 `ThemeData` 把 `hintColor` 默认成与 ColorScheme 无关的固定灰（`theme_data.dart:487`：`isDark ? Colors.white60 : Colors.black.withOpacity(0.6)`），且本仓库没有覆写它——用 `hintColor` 的文字不会跟着用户的 seed 色调走，周围的文字却会。仓库现状也是 `colorScheme` 为主（29 处引用，`hintColor` 只有 1 处历史用法，就在本轮要拆掉的 `subject_detail_screen.dart` 里）。
 
 7. **接口返回的真实形状已经实测过**，写在设计文档的「后端接口实测结果」一节。不要凭猜测改模型。特别注意：
    - `/v2/subjects/{id}/characters` 返回**裸 JSON 数组**，没有 `items` 外层。
@@ -1711,7 +1715,7 @@ Expected: 生成 `lib/domain/subject/continue_watching_controller.g.dart`。
 - [ ] **Step 5: 跑测试确认通过**
 
 Run: `flutter test test/domain/subject/continue_watching_controller_test.dart`
-Expected: 4 个用例全 PASS。
+Expected: 6 个用例全 PASS。
 
 - [ ] **Step 6: 静态分析 + 全量测试**
 
@@ -1770,12 +1774,17 @@ void main() {
 
   final provider = subjectReviewsControllerProvider(subjectId: 1);
 
+  // Builds a page the way the backend does: `total` is a has-more sentinel
+  // that exceeds the returned row count exactly when more rows exist. (The
+  // real backend returns `limit + 1`; scaled down here so the fixtures stay
+  // short -- see `PaginatedReviews`'s class doc.)
+  PaginatedReviews page(List<SubjectReview> items, {required bool more}) =>
+      PaginatedReviews(total: items.length + (more ? 1 : 0), items: items);
+
   test('loads the first page with offset 0', () async {
     when(
       () => api.getReviews(subjectId: 1, offset: 0, limit: 20),
-    ).thenAnswer(
-      (_) async => PaginatedReviews(total: 21, items: [review('a'), review('b')]),
-    );
+    ).thenAnswer((_) async => page([review('a'), review('b')], more: true));
 
     final result = await container.read(provider.future);
 
@@ -1787,12 +1796,10 @@ void main() {
   test('loadMore appends the next page and advances the offset', () async {
     when(
       () => api.getReviews(subjectId: 1, offset: 0, limit: 20),
-    ).thenAnswer(
-      (_) async => PaginatedReviews(total: 21, items: [review('a'), review('b')]),
-    );
+    ).thenAnswer((_) async => page([review('a'), review('b')], more: true));
     when(
       () => api.getReviews(subjectId: 1, offset: 2, limit: 20),
-    ).thenAnswer((_) async => PaginatedReviews(total: 2, items: [review('c')]));
+    ).thenAnswer((_) async => page([review('c')], more: false));
 
     await container.read(provider.future);
     await container.read(provider.notifier).loadMore();
@@ -1802,16 +1809,52 @@ void main() {
     expect(result.hasMore, isFalse);
   });
 
+  // The regression test this whole task exists for. If the controller kept
+  // an accumulated `PaginatedReviews` and let its `hasMore` getter
+  // recompute, page 2's sentinel of 3 would be compared against the 4
+  // accumulated rows, `hasMore` would silently flip to false, and every
+  // row after page 2 would be unreachable. `hasMore` must come from the
+  // freshly fetched page alone.
+  test('keeps hasMore true when a full second page still has more', () async {
+    when(
+      () => api.getReviews(subjectId: 1, offset: 0, limit: 20),
+    ).thenAnswer((_) async => page([review('a'), review('b')], more: true));
+    when(
+      () => api.getReviews(subjectId: 1, offset: 2, limit: 20),
+    ).thenAnswer((_) async => page([review('c'), review('d')], more: true));
+
+    await container.read(provider.future);
+    await container.read(provider.notifier).loadMore();
+
+    final result = container.read(provider).requireValue;
+    expect(result.items.map((e) => e.id), ['a', 'b', 'c', 'd']);
+    expect(result.hasMore, isTrue);
+  });
+
   test('loadMore is a no-op once hasMore is false', () async {
     when(
       () => api.getReviews(subjectId: 1, offset: 0, limit: 20),
-    ).thenAnswer((_) async => PaginatedReviews(total: 1, items: [review('a')]));
+    ).thenAnswer((_) async => page([review('a')], more: false));
 
     await container.read(provider.future);
     await container.read(provider.notifier).loadMore();
 
     verifyNever(() => api.getReviews(subjectId: 1, offset: 1, limit: 20));
     expect(container.read(provider).requireValue.items.length, 1);
+  });
+
+  test('loadMore is a no-op when the first page failed', () async {
+    when(
+      () => api.getReviews(subjectId: 1, offset: 0, limit: 20),
+    ).thenThrow(Exception('network error'));
+
+    await expectLater(
+      container.read(provider.future),
+      throwsA(isA<Exception>()),
+    );
+    await container.read(provider.notifier).loadMore();
+
+    verifyNever(() => api.getReviews(subjectId: 1, offset: 1, limit: 20));
   });
 
   test('propagates a first-page failure', () async {
@@ -1824,7 +1867,7 @@ void main() {
 }
 ```
 
-第二个用例里第二页返回 `total: 2, items: [c]` —— `2 > 1` 为真，所以**那一页自己**的 `hasMore` 是 true；但累积后的列表有 3 条，`total` 取新页的 2，`2 > 3` 为假，于是整体 `hasMore` 变 false。这正是我们想要的行为：`total` 只是「还有没有下一页」的哨兵，累积后必须重新比对累积长度。实现里因此保留新页的 `total` 而不是相加。
+关键约束：控制器的累积状态是**新类 `SubjectReviewsPage`（`items` + `hasMore`）**，不是累积起来的 `PaginatedReviews`。`PaginatedReviews.hasMore` 是 `total > items.length`，而 `total` 是**单次请求**的 `limit + 1` 哨兵，只对「原样从 `getReviews` 拿到的那一页」成立。一旦把多页拼起来再拿它比对累积长度，`hasMore` 会无声变 false：`pageSize` 20、条目有 100 条评价时，第二页返回 `total: 21`，此时累积 40 条，`21 > 40` 为假，加载更多就停在 40 条，剩下 60 条永远取不到，而且没有任何报错。所以 `hasMore` 必须**只**取自刚拉到的那一页（`next.hasMore`）。`MyCollectionsPage`（`lib/domain/subject/my_collections_controller.dart:34`）把 `hasMore` 存成自己的字段，正是同一个原因。第三个用例（`keeps hasMore true when a full second page still has more`）就是专门锁这一点的回归测试。
 
 - [ ] **Step 2: 跑测试确认失败**
 
@@ -1844,8 +1887,33 @@ import '../../data/subject/subject_api.dart';
 
 part 'subject_reviews_controller.g.dart';
 
+/// The accumulated reviews the UI renders: every row fetched so far, plus
+/// whether another page exists after the last one fetched.
+///
+/// Deliberately NOT an accumulated [PaginatedReviews]. That class's
+/// `hasMore` is `total > items.length`, and `total` is a per-request
+/// has-more sentinel (`limit + 1`) that is only meaningful for a single
+/// page exactly as returned by `SubjectApi.getReviews`. Compare a page-2
+/// sentinel against an accumulated list and it silently goes false: with
+/// [SubjectReviewsController.pageSize] 20 on a subject that has 100
+/// reviews, page 2 reports `total: 21` while 40 rows have accumulated,
+/// `21 > 40` is false, and load-more stops at 40 -- stranding 60 rows with
+/// no error anywhere. So [hasMore] is stored, taken from the freshly
+/// fetched page alone. `MyCollectionsPage`
+/// (`lib/domain/subject/my_collections_controller.dart:34`) keeps a
+/// per-page `hasMore` field for the same reason.
+class SubjectReviewsPage {
+  const SubjectReviewsPage({required this.items, required this.hasMore});
+
+  /// Every review fetched so far, first page first.
+  final List<SubjectReview> items;
+
+  /// Whether another page exists after the last one fetched.
+  final bool hasMore;
+}
+
 /// Other users' short reviews (热门评价). Paginated by offset, accumulating
-/// into a single [PaginatedReviews] so the sheet can just render
+/// into a single [SubjectReviewsPage] so the sheet can just render
 /// `state.items`.
 ///
 /// The detail page's right-column card shows only the first few of these;
@@ -1860,16 +1928,17 @@ class SubjectReviewsController extends _$SubjectReviewsController {
   static const int pageSize = 20;
 
   @override
-  Future<PaginatedReviews> build({required int subjectId}) {
-    return ref
+  Future<SubjectReviewsPage> build({required int subjectId}) async {
+    final page = await ref
         .watch(subjectApiProvider)
         .getReviews(subjectId: subjectId, offset: 0, limit: pageSize);
+    return SubjectReviewsPage(items: page.items, hasMore: page.hasMore);
   }
 
   /// Fetches the next page and appends it. No-op while loading, on error,
-  /// or once [PaginatedReviews.hasMore] is false.
+  /// or once [SubjectReviewsPage.hasMore] is false.
   Future<void> loadMore() async {
-    final current = state.valueOrNull;
+    final current = state.value;
     if (current == null || !current.hasMore) return;
 
     final next = await ref.read(subjectApiProvider).getReviews(
@@ -1877,14 +1946,12 @@ class SubjectReviewsController extends _$SubjectReviewsController {
       offset: current.items.length,
       limit: pageSize,
     );
-    // Keep the NEW page's `total`: it is a `limit + 1` has-more sentinel,
-    // not a running count, so summing it would be meaningless. Comparing
-    // it against the accumulated item count is what makes `hasMore` flip
-    // to false on the last (short) page.
+    // `hasMore` comes from the freshly fetched page and is never
+    // recomputed against the accumulated list -- see [SubjectReviewsPage].
     state = AsyncData(
-      PaginatedReviews(
-        total: next.total,
+      SubjectReviewsPage(
         items: [...current.items, ...next.items],
+        hasMore: next.hasMore,
       ),
     );
   }
@@ -1899,7 +1966,7 @@ Expected: 生成 `lib/domain/subject/subject_reviews_controller.g.dart`。
 - [ ] **Step 5: 跑测试确认通过**
 
 Run: `flutter test test/domain/subject/subject_reviews_controller_test.dart`
-Expected: 4 个用例全 PASS。
+Expected: 6 个用例全 PASS。
 
 - [ ] **Step 6: 静态分析 + 全量测试**
 
@@ -1931,11 +1998,14 @@ git commit -m "feat(subject): add the paginated subject reviews controller"
 /// Width at/above which the subject detail page uses its three-column
 /// desktop layout; below it the same sections stack into one column.
 ///
-/// Chosen so the middle column still fits four 96dp episode buttons at
-/// the breakpoint itself: 1000 - 2*24 (page padding) - 200 (left) - 300
-/// (right) - 2*24 (gaps) = 428dp, and 4*96 + 3*8 = 408dp. Narrower than
-/// this and the episode grid would drop to three columns, which looks
-/// broken next to two fixed sidebars.
+/// At the breakpoint itself the middle column is `1000 - 2*24 (page
+/// padding) - 200 (left) - 300 (right) - 2*24 (gaps) = 404dp`, which fits
+/// three 96dp episode buttons (`3*96 + 2*8 = 304`). A fourth needs
+/// `4*96 + 3*8 = 408dp`, i.e. a window of 1004dp or wider -- so the
+/// bottom 4dp of the wide layout renders a three-wide episode grid.
+/// Accepted rather than moving the breakpoint to 1004: the design doc
+/// lists these widths under 「已知的估算项」, and a round 1000 is easier to
+/// reason about than a number derived from one grid's button size.
 ///
 /// Deliberately unrelated to [pagePadding]'s 600dp compact/wide
 /// breakpoint -- that one mirrors the reference app's `WindowSizeClass`,
@@ -2261,7 +2331,7 @@ String buildSubjectMetaLine({
 - [ ] **Step 4: 运行测试确认通过**
 
 Run: `flutter test test/ui/subject/subject_meta_text_test.dart`
-Expected: `All tests passed!`（18 个测试）
+Expected: `All tests passed!`（17 个测试）
 
 - [ ] **Step 5: 提交**
 
@@ -2473,7 +2543,7 @@ class SubjectTitleBlock extends StatelessWidget {
             child: SelectableText(
               subject.name,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.hintColor,
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
           ),
@@ -2483,7 +2553,7 @@ class SubjectTitleBlock extends StatelessWidget {
             child: Text(
               metaLine,
               style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.hintColor,
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
           ),
@@ -2677,13 +2747,13 @@ class ContinueWatchingButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final target = ref
         .watch(continueWatchingProvider(subjectId: subjectId))
-        .valueOrNull;
+        .value;
     if (target == null) return const SizedBox.shrink();
 
     final episodes =
         ref
             .watch(subjectMainEpisodesControllerProvider(subjectId: subjectId))
-            .valueOrNull ??
+            .value ??
         const [];
     final ordinalIndex = episodes.indexWhere(
       (episode) => episode.episodeId == target.episodeId,
@@ -2692,7 +2762,7 @@ class ContinueWatchingButton extends ConsumerWidget {
 
     final storedEpisodeId = ref
         .watch(lastPlayedEpisodeStorageProvider)
-        .valueOrNull
+        .value
         ?.get(subjectId);
     final resumed = storedEpisodeId == target.episodeId;
     final label = resumed
@@ -2739,6 +2809,10 @@ git commit -m "feat(subject): add continue-watching button for detail page left 
 
 `PopupMenuButton` 的泛型用 `CollectionType?`，`null` 表示「移除」——这样 `onSelected` 只有一个分支判断，不需要引入额外的 sealed class。
 
+> **修订记录（Task 14 实施后回填）**：`null` 只能作为该菜单项的 `value`，不能靠 `onSelected` 的 `null` 分支来分发。`PopupMenuButton` 会把 `null` 的返回值当成「菜单被取消」交给 `onCanceled` 并直接 return，根本不会调用 `onSelected`——见 Flutter 3.44.2 的 `packages/flutter/lib/src/material/popup_menu.dart:1715-1727`。所以「移除」改由它那一项自己的 `onTap` 触发（`PopupMenuItemState.handleTap` 在 `popup_menu.dart:399-404` 里先 `Navigator.pop` 再调 `onTap`）。**注意这条路径没有 mounted 兜底**：`onSelected` 那边 framework 自己有 `if (!mounted) return null;`（`popup_menu.dart:1716-1718`），`handleTap` 没有，而菜单项活在 Navigator 的 overlay route 里、比本控件活得久。正常路径下 `onTap` 触发时控件仍 mounted、`ScaffoldMessenger.of(context)` 照常可用；但菜单打开期间控件被卸载（窗口宽度跨过三栏断点导致 pane 重建）时不成立，会 `setState() called after dispose()`，所以 `_remove` 必须自己先判一次 `mounted`——转抄实现片段时不要把那个守卫丢掉。本任务原先给出的实现代码里那个 `if (value == null) _remove();` 分支是死代码，会让「移除」点了没反应，下面的实现片段已按实际提交（`8ac6614` / `8eb7e58`）修正；本任务第 6 个测试「菜单里选「移除」调用 deleteCollection」正是抓住这一点的那条测试。「移除」那一项因此不再是 `const`——`onTap: _remove` 是实例方法的 tear-off。另外测试片段里补了 `subjectImageCacheRepositoryProvider` 的 override：`pump` 传了 `imageUrl: 'u'`，成功路径会让 controller 去写本地封面缓存，不 override 就会构造真的 `AppDatabase`，在测试输出里打出一段 drift 的 "created the database class multiple times" 警告，然后以 `MissingPluginException` 失败——那两条测试实际走的是被吞掉的失败分支，而不是成功分支。
+>
+> **修订记录（Task 14 代码评审后回填，`ca82c76`）**：又改了三处，实现片段与测试片段都已同步。① `_remove` 开头加 `if (!mounted) return;`（上一段说明的那个 defect，已复现出真实的 `setState() called after dispose()`）。② `_setType` 开头加 `if (_busy) return;`：`enabled`/`onPressed` 的值是 build 时捕获的，要到下一帧才反映 `_busy`，所以请求进行中的第二次点击照样进得来，会发出第二个 `PATCH`；加了这一行 `_busy` 才真的挡得住重复提交。只加在 `_setType`，`_remove` 不加——一次点击就把菜单 pop 掉了，第二次点击碰不到同一个菜单项，加了是死代码。③ dartdoc 删掉了「与失败重试」这半句：`setCollectionType`（`subject_collection_controller.dart:67-92`）和 `SubjectApi.updateCollection`（`subject_api.dart:32`）都没有任何重试，全仓库只有 `auth_interceptor.dart:71` 的 401 刷新后重放一次；design doc 279 行给这个控件的描述也只有「乐观更新 + 失败回滚」。同时按 `continue_watching_button.dart:16-18` / `subject_title_block.dart:15-18` 的先例，给 dartdoc 补了「本控件目前还没有任何地方构造」的休眠声明 + design doc 行号引用，并把「`null` 代表「移除」所以 `onSelected` 只要一个分支」那句陈旧的理由重写成一段前后一致的说明。测试也从 7 条加到 9 条：两个 defect 各配一条回归测试（`菜单打开期间控件被卸载，再选「移除」不会 setState` / `同一帧内连点两次「追番」只调用一次 updateCollection`）。后者的 stub 必须用挂着不 complete 的 `Completer`——让 stub 立刻返回是观察不到 `_busy` 的，`await tester.tap` 会把 microtask 冲干净，第一次请求在第二次点击之前就已经跑完了。
+
 **Files:**
 - Create: `lib/ui/subject/subject_collection_action_button.dart`
 - Test: `test/ui/subject/subject_collection_action_button_test.dart`
@@ -2748,8 +2822,11 @@ git commit -m "feat(subject): add continue-watching button for detail page left 
 创建 `test/ui/subject/subject_collection_action_button_test.dart`：
 
 ```dart
+import 'dart:async';
+
 import 'package:animeko_flutter/data/subject/collection_type.dart';
 import 'package:animeko_flutter/data/subject/subject_api.dart';
+import 'package:animeko_flutter/data/subject/subject_image_cache_repository.dart';
 import 'package:animeko_flutter/data/subject/subject_models.dart';
 import 'package:animeko_flutter/ui/subject/subject_collection_action_button.dart';
 import 'package:flutter/material.dart';
@@ -2759,6 +2836,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockSubjectApi extends Mock implements SubjectApi {}
+
+class MockSubjectImageCacheRepository extends Mock
+    implements SubjectImageCacheRepository {}
 
 SubjectDetail detailWith(CollectionType? type) => SubjectDetail(
   id: 1,
@@ -2780,6 +2860,7 @@ Widget wrap(Widget child, {required List<Override> overrides}) {
 
 void main() {
   late MockSubjectApi api;
+  late MockSubjectImageCacheRepository imageCacheRepo;
 
   setUpAll(() {
     registerFallbackValue(CollectionType.wish);
@@ -2787,6 +2868,15 @@ void main() {
 
   setUp(() {
     api = MockSubjectApi();
+    // `pump` passes `imageUrl: 'u'`, so every successful update also writes
+    // the local cover cache. Without this override that write reaches the
+    // real `AppDatabase`, which both logs a drift "created the database
+    // class multiple times" warning and then fails with
+    // `MissingPluginException` (no `getApplicationDocumentsDirectory` under
+    // `flutter_test`) -- silently exercising the swallowed failure path
+    // instead of the success path.
+    imageCacheRepo = MockSubjectImageCacheRepository();
+    when(() => imageCacheRepo.save(1, 'u')).thenAnswer((_) async {});
   });
 
   Future<void> pump(WidgetTester tester, CollectionType? type) async {
@@ -2794,7 +2884,10 @@ void main() {
     await tester.pumpWidget(
       wrap(
         const SubjectCollectionActionButton(subjectId: 1, imageUrl: 'u'),
-        overrides: [subjectApiProvider.overrideWithValue(api)],
+        overrides: [
+          subjectApiProvider.overrideWithValue(api),
+          subjectImageCacheRepositoryProvider.overrideWithValue(imageCacheRepo),
+        ],
       ),
     );
     await tester.pumpAndSettle();
@@ -2892,6 +2985,65 @@ void main() {
 
       expect(find.textContaining('更新收藏状态失败'), findsOneWidget);
     });
+
+    testWidgets('菜单打开期间控件被卸载，再选「移除」不会 setState', (tester) async {
+      when(
+        () => api.getSubject(1),
+      ).thenAnswer((_) async => detailWith(CollectionType.doing));
+      when(() => api.deleteCollection(1)).thenAnswer((_) async {});
+      final overrides = [
+        subjectApiProvider.overrideWithValue(api),
+        subjectImageCacheRepositoryProvider.overrideWithValue(imageCacheRepo),
+      ];
+      await tester.pumpWidget(
+        wrap(
+          const SubjectCollectionActionButton(subjectId: 1, imageUrl: 'u'),
+          overrides: overrides,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('在看'));
+      await tester.pumpAndSettle();
+
+      // 菜单项活在 Navigator 的 overlay route 里，比本控件活得久：把控件从树上
+      // 摘掉（窗口宽度跨过三栏断点导致 pane 重建就会这样）之后菜单还在，而
+      // `PopupMenuItem.onTap` 不像 `onSelected` 那样有 framework 的 mounted 兜底。
+      await tester.pumpWidget(
+        wrap(const SizedBox.shrink(), overrides: overrides),
+      );
+      await tester.pump();
+
+      await tester.tap(find.text('移除'));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('同一帧内连点两次「追番」只调用一次 updateCollection', (tester) async {
+      // PATCH 故意挂着不完成，这样第二次点击落在请求进行中的那段窗口里 ——
+      // 让 stub 立刻返回是观察不到 [_busy] 的：`await tester.tap` 会把 microtask
+      // 冲干净，第一次请求在第二次点击之前就已经跑完、`_busy` 也已经清掉了。
+      final pending = Completer<void>();
+      when(
+        () => api.updateCollection(
+          any(),
+          collectionType: any(named: 'collectionType'),
+        ),
+      ).thenAnswer((_) => pending.future);
+      await pump(tester, null);
+
+      // 中间不 pump：`_busy` 要到下一帧才会改变 `onPressed`，所以拦第二次点击
+      // 只能靠 `_setType` 自己进门先判一次。
+      await tester.tap(find.text('追番'));
+      await tester.tap(find.text('追番'));
+      pending.complete();
+      await tester.pumpAndSettle();
+
+      verify(
+        () => api.updateCollection(1, collectionType: CollectionType.wish),
+      ).called(1);
+    });
   });
 }
 ```
@@ -2916,11 +3068,21 @@ import '../../domain/subject/subject_collection_controller.dart';
 /// [CollectionType.wish]）；已收藏时是「★ <当前状态> ▾」，点开是一个
 /// [PopupMenuButton]，列出其余四个状态和「移除」。
 ///
-/// 取代改版前平铺的 5 个 [ChoiceChip]（旧 `_CollectionButtons`）。菜单项
-/// 的泛型是 `CollectionType?`，`null` 代表「移除」，这样 `onSelected` 只
-/// 需要一个分支判断，不必额外定义一个 sealed 的动作类型。
+/// 取代改版前平铺的 5 个 [ChoiceChip]（旧 `_CollectionButtons`，
+/// `subject_detail_screen.dart`）——真正的替换是后面的任务，目前那些
+/// `ChoiceChip` 仍是 app 里唯一渲染的收藏控件，`lib/` 里还没有任何地方构造
+/// 本控件。它归属左栏那一列纵向按钮（design doc
+/// `2026-09-12-subject-detail-three-column-layout-design.md` 247/252 行，
+/// 行为约定见 272-279 行）。
 ///
-/// 乐观更新/回滚与失败重试都由
+/// [PopupMenuButton] 的泛型是 `CollectionType?`，「移除」那一项的值就是
+/// `null`；但它并不是由 `onSelected` 分发的——framework 把 `null` 的返回值
+/// 当成「菜单被取消」交给 `onCanceled` 后直接 return，`onSelected` 根本收不
+/// 到（`popup_menu.dart` 里 `showMenu(...)` 的 `.then`），所以「移除」由它
+/// 自己那一项的 `onTap` 触发，`onSelected` 只剩「非 null 即状态切换」这一个
+/// 判断，也就不必额外定义一个 sealed 的动作类型。
+///
+/// 乐观更新/回滚都由
 /// [SubjectCollectionController.setCollectionType] 负责，本控件只负责在
 /// 请求进行中禁用交互（[_busy]）并把失败呈现为一次性 [SnackBar]。
 class SubjectCollectionActionButton extends ConsumerStatefulWidget {
@@ -2954,6 +3116,9 @@ class _SubjectCollectionActionButtonState
   bool _busy = false;
 
   Future<void> _setType(CollectionType type) async {
+    // `enabled`/`onPressed` 只在下一帧才反映 [_busy]，所以同一帧里的第二次点击
+    // 还是会走到这里，得自己再拦一次。
+    if (_busy) return;
     setState(() => _busy = true);
     try {
       await ref
@@ -2975,6 +3140,12 @@ class _SubjectCollectionActionButtonState
   }
 
   Future<void> _remove() async {
+    // 「移除」是从菜单项的 `onTap` 进来的，而菜单项活在 Navigator 的 overlay
+    // route 里、比本控件活得久：菜单打开期间本控件被卸载（窗口宽度跨过三栏断点
+    // 导致 pane 重建就会这样），这里仍会被调用。`onSelected` 那条路径有
+    // framework 自己的 `if (!mounted) return null;`（`popup_menu.dart` 里
+    // `showMenu(...)` 的 `.then`）兜底，`PopupMenuItemState.handleTap` 没有。
+    if (!mounted) return;
     setState(() => _busy = true);
     try {
       await ref
@@ -3000,7 +3171,7 @@ class _SubjectCollectionActionButtonState
     final collectionAsync = ref.watch(
       subjectCollectionControllerProvider(subjectId: widget.subjectId),
     );
-    final collection = collectionAsync.valueOrNull;
+    final collection = collectionAsync.value;
     if (collection == null) return const SizedBox.shrink();
 
     final current = collection.collectionType;
@@ -3022,12 +3193,13 @@ class _SubjectCollectionActionButtonState
         enabled: !_busy,
         tooltip: '修改收藏状态',
         position: PopupMenuPosition.under,
+        // 这里只可能收到非 null 值：[PopupMenuButton] 把 `null` 的返回值当作
+        // 「菜单被取消」处理（framework `popup_menu.dart` 里 `showMenu(...)`
+        // 的 `.then` 对 `newValue == null` 直接调 `onCanceled` 并 return），
+        // 所以「移除」不能挂在这里的 `null` 分支上，改由该菜单项自己的
+        // `onTap` 触发 [_remove]。
         onSelected: (value) {
-          if (value == null) {
-            _remove();
-          } else {
-            _setType(value);
-          }
+          if (value != null) _setType(value);
         },
         itemBuilder: (context) => [
           for (final type in CollectionType.values)
@@ -3037,7 +3209,11 @@ class _SubjectCollectionActionButtonState
                 child: Text(labels[type]!),
               ),
           const PopupMenuDivider(),
-          const PopupMenuItem<CollectionType?>(value: null, child: Text('移除')),
+          PopupMenuItem<CollectionType?>(
+            value: null,
+            onTap: _remove,
+            child: const Text('移除'),
+          ),
         ],
         child: Container(
           height: 40,
@@ -3130,6 +3306,8 @@ void main() {
       expect(find.text('收藏'), findsNothing);
       expect(find.text('在看'), findsNothing);
       expect(find.text('想看'), findsNothing);
+      // 三个标签不在还不够：整块必须什么都不渲染，而不是渲染三个 0。
+      expect(find.byType(Text), findsNothing);
     });
 
     testWidgets('按 done/doing/wish 映射到 收藏/在看/想看', (tester) async {
@@ -3155,6 +3333,16 @@ void main() {
       expect(find.text('在看'), findsOneWidget);
       expect(find.text('1,449'), findsOneWidget);
       expect(find.text('想看'), findsOneWidget);
+
+      // 上面六个断言只说明这六段文字都在，不说明谁配谁；把每个 _StatItem 的
+      // Column 里「数字在上、标签在下」的配对也钉住，否则把 收藏/想看 两个
+      // 标签对调的实现同样能通过这个测试。
+      final pairs = <String, String>{};
+      for (final column in tester.widgetList<Column>(find.byType(Column))) {
+        final texts = column.children.whereType<Text>().toList();
+        if (texts.length == 2) pairs[texts.last.data!] = texts.first.data!;
+      }
+      expect(pairs, {'收藏': '7,781', '在看': '5,959', '想看': '1,449'});
     });
 
     testWidgets('不展示 搁置/弃番 的数字', (tester) async {
@@ -3213,9 +3401,16 @@ String formatCount(int value) {
 
 /// 左栏的收藏统计三联块：`收藏 / 在看 / 想看`。
 ///
-/// 字段映射（spec「收藏统计字段映射」）：收藏 = [SubjectFavorite.done]、
+/// 字段映射（spec「收藏统计的字段映射」）：收藏 = [SubjectFavorite.done]、
 /// 在看 = [SubjectFavorite.doing]、想看 = [SubjectFavorite.wish]。
-/// `onHold`/`dropped` 拿得到但不展示——参考应用的详情页也只显示这三项。
+/// `onHold`/`dropped` 拿得到但不展示——设计文档那一节的映射表只列了这三项，
+/// 给出的理由是「`favorite` 有 5 个数字，参考图只显示 3 个」。
+///
+/// 「收藏 = `done`」目前仍是暂定的：设计文档同一节要求「实施时用一个真实
+/// subject 与 Bangumi 网页上的数字对照一次，确认「收藏」确实对应 `done`
+/// 而不是五项求和」，这次核对挂在 plan 的 Task 25 Step 5 第 8 项；若网页的
+/// 「收藏」等于五项之和，这里要改成五项求和，
+/// `test/ui/subject/subject_collection_stats_test.dart` 的期望值也要跟着改。
 ///
 /// [favorite] 为 `null`（接口没返回 `favorite`）时整块隐藏，而不是显示
 /// 三个 `0`。
@@ -3260,7 +3455,9 @@ class _StatItem extends StatelessWidget {
         const SizedBox(height: 2),
         Text(
           label,
-          style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
         ),
       ],
     );
@@ -3337,7 +3534,9 @@ SubjectEpisode mainEpisode(int id) => SubjectEpisode(
 
 Future<void> pump(WidgetTester tester, SubjectDetail subject) =>
     tester.pumpWidget(
-      MaterialApp(home: Scaffold(body: SubjectInfoTable(subject: subject))),
+      MaterialApp(
+        home: Scaffold(body: SubjectInfoTable(subject: subject)),
+      ),
     );
 
 void main() {
@@ -3389,7 +3588,10 @@ void main() {
           aliases: const ['别名一', '别名二'],
           infobox: const SubjectInfobox(
             fields: [
-              InfoboxField(key: '别名', values: [InfoboxValue(v: '只有第一个')]),
+              InfoboxField(
+                key: '别名',
+                values: [InfoboxValue(v: '只有第一个')],
+              ),
             ],
           ),
         ),
@@ -3413,6 +3615,42 @@ void main() {
 
       expect(find.text('作品信息'), findsNothing);
     });
+
+    testWidgets('一行都没有但有标签时整块仍然渲染', (tester) async {
+      await pump(
+        tester,
+        detail(
+          airDate: 'not-a-date',
+          tags: const [SubjectTag(name: '奇幻', count: 12)],
+        ),
+      );
+
+      expect(find.text('作品信息'), findsOneWidget);
+      expect(find.textContaining('奇幻'), findsOneWidget);
+      expect(find.text('放送开始'), findsNothing);
+      expect(find.text('话数'), findsNothing);
+      expect(find.text('别名'), findsNothing);
+    });
+
+    testWidgets('话数优先用 infobox 而不是 episodeCount', (tester) async {
+      await pump(
+        tester,
+        detail(
+          episodes: [mainEpisode(1), mainEpisode(2)],
+          infobox: const SubjectInfobox(
+            fields: [
+              InfoboxField(
+                key: '话数',
+                values: [InfoboxValue(v: '11')],
+              ),
+            ],
+          ),
+        ),
+      );
+
+      expect(find.text('11'), findsOneWidget);
+      expect(find.text('2'), findsNothing);
+    });
   });
 }
 ```
@@ -3420,7 +3658,7 @@ void main() {
 - [ ] **Step 2: 运行测试确认失败**
 
 Run: `flutter test test/ui/subject/subject_info_table_test.dart`
-Expected: FAIL — `Target of URI doesn't exist: 'package:animeko_flutter/ui/subject/subject_info_table.dart'`。
+Expected: FAIL — 编译失败：``Error when reading 'lib/ui/subject/subject_info_table.dart': No such file or directory``，外加 `Method not found: 'SubjectInfoTable'.`。
 
 - [ ] **Step 3: 实现**
 
@@ -3435,15 +3673,22 @@ import 'subject_tags_row.dart';
 
 /// 左栏的「作品信息」两列表：`放送开始 / 话数 / 别名`，下面接标签行。
 ///
-/// 取值策略：`放送开始`、`话数` 优先读 `infobox`——后端返回的 infobox 里
-/// 这两项已经是中文成品字符串（`"2022年10月10日"`、`"13"`），比自己格式化
-/// 更贴近 Bangumi 页面；拿不到时才退回 [SubjectDetail.airDate] /
+/// 取值策略：`放送开始`、`话数` 优先读 `infobox`——设计文档
+/// `2026-09-12-subject-detail-three-column-layout-design.md` 的「后端接口
+/// 实测结果」一节实测到 `放送开始` 在后端返回的 infobox 里已经是中文成品
+/// 字符串（`"2022年10月10日"`，「已是中文格式」），比自己格式化更贴近
+/// Bangumi 页面；拿不到时才退回 [SubjectDetail.airDate] /
 /// [SubjectDetail.episodeCount]。
 ///
-/// `别名` 反过来——优先用 [SubjectDetail.aliases]，因为后端已经把 infobox
-/// 里的多个别名拍平成数组，而 [SubjectDetail.infoboxValue] 只取第一个值。
+/// `别名` 反过来——优先用 [SubjectDetail.aliases]：它是一个扁平的
+/// `List<String>`，能把全部别名都展开，而 [SubjectDetail.infoboxValue] 只取
+/// 第一个值；infobox 只作兜底。
 ///
 /// 三行全都拿不到、且没有标签时整块隐藏（不显示一个空的「作品信息」标题）。
+///
+/// 目标位置是 `subject_detail_left_pane.dart` 里「封面 / 继续观看 / 追番 /
+/// 收藏统计 / 作品信息」的纵向组合（设计文档「UI 结构设计」一节的文件职责
+/// 表），那个 pane 是后面的任务，所以目前还没有任何地方构造这个 widget。
 class SubjectInfoTable extends StatelessWidget {
   const SubjectInfoTable({super.key, required this.subject});
 
@@ -3454,8 +3699,7 @@ class SubjectInfoTable extends StatelessWidget {
     final theme = Theme.of(context);
 
     final airDate =
-        subject.infoboxValue('放送开始') ??
-        formatAirDateYearMonth(subject.airDate);
+        subject.infoboxValue('放送开始') ?? formatAirDateYearMonth(subject.airDate);
     final episodeCount =
         subject.infoboxValue('话数') ?? subject.episodeCount?.toString();
     final aliases = subject.aliases.isNotEmpty
@@ -3490,7 +3734,7 @@ class SubjectInfoTable extends StatelessWidget {
                       child: Text(
                         label,
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.hintColor,
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ),
@@ -3515,7 +3759,7 @@ class SubjectInfoTable extends StatelessWidget {
 - [ ] **Step 4: 运行测试确认通过**
 
 Run: `flutter test test/ui/subject/subject_info_table_test.dart`
-Expected: PASS（7 个测试全部通过）。
+Expected: PASS（9 个测试全部通过）。
 
 - [ ] **Step 5: 提交**
 
@@ -3544,6 +3788,8 @@ git commit -m "feat(subject): add infobox-driven work info table"
 创建 `test/ui/subject/subject_character_row_test.dart`：
 
 ```dart
+import 'dart:async';
+
 import 'package:animeko_flutter/data/subject/subject_api.dart';
 import 'package:animeko_flutter/data/subject/subject_models.dart';
 import 'package:animeko_flutter/ui/subject/subject_character_row.dart';
@@ -3555,17 +3801,26 @@ import 'package:mocktail/mocktail.dart';
 
 class MockSubjectApi extends Mock implements SubjectApi {}
 
-/// 所有 fixture 的头像字段都留 null，避免 `NetworkImage` 在
-/// `flutter_test` 里发起被拦截的 HTTP 请求并把异常报到测试上。
+/// `imageMedium` 默认留 null，这样绝大多数 fixture 都不会让 `NetworkImage`
+/// 在 `flutter_test` 里发起被拦截的 HTTP 请求并把异常报到测试上。只有
+/// 「头像加载失败」那个测试显式传 URL —— 它要的正是那个被拦截的请求
+/// (`statusCode: 400`) 触发 `onBackgroundImageError`。
 RelatedCharacter related({
   required int id,
   required String name,
   String? nameCn,
+  String? imageMedium,
   List<PersonInfo> actors = const [],
 }) {
   return RelatedCharacter(
     index: id,
-    character: CharacterInfo(id: id, name: name, nameCn: nameCn, actors: actors),
+    character: CharacterInfo(
+      id: id,
+      name: name,
+      nameCn: nameCn,
+      imageMedium: imageMedium,
+      actors: actors,
+    ),
     role: 1,
   );
 }
@@ -3614,11 +3869,7 @@ void main() {
   ) async {
     when(() => api.getCharacters(1)).thenAnswer(
       (_) async => [
-        related(
-          id: 1,
-          name: '黑崎一护',
-          actors: [actor('森田成一'), actor('ignored')],
-        ),
+        related(id: 1, name: '黑崎一护', actors: [actor('森田成一'), actor('ignored')]),
       ],
     );
 
@@ -3644,6 +3895,16 @@ void main() {
     // 只有角色名一个 Text 在 cell 里（外加 header 的「角色」和按钮文字）。
     expect(find.text('黑崎一护'), findsOneWidget);
     expect(find.byIcon(Icons.person), findsOneWidget);
+    // 并且 cell 里除了角色名没有第二个 `Text`：`actors` 为空时 CV 行必须
+    // 整行不存在，而不是渲染成一个空/占位字符串。上一个测试证明 CV 行在
+    // `actors` 非空时确实会渲染，所以这里断言的是真实的「缺席」。
+    final cell = find
+        .ancestor(of: find.text('黑崎一护'), matching: find.byType(Column))
+        .first;
+    expect(
+      find.descendant(of: cell, matching: find.byType(Text)),
+      findsOneWidget,
+    );
   });
 
   testWidgets('renders the fallback icon when there is no avatar url', (
@@ -3659,6 +3920,45 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byIcon(Icons.person), findsOneWidget);
+  });
+
+  testWidgets('renders the fallback icon when the avatar fails to load', (
+    tester,
+  ) async {
+    when(() => api.getCharacters(1)).thenAnswer(
+      (_) async => [
+        related(
+          id: 1,
+          name: 'A',
+          imageMedium: 'https://api.animeko.org/v2/characters/3320/image',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      wrap(const SubjectCharacterRow(subjectId: 1), overrides: overrides),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.person), findsOneWidget);
+  });
+
+  testWidgets('keeps the card frame and shows a spinner while loading', (
+    tester,
+  ) async {
+    final pending = Completer<List<RelatedCharacter>>();
+    when(() => api.getCharacters(1)).thenAnswer((_) => pending.future);
+
+    await tester.pumpWidget(
+      wrap(const SubjectCharacterRow(subjectId: 1), overrides: overrides),
+    );
+    await tester.pump();
+
+    expect(find.text('角色'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    pending.complete(const []);
+    await tester.pumpAndSettle();
   });
 
   testWidgets('hides the whole section on error', (tester) async {
@@ -3717,6 +4017,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('全部角色'), findsOneWidget);
+    // sheet 复用横向行已经填好的 provider 缓存，不会再打一次接口。
+    verify(() => api.getCharacters(1)).called(1);
   });
 }
 ```
@@ -3724,8 +4026,12 @@ void main() {
 - [ ] **Step 2: 运行测试确认失败**
 
 Run: `flutter test test/ui/subject/subject_character_row_test.dart`
-Expected: FAIL，`Error: Couldn't resolve the package 'animeko_flutter' ... subject_character_row.dart` 或
-`Target of URI doesn't exist: 'package:animeko_flutter/ui/subject/subject_character_row.dart'`。
+Expected: FAIL。实测的 RED 是 CFE 的
+`test/ui/subject/subject_character_row_test.dart:5:8: Error: Error when reading 'lib/ui/subject/subject_character_row.dart': No such file or directory`
+外加每个引用点的 `Error: Undefined name 'SubjectCharacterRow'.` /
+`Error: Couldn't find constructor 'SubjectCharacterRow'.`，最后
+`Compilation failed for testPath=...`。**不是** `Target of URI doesn't exist`
+—— 那是 analyzer 的措辞，`flutter test` 不走 analyzer。
 
 - [ ] **Step 3: 实现 `character_avatar.dart`**
 
@@ -3736,29 +4042,54 @@ import 'package:flutter/material.dart';
 
 import '../../data/subject/subject_models.dart';
 
-/// 圆形角色头像，缺图时退回一个人形占位图标。
+/// 圆形角色头像，缺图或加载失败时退回一个人形占位图标。
 ///
 /// 后端返回的是 `imageMedium` / `imageLarge` 两个字段（不存在 `imageUrl`，
-/// 见数据层 Task 3 的说明）。这里优先用 `imageMedium`：行内头像直径只有
-/// 64dp，medium 尺寸足够。
+/// 见 [CharacterInfo] 的文档注释）。这里优先用 `imageMedium`：设计文档
+/// `2026-09-12-subject-detail-three-column-layout-design.md` 的「修
+/// `CharacterInfo`」一节写的是「头像用 `imageMedium`（横向头像行只有 64px
+/// 直径，不需要 large）」—— 默认 [radius] 32 正好是那个 64。
 ///
-/// `onBackgroundImageError` 必须给：`CircleAvatar.backgroundImage` 没有
-/// `errorBuilder`，不接这个回调时加载失败会把异常抛到 `FlutterError`，
-/// 在 widget 测试里会直接把测试判成失败。
-class CharacterAvatar extends StatelessWidget {
+/// 加载失败退占位图标同样出自设计文档，「加载 / 错误 / 空态」一节：「封面 /
+/// 角色头像 / 评价者头像 加载失败 → 占位图标」。所以这是个
+/// [StatefulWidget]：`CircleAvatar.backgroundImage` 没有 `errorBuilder`，
+/// 想换成占位图标只能靠 `onBackgroundImageError` 回调 + `setState`。
+/// 这个回调还必须给：不接它时加载失败会把异常抛到 `FlutterError`，在 widget
+/// 测试里会直接把测试判成失败。
+///
+/// 注意 `CircleAvatar` 把 `child` 画在 `backgroundImage` **之上**，所以占位
+/// 图标只能在没有可用 URL 时才渲染，不能无条件塞进 `child`。
+class CharacterAvatar extends StatefulWidget {
   const CharacterAvatar({super.key, required this.character, this.radius = 32});
 
   final CharacterInfo character;
   final double radius;
 
   @override
+  State<CharacterAvatar> createState() => _CharacterAvatarState();
+}
+
+class _CharacterAvatarState extends State<CharacterAvatar> {
+  /// 已经加载失败过的那张图的 URL。记 URL 而不是一个 bool，是因为横向行的
+  /// cell 没有 key：Flutter 会把这个 [State] 复用到同一位置的另一个角色上，
+  /// 存 bool 会把上一个角色的失败状态带过去，让新角色也只显示占位图标。
+  String? _failedUrl;
+
+  @override
   Widget build(BuildContext context) {
-    final url = character.imageMedium ?? character.imageLarge;
+    final source = widget.character.imageMedium ?? widget.character.imageLarge;
+    final url = source == _failedUrl ? null : source;
     return CircleAvatar(
-      radius: radius,
+      radius: widget.radius,
       backgroundImage: url == null ? null : NetworkImage(url),
-      onBackgroundImageError: url == null ? null : (_, _) {},
-      child: url == null ? Icon(Icons.person, size: radius) : null,
+      onBackgroundImageError: url == null
+          ? null
+          // 图片流是异步回调的，widget 可能已经被移除了 —— 不加 `mounted`
+          // 守卫就是一个 `setState() called after dispose` 崩溃。
+          : (_, _) {
+              if (mounted) setState(() => _failedUrl = url);
+            },
+      child: url == null ? Icon(Icons.person, size: widget.radius) : null,
     );
   }
 }
@@ -3790,7 +4121,7 @@ class SubjectCharactersSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final characters =
-        ref.watch(subjectCharactersProvider(subjectId: subjectId)).valueOrNull ??
+        ref.watch(subjectCharactersProvider(subjectId: subjectId)).value ??
         const <RelatedCharacter>[];
 
     return DraggableScrollableSheet(
@@ -3810,7 +4141,7 @@ class SubjectCharactersSheet extends ConsumerWidget {
                   Text(
                     '${characters.length}',
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.hintColor,
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ],
@@ -3855,14 +4186,19 @@ import 'subject_characters_sheet.dart';
 /// 中栏的「角色」横向头像行：头像 + 角色名 + 声优名。
 ///
 /// 加载中时渲染带标题的外框 + 一个小 spinner（不是整块隐藏），这样数据到
-/// 位时页面不会跳动 —— 见设计文档「加载/错误/空态」一节。失败和空列表都
-/// 整块静默隐藏：角色不是详情页的主线信息，缺了不该显示报错。
+/// 位时页面不会跳动 —— 见设计文档
+/// `2026-09-12-subject-detail-three-column-layout-design.md` 的
+/// 「加载 / 错误 / 空态」一节。失败和空列表都整块静默隐藏：角色不是详情页
+/// 的主线信息，缺了不该显示报错。
 class SubjectCharacterRow extends ConsumerWidget {
   const SubjectCharacterRow({super.key, required this.subjectId});
 
   /// 行内最多显示多少个角色，其余交给「查看全部」sheet。
-  /// 估算值：参考应用一屏显示 8 个，这里给到 12 留一点横向滚动余量；
-  /// 全量渲染不可行（BLEACH 千年血战篇有 104 个角色）。
+  ///
+  /// 12 是本计划引入的估算值：设计文档的「已知的估算项」一节里没有它，别处
+  /// 也没有规定这个数，所以调它不需要改设计文档。全量渲染不可行 —— 设计文档
+  /// 「后端接口实测结果」一节记录 subject 302286 的 characters 接口返回
+  /// 104 项。
   static const int maxVisible = 12;
 
   final int subjectId;
@@ -3870,7 +4206,7 @@ class SubjectCharacterRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(subjectCharactersProvider(subjectId: subjectId));
-    final characters = async.valueOrNull;
+    final characters = async.value;
 
     if (characters == null) {
       if (async.isLoading) {
@@ -3931,10 +4267,7 @@ class SubjectCharacterRow extends ConsumerWidget {
               Text('角色', style: theme.textTheme.titleSmall),
               const Spacer(),
               if (onSeeAll != null)
-                TextButton(
-                  onPressed: onSeeAll,
-                  child: const Text('查看全部 ›'),
-                ),
+                TextButton(onPressed: onSeeAll, child: const Text('查看全部 ›')),
             ],
           ),
           const SizedBox(height: 8),
@@ -3974,7 +4307,7 @@ class _CharacterCell extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
               style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.hintColor,
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
         ],
@@ -3987,7 +4320,7 @@ class _CharacterCell extends StatelessWidget {
 - [ ] **Step 6: 运行测试确认通过**
 
 Run: `flutter test test/ui/subject/subject_character_row_test.dart`
-Expected: PASS，8 个测试全绿。
+Expected: PASS，10 个测试全绿。
 
 - [ ] **Step 7: 提交**
 
@@ -4237,7 +4570,7 @@ class SubjectEpisodesSection extends ConsumerWidget {
     );
     final episodeCount = ref
         .watch(subjectDetailControllerProvider(subjectId: subjectId))
-        .valueOrNull
+        .value
         ?.episodeCount;
 
     return episodesAsync.when(
@@ -4272,7 +4605,7 @@ class SubjectEpisodesSection extends ConsumerWidget {
                     Text(
                       progress,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.hintColor,
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                 ],
@@ -4828,12 +5161,12 @@ class SubjectRatingCard extends ConsumerWidget {
     final theme = Theme.of(context);
     final subject = ref
         .watch(subjectDetailControllerProvider(subjectId: subjectId))
-        .valueOrNull;
+        .value;
     if (subject == null) return const SizedBox.shrink();
 
     final selfRating = ref
         .watch(subjectCollectionControllerProvider(subjectId: subjectId))
-        .valueOrNull
+        .value
         ?.selfRating;
     final myScore = selfRating != null && selfRating.score > 0
         ? selfRating.score
@@ -4889,7 +5222,7 @@ class SubjectRatingCard extends ConsumerWidget {
                   if (total > 0) '$total 人评分',
                 ].join(' · '),
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.hintColor,
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
             ),
@@ -5148,8 +5481,30 @@ git commit -m "feat(subject): add rating card with histogram and rating dialog"
 - Create: `lib/ui/subject/subject_reviews_sheet.dart`
 - Create: `lib/ui/subject/subject_reviews_card.dart`
 - Test: `test/ui/subject/subject_reviews_card_test.dart`
+- Test: `test/ui/subject/subject_reviews_sheet_test.dart`（新增；见下方 PLAN EDIT 说明）
 
 依赖：Task 5（`stripBbcode`）、Task 6（`SubjectReview` / `PaginatedReviews` / `getReviews`）、Task 9（`subjectReviewsControllerProvider` + `loadMore`）、Task 19（`SubjectSideCard`）。
+
+> **PLAN EDIT（本轮修订，非原始设计）**：`ReviewAvatar` 和 `SubjectReviewsSheet` 的
+> 下方代码已经改过，修的是两个真实缺陷（不是风格调整）：(1) `ReviewAvatar` 原稿的
+> `onBackgroundImageError: (_, _) {}` 只吞异常、不换占位图标，与 Task 17 里
+> `CharacterAvatar` 修过的是同一个缺陷（design doc 「加载 / 错误 / 空态」明写
+> 「角色头像 / 评价者头像 加载失败 → 占位图标」）——现在 `ReviewAvatar` 改成了和
+> `CharacterAvatar` 一样的 `StatefulWidget` + `_failedUrl` 写法；(2) 「加载更多」
+> 按钮原稿用 `async.isLoading ? null : ...` disable，但 `loadMore()`
+> （`subject_reviews_controller.dart:60`）从不经过 `AsyncValue.guard`、也不吞
+> 异常，所以 `isLoading` 在整个 `loadMore` 期间一直是 `false`（按钮从未真正被
+> disable），失败会直接从 `onPressed` 抛出去——现在 `SubjectReviewsSheet` 改成
+> `ConsumerStatefulWidget`，用局部 `bool _loadingMore` + `try/catch` +
+> 失败 SnackBar（`加载更多评价失败：$e`）。**实施者必须在
+> `test/ui/subject/subject_reviews_sheet_test.dart` 里补至少 3 个测试**：
+> 「加载中按钮 disabled」（`Completer` 挂住 `loadMore` 的下一页请求，断言按钮
+> `onPressed == null`）、「失败时弹 SnackBar 且按钮恢复可点」（mock `loadMore`
+> 触发的 `getReviews` 第二页请求 `thenThrow`，断言 SnackBar 文案 + 按钮恢复）、
+> 「`ReviewAvatar` 加载失败退占位图标」（真实 URL + `flutter_test` 的常态 400
+> 拦截，断言 `Icon(Icons.person)` 出现，镜像 Task 17 `CharacterAvatar` 那个
+> 测试的写法）。这三条不在原 plan 的 Step 3 测试列表里，是本次 PLAN EDIT 新增的
+> 强制要求，不算实施者自由发挥的范围扩张。
 
 和 Task 17 一样，头像单独成文件，避免 card ↔ sheet 循环 import。
 
@@ -5161,24 +5516,46 @@ import 'package:flutter/material.dart';
 
 import '../../data/subject/review_models.dart';
 
-/// A commenter's avatar. `avatarUrl` is often present but may 404, so
-/// `onBackgroundImageError` is mandatory -- `CircleAvatar.backgroundImage`
-/// has no `errorBuilder`, and an unhandled image error fails widget tests
-/// (same reasoning as `CharacterAvatar`).
-class ReviewAvatar extends StatelessWidget {
+/// A commenter's avatar. `avatarUrl` is often present but may 404, so a
+/// bare `onBackgroundImageError` callback is not enough to satisfy the
+/// design doc's 「加载 / 错误 / 空态」 table (「封面 / 角色头像 / 评价者头像
+/// 加载失败 → 占位图标」) -- an empty callback only swallows the exception,
+/// it does not swap in the placeholder icon. `CircleAvatar.backgroundImage`
+/// has no `errorBuilder`, so the swap can only happen via `setState`,
+/// which is why this is a [StatefulWidget], mirroring `CharacterAvatar`
+/// (`character_avatar.dart`) exactly -- same defect, same fix, same
+/// `mounted` guard (the image stream's callback is async and the widget
+/// may already be gone), same URL-not-bool tracking (unkeyed cells in a
+/// scrollable list recycle `State` across different authors; a bool would
+/// leak one author's failure onto the next author rendered in that slot).
+class ReviewAvatar extends StatefulWidget {
   const ReviewAvatar({super.key, required this.author, this.radius = 14});
 
   final ReviewAuthor author;
   final double radius;
 
   @override
+  State<ReviewAvatar> createState() => _ReviewAvatarState();
+}
+
+class _ReviewAvatarState extends State<ReviewAvatar> {
+  /// The URL that most recently failed to load. Tracked by value, not a
+  /// bool, for the State-recycling reason in the class dartdoc.
+  String? _failedUrl;
+
+  @override
   Widget build(BuildContext context) {
-    final url = author.avatarUrl;
+    final source = widget.author.avatarUrl;
+    final url = source == _failedUrl ? null : source;
     return CircleAvatar(
-      radius: radius,
+      radius: widget.radius,
       backgroundImage: url == null ? null : NetworkImage(url),
-      onBackgroundImageError: url == null ? null : (_, _) {},
-      child: url == null ? Icon(Icons.person, size: radius) : null,
+      onBackgroundImageError: url == null
+          ? null
+          : (_, _) {
+              if (mounted) setState(() => _failedUrl = url);
+            },
+      child: url == null ? Icon(Icons.person, size: widget.radius) : null,
     );
   }
 }
@@ -5201,17 +5578,64 @@ import 'review_avatar.dart';
 ///
 /// The backend's `total` is a `limit + 1` sentinel, NOT a real count, so
 /// this sheet never renders a 「共 N 条」 header -- see `PaginatedReviews`.
-class SubjectReviewsSheet extends ConsumerWidget {
+///
+/// This is a [ConsumerStatefulWidget], not a [ConsumerWidget], because
+/// `SubjectReviewsController.loadMore` (`subject_reviews_controller.dart`)
+/// appends into the *existing* `AsyncData` and only ever calls
+/// `state = AsyncData(...)` on success -- it never routes through
+/// `AsyncValue.guard`, so `ref.watch(provider).isLoading` stays `false`
+/// for the button's entire in-flight duration and `async.isLoading
+/// ? null : ...` never actually disables the button (a double-tap during
+/// the request re-enters `loadMore`, which just re-appends the same next
+/// page onto whatever `current` it captures). It also never catches: an
+/// error thrown by the `getReviews` call inside `loadMore` propagates
+/// straight out of the button's `onPressed`, uncaught. So the button
+/// needs its own local `_loadingMore` flag around the `await`, plus a
+/// `try/catch` with a failure `SnackBar` (loadMore() deliberately doesn't
+/// swallow failures itself). Note a latent, currently-unreachable
+/// interaction: a failed `loadMore` leaves `state` exactly as it was
+/// (the first page's `AsyncData`), so nothing here can overwrite an error
+/// state -- that only becomes possible if a future task adds a
+/// pull-to-refresh path that can put this provider into `AsyncError`
+/// while `loadMore` is in flight.
+class SubjectReviewsSheet extends ConsumerStatefulWidget {
   const SubjectReviewsSheet({super.key, required this.subjectId});
 
   final int subjectId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SubjectReviewsSheet> createState() =>
+      _SubjectReviewsSheetState();
+}
+
+class _SubjectReviewsSheetState extends ConsumerState<SubjectReviewsSheet> {
+  bool _loadingMore = false;
+
+  Future<void> _loadMore() async {
+    final provider = subjectReviewsControllerProvider(
+      subjectId: widget.subjectId,
+    );
+    setState(() => _loadingMore = true);
+    try {
+      await ref.read(provider.notifier).loadMore();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('加载更多评价失败：$e')),
+      );
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final provider = subjectReviewsControllerProvider(subjectId: subjectId);
+    final provider = subjectReviewsControllerProvider(
+      subjectId: widget.subjectId,
+    );
     final async = ref.watch(provider);
-    final page = async.valueOrNull;
+    final page = async.value;
     final reviews = page?.items ?? const [];
 
     return DraggableScrollableSheet(
@@ -5243,19 +5667,23 @@ class SubjectReviewsSheet extends ConsumerWidget {
                       padding: const EdgeInsets.all(16),
                       child: Center(
                         child: TextButton(
-                          onPressed: async.isLoading
-                              ? null
-                              : () => ref.read(provider.notifier).loadMore(),
+                          onPressed: _loadingMore ? null : _loadMore,
                           child: const Text('加载更多'),
                         ),
                       ),
                     );
                   }
                   final review = reviews[index];
+                  // `stripBbcode` already trims, and returns '' for an
+                  // image-only / mask-only review. Pass `null` rather than
+                  // `Text('')` in that case -- an empty `Text` is still a
+                  // full line height and pushes `ListTile` into its
+                  // two-line layout, leaving a visibly blank second row.
+                  final content = stripBbcode(review.contentBbcode ?? '');
                   return ListTile(
                     leading: ReviewAvatar(author: review.author, radius: 18),
                     title: Text(review.author.nickname),
-                    subtitle: Text(stripBbcode(review.contentBbcode ?? '')),
+                    subtitle: content.isEmpty ? null : Text(content),
                     trailing: review.rating == null
                         ? null
                         : Text(
@@ -5274,7 +5702,141 @@ class SubjectReviewsSheet extends ConsumerWidget {
 }
 ```
 
-- [ ] **Step 3: 写失败的 card 测试**
+- [ ] **Step 3: 写 `subject_reviews_sheet_test.dart`，确认通过（PLAN EDIT 新增的 3 个测试）**
+
+`SubjectReviewsSheet` 和 `ReviewAvatar` 的生产代码已经在 Step 1-2 写好，所以这里补的
+3 个测试预期**直接 PASS**，不是 TDD 的 RED 步骤——和 Task 17 补的 loading-frame/
+cache-reuse 测试是同一种「针对已实现行为补回归测试」的模式。
+
+```dart
+// test/ui/subject/subject_reviews_sheet_test.dart
+import 'dart:async';
+
+import 'package:animeko_flutter/data/subject/review_models.dart';
+import 'package:animeko_flutter/data/subject/subject_api.dart';
+import 'package:animeko_flutter/ui/subject/subject_reviews_sheet.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
+
+class MockSubjectApi extends Mock implements SubjectApi {}
+
+SubjectReview review({
+  required String id,
+  required String nickname,
+  String? avatarUrl,
+}) => SubjectReview(
+  id: id,
+  subjectId: 1,
+  source: 'bangumi',
+  author: ReviewAuthor(id: id, nickname: nickname, avatarUrl: avatarUrl),
+);
+
+Widget wrap(Widget child, {required List<Override> overrides}) {
+  return ProviderScope(
+    overrides: overrides,
+    child: MaterialApp(home: Scaffold(body: child)),
+  );
+}
+
+void main() {
+  late MockSubjectApi api;
+  late List<Override> overrides;
+
+  setUp(() {
+    api = MockSubjectApi();
+    overrides = [subjectApiProvider.overrideWithValue(api)];
+  });
+
+  testWidgets('disables 加载更多 while the next page is in flight', (
+    tester,
+  ) async {
+    when(() => api.getReviews(subjectId: 1, offset: 0, limit: 20)).thenAnswer(
+      (_) async =>
+          PaginatedReviews(total: 2, items: [review(id: 'r1', nickname: 'A')]),
+    );
+    final completer = Completer<PaginatedReviews>();
+    when(
+      () => api.getReviews(subjectId: 1, offset: 1, limit: 20),
+    ).thenAnswer((_) => completer.future);
+
+    await tester.pumpWidget(
+      wrap(const SubjectReviewsSheet(subjectId: 1), overrides: overrides),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('加载更多'));
+    await tester.pump();
+
+    final button = tester.widget<TextButton>(
+      find.widgetWithText(TextButton, '加载更多'),
+    );
+    expect(button.onPressed, isNull);
+
+    completer.complete(const PaginatedReviews(total: 2, items: []));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('shows a failure SnackBar and re-enables 加载更多 on error', (
+    tester,
+  ) async {
+    when(() => api.getReviews(subjectId: 1, offset: 0, limit: 20)).thenAnswer(
+      (_) async =>
+          PaginatedReviews(total: 2, items: [review(id: 'r1', nickname: 'A')]),
+    );
+    when(
+      () => api.getReviews(subjectId: 1, offset: 1, limit: 20),
+    ).thenThrow(Exception('network'));
+
+    await tester.pumpWidget(
+      wrap(const SubjectReviewsSheet(subjectId: 1), overrides: overrides),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('加载更多'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('加载更多评价失败'), findsOneWidget);
+    final button = tester.widget<TextButton>(
+      find.widgetWithText(TextButton, '加载更多'),
+    );
+    expect(button.onPressed, isNotNull);
+  });
+
+  testWidgets(
+    'falls back to the placeholder icon when an avatar fails to load',
+    (tester) async {
+      when(
+        () => api.getReviews(subjectId: 1, offset: 0, limit: 20),
+      ).thenAnswer(
+        (_) async => PaginatedReviews(
+          total: 1,
+          items: [
+            review(
+              id: 'r1',
+              nickname: 'A',
+              avatarUrl: 'https://example.com/a.png',
+            ),
+          ],
+        ),
+      );
+
+      await tester.pumpWidget(
+        wrap(const SubjectReviewsSheet(subjectId: 1), overrides: overrides),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.person), findsOneWidget);
+    },
+  );
+}
+```
+
+Run: `flutter test test/ui/subject/subject_reviews_sheet_test.dart`
+Expected: PASS（3 个测试）。
+
+- [ ] **Step 4: 写失败的 card 测试**
 
 ```dart
 // test/ui/subject/subject_reviews_card_test.dart
@@ -5444,12 +6006,12 @@ void main() {
 }
 ```
 
-- [ ] **Step 4: 运行测试，确认失败**
+- [ ] **Step 5: 运行测试，确认失败**
 
 Run: `flutter test test/ui/subject/subject_reviews_card_test.dart`
 Expected: FAIL —— `Error: Couldn't resolve the package 'animeko_flutter' ... subject_reviews_card.dart` / `Undefined name 'SubjectReviewsCard'`。
 
-- [ ] **Step 5: 写 `subject_reviews_card.dart`**
+- [ ] **Step 6: 写 `subject_reviews_card.dart`**
 
 ```dart
 // lib/ui/subject/subject_reviews_card.dart
@@ -5484,7 +6046,7 @@ class SubjectReviewsCard extends ConsumerWidget {
     final async = ref.watch(
       subjectReviewsControllerProvider(subjectId: subjectId),
     );
-    final page = async.valueOrNull;
+    final page = async.value;
 
     if (page == null) {
       if (!async.isLoading) return const SizedBox.shrink();
@@ -5532,7 +6094,10 @@ class _ReviewItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final content = stripBbcode(review.contentBbcode ?? '').trim();
+    // `stripBbcode` already trims, so no `.trim()` here. It returns ''
+    // for an image-only / mask-only review, which the `isNotEmpty` guard
+    // below turns into "render no body line at all".
+    final content = stripBbcode(review.contentBbcode ?? '');
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -5566,7 +6131,7 @@ class _ReviewItem extends StatelessWidget {
 }
 ```
 
-- [ ] **Step 6: 写 `subject_reviews_card_frame.dart`**
+- [ ] **Step 7: 写 `subject_reviews_card_frame.dart`**
 
 `SubjectReviewsCard` 的 loading 分支和 data 分支要共用同一个卡壳（标题 + 可选「查看全部 ›」），抽成一个薄封装，避免在两个分支里重复写 `SubjectSideCard` 的参数。
 
@@ -5601,15 +6166,15 @@ class SubjectReviewsCardFrame extends StatelessWidget {
 }
 ```
 
-- [ ] **Step 7: 运行测试，确认通过**
+- [ ] **Step 8: 运行测试，确认通过**
 
-Run: `flutter test test/ui/subject/subject_reviews_card_test.dart`
-Expected: PASS（6 个测试）。
+Run: `flutter test test/ui/subject/subject_reviews_card_test.dart test/ui/subject/subject_reviews_sheet_test.dart`
+Expected: PASS（6 + 3 个测试）。
 
-- [ ] **Step 8: 提交**
+- [ ] **Step 9: 提交**
 
 ```bash
-git add lib/ui/subject/review_avatar.dart lib/ui/subject/subject_reviews_card_frame.dart lib/ui/subject/subject_reviews_card.dart lib/ui/subject/subject_reviews_sheet.dart test/ui/subject/subject_reviews_card_test.dart
+git add lib/ui/subject/review_avatar.dart lib/ui/subject/subject_reviews_card_frame.dart lib/ui/subject/subject_reviews_card.dart lib/ui/subject/subject_reviews_sheet.dart test/ui/subject/subject_reviews_card_test.dart test/ui/subject/subject_reviews_sheet_test.dart
 git commit -m "feat(subject): add popular reviews card and full reviews sheet"
 ```
 
@@ -5662,7 +6227,7 @@ class SubjectStaffSheet extends StatelessWidget {
                   Text(
                     '${fields.length}',
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.hintColor,
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ],
@@ -5892,7 +6457,7 @@ class SubjectStaffCard extends StatelessWidget {
                   child: Text(
                     field.key,
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.hintColor,
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ),
@@ -6225,7 +6790,7 @@ class SubjectDetailLeftPane extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final subject = ref
         .watch(subjectDetailControllerProvider(subjectId: subjectId))
-        .valueOrNull;
+        .value;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -6291,11 +6856,11 @@ class SubjectDetailMainPane extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final subject = ref
         .watch(subjectDetailControllerProvider(subjectId: subjectId))
-        .valueOrNull;
+        .value;
     final episodes =
         ref
             .watch(subjectMainEpisodesControllerProvider(subjectId: subjectId))
-            .valueOrNull ??
+            .value ??
         const [];
 
     return Column(
@@ -6354,7 +6919,7 @@ class SubjectDetailSidePane extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final subject = ref
         .watch(subjectDetailControllerProvider(subjectId: subjectId))
-        .valueOrNull;
+        .value;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -6705,7 +7270,7 @@ class SubjectDetailScreen extends ConsumerWidget {
     final episodes =
         ref
             .watch(subjectMainEpisodesControllerProvider(subjectId: subjectId))
-            .valueOrNull ??
+            .value ??
         const [];
 
     return Column(

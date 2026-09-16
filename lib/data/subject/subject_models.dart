@@ -32,12 +32,138 @@ class SelfRating {
   Map<String, dynamic> toJson() => _$SelfRatingToJson(this);
 }
 
+/// Aggregate collection counters for a subject, from `SubjectDetail`'s
+/// `favorite` object. Live-verified shape (subject 302286):
+/// `{"wish":2138,"done":7420,"doing":1102,"onHold":360,"dropped":177}`.
+///
+/// Note the backend uses camelCase `onHold` (not Bangumi's official
+/// snake_case `on_hold`) and `done` (not Bangumi's `collect`). Every
+/// counter defaults to 0 so a partial object still parses -- the UI
+/// only shows `done`/`doing`/`wish`.
+///
+/// Collapsing "counter absent" into "counter is 0" here is deliberate,
+/// and the opposite of what [SubjectDetail.episodes] and
+/// [SubjectDetail.scoreDetails] do: those keep null distinct from
+/// zero/empty because the UI must omit a line it has no data for,
+/// whereas for a display counter an unreported count and a count of zero
+/// mean the same thing to the reader.
+@JsonSerializable()
+class SubjectFavorite {
+  const SubjectFavorite({
+    required this.wish,
+    required this.done,
+    required this.doing,
+    required this.onHold,
+    required this.dropped,
+  });
+
+  @JsonKey(defaultValue: 0)
+  final int wish;
+  @JsonKey(defaultValue: 0)
+  final int done;
+  @JsonKey(defaultValue: 0)
+  final int doing;
+  @JsonKey(defaultValue: 0)
+  final int onHold;
+  @JsonKey(defaultValue: 0)
+  final int dropped;
+
+  factory SubjectFavorite.fromJson(Map<String, dynamic> json) =>
+      _$SubjectFavoriteFromJson(json);
+
+  Map<String, dynamic> toJson() => _$SubjectFavoriteToJson(this);
+}
+
+/// One value of an infobox field. Bangumi's infobox format allows an
+/// optional sub-key (`k`), so it is modeled as nullable -- but every
+/// value observed on this backend so far carries only `v`. Do not assume
+/// `k` is ever populated in production until it is seen live.
+///
+/// [v] defaults to `''` rather than being a hard requirement: a single
+/// malformed value object would otherwise throw out of
+/// `SubjectDetail.fromJson` and blank the entire subject page over one
+/// unrenderable infobox row (the same class of crash that earned
+/// [MyCollectionSubject] its hand-written factory).
+@JsonSerializable()
+class InfoboxValue {
+  const InfoboxValue({this.k, required this.v});
+
+  final String? k;
+  @JsonKey(defaultValue: '')
+  final String v;
+
+  factory InfoboxValue.fromJson(Map<String, dynamic> json) =>
+      _$InfoboxValueFromJson(json);
+
+  Map<String, dynamic> toJson() => _$InfoboxValueToJson(this);
+}
+
+/// One infobox row: a Chinese label (`key`) plus one or more values.
+@JsonSerializable()
+class InfoboxField {
+  const InfoboxField({required this.key, this.values = const []});
+
+  final String key;
+  @JsonKey(defaultValue: <InfoboxValue>[])
+  final List<InfoboxValue> values;
+
+  factory InfoboxField.fromJson(Map<String, dynamic> json) =>
+      _$InfoboxFieldFromJson(json);
+
+  Map<String, dynamic> toJson() => _$InfoboxFieldToJson(this);
+}
+
+/// The `infobox` object on `GET /v2/subjects/{id}`. This is the ONLY
+/// source of human-readable Chinese staff role names -- the
+/// `/v2/subjects/{id}/staff` endpoint returns integer `position` codes
+/// (52 distinct codes observed on a single subject) with no label, and
+/// we deliberately do not maintain a code->label mapping table.
+@JsonSerializable()
+class SubjectInfobox {
+  const SubjectInfobox({this.template, this.fields = const []});
+
+  final String? template;
+  @JsonKey(defaultValue: <InfoboxField>[])
+  final List<InfoboxField> fields;
+
+  factory SubjectInfobox.fromJson(Map<String, dynamic> json) =>
+      _$SubjectInfoboxFromJson(json);
+
+  Map<String, dynamic> toJson() => _$SubjectInfoboxToJson(this);
+}
+
+/// Infobox keys that are subject metadata, not staff credits. Used by
+/// [SubjectDetail.staffFields].
+///
+/// This is a BLOCKLIST, not an allowlist, on purpose: staff role keys
+/// are free text and 40+ distinct ones have been observed across
+/// subjects. An allowlist would silently drop any role we hadn't seen
+/// yet, which is worse than occasionally showing one metadata row we
+/// forgot to exclude.
+const subjectInfoboxNonStaffKeys = <String>{
+  '中文名',
+  '别名',
+  '话数',
+  '放送开始',
+  '放送星期',
+  '放送结束',
+  '官方网站',
+  '在线播放平台',
+  '播放电视台',
+  '其他电视台',
+  '链接',
+  '其他',
+  'Copyright',
+};
+
 /// Response of `GET /v2/subjects/{subjectId}` -- verified against the
 /// real `AniSubjectCollection` model. This is a deliberately lean subset
-/// (the real wire shape also has `type`/`nsfw`/`favorite`/`metaTags`/
-/// `relations`/`infobox`/`platform`/`airingInfo`/`updatedAt`, none of
-/// which the UI needs) -- json_serializable's generated `fromJson`
-/// ignores undeclared keys, so omitting fields is safe.
+/// -- json_serializable's generated `fromJson` ignores undeclared keys,
+/// so omitting fields is safe.
+///
+/// The real wire shape also has `type`/`nsfw`/`metaTags`/`relations`/
+/// `platform`/`airingInfo`/`updatedAt`, none of which the UI needs.
+/// `favorite` and `infobox` ARE parsed (see the fields below).
 @JsonSerializable()
 class SubjectDetail {
   const SubjectDetail({
@@ -53,6 +179,8 @@ class SubjectDetail {
     required this.selfRating,
     this.aliases = const [],
     this.scoreDetails,
+    this.favorite,
+    this.infobox,
     this.episodes,
   });
 
@@ -98,6 +226,19 @@ class SubjectDetail {
   /// responses that predate this field being added).
   final Map<String, int>? scoreDetails;
 
+  /// Aggregate collection counters. Nullable because the field is absent
+  /// on some responses; the 收藏统计 block hides itself when null.
+  final SubjectFavorite? favorite;
+
+  /// The raw infobox. Nullable; [infoboxValue] returns null and
+  /// [staffFields] returns empty when absent.
+  ///
+  /// Note that a field whose only value degraded to [InfoboxValue.v] ==
+  /// `''` still counts as having values, so it survives [staffFields]
+  /// and [infoboxValue] returns `''` for it -- absent and blank are not
+  /// collapsed here.
+  final SubjectInfobox? infobox;
+
   /// Every episode of this subject, of every type (`MAIN`/`SPECIAL`/`OP`/
   /// `ED`), exactly as embedded in this same `/v2/subjects/{id}` response.
   ///
@@ -122,26 +263,122 @@ class SubjectDetail {
   /// entirely rather than asserting a wrong 话数：0.
   int? get episodeCount => episodes?.where((episode) => episode.isMain).length;
 
+  /// First value of the infobox field named [key], or null when the
+  /// field is absent, the whole infobox is absent, or the field is
+  /// present with no values. Used for the pre-formatted Chinese
+  /// `放送开始` / `话数` / `别名` rows in 作品信息.
+  ///
+  /// Duplicate keys are realistic on a wiki-sourced infobox: the first
+  /// match that actually has a value wins, so an empty duplicate is
+  /// skipped rather than shadowing a later populated one.
+  String? infoboxValue(String key) {
+    final fields = infobox?.fields;
+    if (fields == null) return null;
+    for (final field in fields) {
+      if (field.key == key && field.values.isNotEmpty) {
+        return field.values.first.v;
+      }
+    }
+    return null;
+  }
+
+  /// Infobox fields that represent staff credits -- everything except
+  /// [subjectInfoboxNonStaffKeys]. Drives the 制作人员 card.
+  ///
+  /// Fields with an empty `values` list are excluded, matching
+  /// [infoboxValue]'s treatment of the same shape, so a renderer can
+  /// join `field.values` unguarded. A value whose `v` degraded to `''`
+  /// is NOT excluded (see [infobox]) -- that path is a malformed payload
+  /// we chose to render blank rather than reject.
+  List<InfoboxField> get staffFields {
+    final fields = infobox?.fields;
+    if (fields == null) return const [];
+    return fields
+        .where((field) => field.values.isNotEmpty)
+        .where((field) => !subjectInfoboxNonStaffKeys.contains(field.key))
+        .toList();
+  }
+
   factory SubjectDetail.fromJson(Map<String, dynamic> json) =>
       _$SubjectDetailFromJson(json);
 
   Map<String, dynamic> toJson() => _$SubjectDetailToJson(this);
 }
 
-/// A single character (with its voice actor's info, since
-/// `getCharacters` is always called with `withActors=true`).
+/// A person (voice actor, staff member, author). Live-verified against
+/// the `actors` array inside a character
+/// (`GET /v2/subjects/302286/characters?withActors=true`); the `person`
+/// object on `/v2/subjects/{id}/staff` was observed to have this exact
+/// field set too, though that endpoint was dropped in favour of
+/// `infobox` (its `position` codes are unmappable).
+@JsonSerializable()
+class PersonInfo {
+  const PersonInfo({
+    required this.id,
+    required this.name,
+    this.nameCn,
+    this.type,
+    this.imageMedium,
+    this.imageLarge,
+    this.summary,
+  });
+
+  final int id;
+  final String name;
+  final String? nameCn;
+
+  /// Opaque server-side person-category code. The only value observed on
+  /// the wire is `1` (every voice actor in the probed payload); there is
+  /// no code->label mapping available and none is planned, so nothing
+  /// renders this.
+  final int? type;
+  final String? imageMedium;
+  final String? imageLarge;
+  final String? summary;
+
+  /// Chinese name when it is present and non-empty, else the original.
+  String get displayName =>
+      (nameCn != null && nameCn!.isNotEmpty) ? nameCn! : name;
+
+  factory PersonInfo.fromJson(Map<String, dynamic> json) =>
+      _$PersonInfoFromJson(json);
+
+  Map<String, dynamic> toJson() => _$PersonInfoToJson(this);
+}
+
+/// A single character plus its voice actors.
 ///
-/// NOTE: `imageUrl`'s real field name is *inferred*, not confirmed
-/// against the real `AniCharacter` Kotlin model (only the wrapper
-/// `AniRelatedCharacter{index,character,role}` shape was actually read
-/// during this plan's design phase) -- verify against a live
-/// `GET .../characters?withActors=true` response before trusting this.
+/// Live-verified against `GET /v2/subjects/{id}/characters?withActors=true`
+/// (subject 302286). NOTE: an earlier version of this model declared an
+/// `imageUrl` field that does not exist on the wire -- the real keys are
+/// `imageMedium` / `imageLarge`. `actors` was also being silently
+/// dropped even though the request always sends `withActors=true`.
 @JsonSerializable()
 class CharacterInfo {
-  const CharacterInfo({required this.name, this.imageUrl});
+  const CharacterInfo({
+    required this.id,
+    required this.name,
+    this.nameCn,
+    this.imageMedium,
+    this.imageLarge,
+    this.actors = const [],
+  });
 
+  final int id;
   final String name;
-  final String? imageUrl;
+  final String? nameCn;
+  final String? imageMedium;
+  final String? imageLarge;
+  @JsonKey(defaultValue: <PersonInfo>[])
+  final List<PersonInfo> actors;
+
+  /// Chinese name when it is present and non-empty, else the original.
+  String get displayName =>
+      (nameCn != null && nameCn!.isNotEmpty) ? nameCn! : name;
+
+  /// The character's primary voice actor, or null when unknown. The UI
+  /// hides the CV line entirely when this is null.
+  PersonInfo? get primaryActor => actors.isEmpty ? null : actors.first;
 
   factory CharacterInfo.fromJson(Map<String, dynamic> json) =>
       _$CharacterInfoFromJson(json);
@@ -168,27 +405,6 @@ class RelatedCharacter {
       _$RelatedCharacterFromJson(json);
 
   Map<String, dynamic> toJson() => _$RelatedCharacterToJson(this);
-}
-
-/// Response item of `GET /v2/subjects/{subjectId}/staff`.
-///
-/// NOTE: this entire shape is an **unconfirmed best guess** -- the real
-/// Kotlin model for this endpoint was never read during this plan's
-/// design phase (flagged explicitly rather than silently assumed
-/// correct). Verify against a live `GET .../staff` response before
-/// trusting `name`/`imageUrl`/`role` as the real field names.
-@JsonSerializable()
-class StaffMember {
-  const StaffMember({required this.name, this.imageUrl, this.role});
-
-  final String name;
-  final String? imageUrl;
-  final String? role;
-
-  factory StaffMember.fromJson(Map<String, dynamic> json) =>
-      _$StaffMemberFromJson(json);
-
-  Map<String, dynamic> toJson() => _$StaffMemberToJson(this);
 }
 
 /// One item of `GET /v2/subjects/list` (the "My Collection" library

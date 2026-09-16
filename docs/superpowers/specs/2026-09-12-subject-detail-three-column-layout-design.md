@@ -214,8 +214,10 @@ AppBar（仅返回箭头，无标题）
 `lib/data/subject/bbcode.dart`：`String stripBbcode(String input)` —— 纯函数。
 - `[b]文字[/b]` → `文字`（保留内层文本，剥掉标签）
 - `[img]…[/img]`、`[img=…]…[/img]` → 整段丢弃
+- `[mask]…[/mask]` → **整段丢弃**（实施期追加）。`[mask]` 是 Bangumi 的马赛克文字标签（`bgm.tv/help/bbcode`，Ctrl+M），即剧透遮罩。不能只剥标签保留内层文本，否则热门评价卡会把剧透当正文直接印出来。丢弃而非展开的理由：剧透一旦被读者看到就不可挽回，而少显示几个字的预览文本是可挽回的（完整评价在 Bangumi 上还能看）。
 - 未闭合标签 → 剥掉标签本身，保留剩余文本
-- 不含标签 → 原样返回
+- 不含标签 → 原样返回（仅去掉首尾空白，见下）
+- 返回值 `trim()`（实施期追加）：丢弃开头/结尾的 `[img]` 后会剩下空白，不 trim 的话纯图片评价会渲染成空白 `Text`、图片开头的评价会多一个空行。在纯函数里 trim 一次，比在每个调用点各自 trim 更可靠。
 
 ### 新增「最近播放集数」
 
@@ -355,7 +357,7 @@ AppBar（仅返回箭头，无标题）
   - `staffFields` 黑名单过滤，**含"没见过的职位仍然保留"这一条**
   - `CharacterInfo` 的 `nameCn` / `imageMedium` / `actors` 解析；`actors` 缺失时为 `[]`
 - `test/data/subject/review_models_test.dart` — 重点测 `hasMore` 的哨兵语义（`total == limit+1` → true；`total == items.length` → false）
-- `test/data/subject/bbcode_test.dart` — `stripBbcode`：嵌套标签、`[img]` 丢弃、未闭合标签、无标签原样返回、空字符串
+- `test/data/subject/bbcode_test.dart` — `stripBbcode`：嵌套标签、`[img]` 丢弃（含多个、跨行、大写）、`[mask]` 丢弃、未闭合标签、字面方括号（`我给[9/10]分`）原样保留、首尾空白被 trim、空字符串
 - `test/data/play/last_played_episode_storage_test.dart` — get/set/未设置时为 null
 - `test/domain/subject/continue_watching_controller_test.dart` — 有记录 / 无记录 / 记录指向已不存在的 episodeId / 集数列表为空
 - `test/domain/subject/subject_reviews_controller_test.dart` — 首屏 + `loadMore()` 追加 + `hasMore` 翻转
@@ -374,7 +376,7 @@ AppBar（仅返回箭头，无标题）
   - `subject_info_table`：infobox 缺字段时对应行不渲染
   - `subject_collection_stats`：`done`/`doing`/`wish` 分别对应 收藏/在看/想看；`favorite` 为 null 时整块不渲染
   - `subject_title_block`：meta 行三段齐全 / 缺 airDate / 缺 episodeCount / 全部已放送（不显示「连载至」）四种组合
-  - `continue_watching_button`：有记录 → 「继续观看 第N集」；无记录 → 「开始观看」
+  - `continue_watching_button`：有**有效**记录 → 「继续观看 第N集」；无记录 → 「开始观看」；记录已失效（存的 `episodeId` 已不在列表里）→ 「开始观看」（三种情形，与上面 `continueWatchingProvider` 的三条分支一致）
   - `subject_rating_card`：分数 / 排名 / 人数（求和得出）/ 柱状图 / 打分按钮文案随已评分状态变化
 - 删 `test/ui/subject/subject_blurred_header_test.dart`
 

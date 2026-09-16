@@ -2,17 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../data/play/last_played_episode_storage.dart';
 import '../../data/subject/subject_episode_models.dart';
 import '../../domain/media/media_registry.dart';
 import '../../domain/play/episode_source_matcher.dart';
 import '../../domain/play/subject_episodes_controller.dart';
+import '../../domain/subject/continue_watching_controller.dart';
 import 'episode_source_sheet.dart' show sourceLabel;
 
 /// Modal bottom sheet for exactly one episode's playback sources --
 /// opened by tapping a number in `EpisodeNumberGrid`.
 ///
 /// Unlike `EpisodeSourceSheet` (which lists every episode across every
-/// source, and stays unmodified/still used elsewhere), this always
+/// source, and which nothing in `lib/` constructs any more -- only its own
+/// test does; the grid it wrapped, `EpisodeSourceGrid`, is still live in
+/// `lib/ui/player/player_screen.dart:726`), this always
 /// shows exactly one episode's matched candidates (via
 /// [matchEpisodeSources]), even when there's only one -- see the
 /// design doc's Section 3 (Q8: interaction consistency, never
@@ -85,7 +89,24 @@ class EpisodePlaybackSheet extends ConsumerWidget {
                       ListTile(
                         title: Text(sourceLabel(sources, match.sourceId)),
                         trailing: FilledButton(
-                          onPressed: () {
+                          onPressed: () async {
+                            // Remember which Bangumi episode was opened so
+                            // the detail page's 继续观看 button can point
+                            // back at it. This is the ONLY place that still
+                            // knows the Bangumi `episodeId` -- `PlayerScreen`
+                            // only ever sees `MergedEpisode`.
+                            final storage = await ref.read(
+                              lastPlayedEpisodeStorageProvider.future,
+                            );
+                            await storage.set(subjectId, episode.episodeId);
+                            // `lastPlayedEpisodeStorageProvider` yields a
+                            // mutable object, so nothing re-emits on write --
+                            // invalidate the derived provider explicitly or
+                            // the button keeps its old label.
+                            ref.invalidate(
+                              continueWatchingProvider(subjectId: subjectId),
+                            );
+                            if (!context.mounted) return;
                             Navigator.of(context).pop();
                             context.push(
                               '/subject/$subjectId/play'

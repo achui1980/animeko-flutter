@@ -5,12 +5,19 @@ import '../../data/subject/subject_models.dart';
 
 part 'subject_detail_controller.g.dart';
 
-/// Fetches the main subject-detail payload (summary/tags/score/rank/
-/// collection status/self-rating). Cast ([SubjectCharacters]) and staff
-/// ([SubjectStaff]) are fetched via separate providers so either can
-/// fail independently without affecting this one or each other -- see
-/// the design doc's "per-source silent failure" pattern (mirrors how
+/// Fetches the main subject-detail payload (summary/tags/aliases/score/
+/// rank/scoreDetails/collection status/self-rating/favorite counters/
+/// infobox/episodes -- note this is the app's only source of episode
+/// data, consumed via `SubjectMainEpisodesController`). Cast
+/// ([SubjectCharacters]) is fetched via a separate provider so it can
+/// fail independently without affecting this one -- see the design
+/// doc's "per-source silent failure" pattern (mirrors how
 /// `SubjectEpisodesController` isolates each `MediaSource`'s failure).
+///
+/// Staff is NOT a separate provider: the 制作人员 card reads
+/// `SubjectDetail.staffFields` off this payload, because the
+/// `/v2/subjects/{id}/staff` endpoint only labels each credit with an
+/// opaque integer `position` code and no human-readable role name.
 @riverpod
 class SubjectDetailController extends _$SubjectDetailController {
   @override
@@ -27,14 +34,5 @@ class SubjectCharacters extends _$SubjectCharacters {
   @override
   Future<List<RelatedCharacter>> build({required int subjectId}) {
     return ref.watch(subjectApiProvider).getCharacters(subjectId);
-  }
-}
-
-/// Staff. Same per-source-silent-failure treatment as [SubjectCharacters].
-@riverpod
-class SubjectStaff extends _$SubjectStaff {
-  @override
-  Future<List<StaffMember>> build({required int subjectId}) {
-    return ref.watch(subjectApiProvider).getStaff(subjectId);
   }
 }

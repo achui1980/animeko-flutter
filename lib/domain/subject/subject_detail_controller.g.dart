@@ -8,30 +8,51 @@ part of 'subject_detail_controller.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Fetches the main subject-detail payload (summary/tags/score/rank/
-/// collection status/self-rating). Cast ([SubjectCharacters]) and staff
-/// ([SubjectStaff]) are fetched via separate providers so either can
-/// fail independently without affecting this one or each other -- see
-/// the design doc's "per-source silent failure" pattern (mirrors how
+/// Fetches the main subject-detail payload (summary/tags/aliases/score/
+/// rank/scoreDetails/collection status/self-rating/favorite counters/
+/// infobox/episodes -- note this is the app's only source of episode
+/// data, consumed via `SubjectMainEpisodesController`). Cast
+/// ([SubjectCharacters]) is fetched via a separate provider so it can
+/// fail independently without affecting this one -- see the design
+/// doc's "per-source silent failure" pattern (mirrors how
 /// `SubjectEpisodesController` isolates each `MediaSource`'s failure).
+///
+/// Staff is NOT a separate provider: the 制作人员 card reads
+/// `SubjectDetail.staffFields` off this payload, because the
+/// `/v2/subjects/{id}/staff` endpoint only labels each credit with an
+/// opaque integer `position` code and no human-readable role name.
 
 @ProviderFor(SubjectDetailController)
 final subjectDetailControllerProvider = SubjectDetailControllerFamily._();
 
-/// Fetches the main subject-detail payload (summary/tags/score/rank/
-/// collection status/self-rating). Cast ([SubjectCharacters]) and staff
-/// ([SubjectStaff]) are fetched via separate providers so either can
-/// fail independently without affecting this one or each other -- see
-/// the design doc's "per-source silent failure" pattern (mirrors how
+/// Fetches the main subject-detail payload (summary/tags/aliases/score/
+/// rank/scoreDetails/collection status/self-rating/favorite counters/
+/// infobox/episodes -- note this is the app's only source of episode
+/// data, consumed via `SubjectMainEpisodesController`). Cast
+/// ([SubjectCharacters]) is fetched via a separate provider so it can
+/// fail independently without affecting this one -- see the design
+/// doc's "per-source silent failure" pattern (mirrors how
 /// `SubjectEpisodesController` isolates each `MediaSource`'s failure).
+///
+/// Staff is NOT a separate provider: the 制作人员 card reads
+/// `SubjectDetail.staffFields` off this payload, because the
+/// `/v2/subjects/{id}/staff` endpoint only labels each credit with an
+/// opaque integer `position` code and no human-readable role name.
 final class SubjectDetailControllerProvider
     extends $AsyncNotifierProvider<SubjectDetailController, SubjectDetail> {
-  /// Fetches the main subject-detail payload (summary/tags/score/rank/
-  /// collection status/self-rating). Cast ([SubjectCharacters]) and staff
-  /// ([SubjectStaff]) are fetched via separate providers so either can
-  /// fail independently without affecting this one or each other -- see
-  /// the design doc's "per-source silent failure" pattern (mirrors how
+  /// Fetches the main subject-detail payload (summary/tags/aliases/score/
+  /// rank/scoreDetails/collection status/self-rating/favorite counters/
+  /// infobox/episodes -- note this is the app's only source of episode
+  /// data, consumed via `SubjectMainEpisodesController`). Cast
+  /// ([SubjectCharacters]) is fetched via a separate provider so it can
+  /// fail independently without affecting this one -- see the design
+  /// doc's "per-source silent failure" pattern (mirrors how
   /// `SubjectEpisodesController` isolates each `MediaSource`'s failure).
+  ///
+  /// Staff is NOT a separate provider: the 制作人员 card reads
+  /// `SubjectDetail.staffFields` off this payload, because the
+  /// `/v2/subjects/{id}/staff` endpoint only labels each credit with an
+  /// opaque integer `position` code and no human-readable role name.
   SubjectDetailControllerProvider._({
     required SubjectDetailControllerFamily super.from,
     required int super.argument,
@@ -72,12 +93,19 @@ final class SubjectDetailControllerProvider
 String _$subjectDetailControllerHash() =>
     r'20c2661d85ddebfb6e0b534bfd822b5f2ff796a6';
 
-/// Fetches the main subject-detail payload (summary/tags/score/rank/
-/// collection status/self-rating). Cast ([SubjectCharacters]) and staff
-/// ([SubjectStaff]) are fetched via separate providers so either can
-/// fail independently without affecting this one or each other -- see
-/// the design doc's "per-source silent failure" pattern (mirrors how
+/// Fetches the main subject-detail payload (summary/tags/aliases/score/
+/// rank/scoreDetails/collection status/self-rating/favorite counters/
+/// infobox/episodes -- note this is the app's only source of episode
+/// data, consumed via `SubjectMainEpisodesController`). Cast
+/// ([SubjectCharacters]) is fetched via a separate provider so it can
+/// fail independently without affecting this one -- see the design
+/// doc's "per-source silent failure" pattern (mirrors how
 /// `SubjectEpisodesController` isolates each `MediaSource`'s failure).
+///
+/// Staff is NOT a separate provider: the 制作人员 card reads
+/// `SubjectDetail.staffFields` off this payload, because the
+/// `/v2/subjects/{id}/staff` endpoint only labels each credit with an
+/// opaque integer `position` code and no human-readable role name.
 
 final class SubjectDetailControllerFamily extends $Family
     with
@@ -97,12 +125,19 @@ final class SubjectDetailControllerFamily extends $Family
         isAutoDispose: true,
       );
 
-  /// Fetches the main subject-detail payload (summary/tags/score/rank/
-  /// collection status/self-rating). Cast ([SubjectCharacters]) and staff
-  /// ([SubjectStaff]) are fetched via separate providers so either can
-  /// fail independently without affecting this one or each other -- see
-  /// the design doc's "per-source silent failure" pattern (mirrors how
+  /// Fetches the main subject-detail payload (summary/tags/aliases/score/
+  /// rank/scoreDetails/collection status/self-rating/favorite counters/
+  /// infobox/episodes -- note this is the app's only source of episode
+  /// data, consumed via `SubjectMainEpisodesController`). Cast
+  /// ([SubjectCharacters]) is fetched via a separate provider so it can
+  /// fail independently without affecting this one -- see the design
+  /// doc's "per-source silent failure" pattern (mirrors how
   /// `SubjectEpisodesController` isolates each `MediaSource`'s failure).
+  ///
+  /// Staff is NOT a separate provider: the 制作人员 card reads
+  /// `SubjectDetail.staffFields` off this payload, because the
+  /// `/v2/subjects/{id}/staff` endpoint only labels each credit with an
+  /// opaque integer `position` code and no human-readable role name.
 
   SubjectDetailControllerProvider call({required int subjectId}) =>
       SubjectDetailControllerProvider._(argument: subjectId, from: this);
@@ -111,12 +146,19 @@ final class SubjectDetailControllerFamily extends $Family
   String toString() => r'subjectDetailControllerProvider';
 }
 
-/// Fetches the main subject-detail payload (summary/tags/score/rank/
-/// collection status/self-rating). Cast ([SubjectCharacters]) and staff
-/// ([SubjectStaff]) are fetched via separate providers so either can
-/// fail independently without affecting this one or each other -- see
-/// the design doc's "per-source silent failure" pattern (mirrors how
+/// Fetches the main subject-detail payload (summary/tags/aliases/score/
+/// rank/scoreDetails/collection status/self-rating/favorite counters/
+/// infobox/episodes -- note this is the app's only source of episode
+/// data, consumed via `SubjectMainEpisodesController`). Cast
+/// ([SubjectCharacters]) is fetched via a separate provider so it can
+/// fail independently without affecting this one -- see the design
+/// doc's "per-source silent failure" pattern (mirrors how
 /// `SubjectEpisodesController` isolates each `MediaSource`'s failure).
+///
+/// Staff is NOT a separate provider: the 制作人员 card reads
+/// `SubjectDetail.staffFields` off this payload, because the
+/// `/v2/subjects/{id}/staff` endpoint only labels each credit with an
+/// opaque integer `position` code and no human-readable role name.
 
 abstract class _$SubjectDetailController extends $AsyncNotifier<SubjectDetail> {
   late final _$args = ref.$arg as int;
@@ -249,106 +291,6 @@ abstract class _$SubjectCharacters
                 List<RelatedCharacter>
               >,
               AsyncValue<List<RelatedCharacter>>,
-              Object?,
-              Object?
-            >;
-    element.handleCreate(ref, () => build(subjectId: _$args));
-  }
-}
-
-/// Staff. Same per-source-silent-failure treatment as [SubjectCharacters].
-
-@ProviderFor(SubjectStaff)
-final subjectStaffProvider = SubjectStaffFamily._();
-
-/// Staff. Same per-source-silent-failure treatment as [SubjectCharacters].
-final class SubjectStaffProvider
-    extends $AsyncNotifierProvider<SubjectStaff, List<StaffMember>> {
-  /// Staff. Same per-source-silent-failure treatment as [SubjectCharacters].
-  SubjectStaffProvider._({
-    required SubjectStaffFamily super.from,
-    required int super.argument,
-  }) : super(
-         retry: null,
-         name: r'subjectStaffProvider',
-         isAutoDispose: true,
-         dependencies: null,
-         $allTransitiveDependencies: null,
-       );
-
-  @override
-  String debugGetCreateSourceHash() => _$subjectStaffHash();
-
-  @override
-  String toString() {
-    return r'subjectStaffProvider'
-        ''
-        '($argument)';
-  }
-
-  @$internal
-  @override
-  SubjectStaff create() => SubjectStaff();
-
-  @override
-  bool operator ==(Object other) {
-    return other is SubjectStaffProvider && other.argument == argument;
-  }
-
-  @override
-  int get hashCode {
-    return argument.hashCode;
-  }
-}
-
-String _$subjectStaffHash() => r'cdf38fd8dfbf39674f58f096d1badf1250ba804c';
-
-/// Staff. Same per-source-silent-failure treatment as [SubjectCharacters].
-
-final class SubjectStaffFamily extends $Family
-    with
-        $ClassFamilyOverride<
-          SubjectStaff,
-          AsyncValue<List<StaffMember>>,
-          List<StaffMember>,
-          FutureOr<List<StaffMember>>,
-          int
-        > {
-  SubjectStaffFamily._()
-    : super(
-        retry: null,
-        name: r'subjectStaffProvider',
-        dependencies: null,
-        $allTransitiveDependencies: null,
-        isAutoDispose: true,
-      );
-
-  /// Staff. Same per-source-silent-failure treatment as [SubjectCharacters].
-
-  SubjectStaffProvider call({required int subjectId}) =>
-      SubjectStaffProvider._(argument: subjectId, from: this);
-
-  @override
-  String toString() => r'subjectStaffProvider';
-}
-
-/// Staff. Same per-source-silent-failure treatment as [SubjectCharacters].
-
-abstract class _$SubjectStaff extends $AsyncNotifier<List<StaffMember>> {
-  late final _$args = ref.$arg as int;
-  int get subjectId => _$args;
-
-  FutureOr<List<StaffMember>> build({required int subjectId});
-  @$mustCallSuper
-  @override
-  void runBuild() {
-    final ref =
-        this.ref as $Ref<AsyncValue<List<StaffMember>>, List<StaffMember>>;
-    final element =
-        ref.element
-            as $ClassProviderElement<
-              AnyNotifier<AsyncValue<List<StaffMember>>, List<StaffMember>>,
-              AsyncValue<List<StaffMember>>,
               Object?,
               Object?
             >;

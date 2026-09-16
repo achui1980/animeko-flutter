@@ -163,104 +163,113 @@ void main() {
   });
 
   group('getCharacters', () {
+    /// `/characters` is declared as `get<dynamic>` because the endpoint
+    /// answers with a bare JSON array, so its stubs cannot reuse the
+    /// `Response<Map<String, dynamic>>`-typed [jsonResponse] helper.
+    Response<dynamic> characterResponse(dynamic body) => Response<dynamic>(
+      data: body,
+      requestOptions: RequestOptions(path: '/'),
+      statusCode: 200,
+    );
+
+    /// A trimmed element of the real `GET /v2/subjects/302286/characters?
+    /// withActors=true` payload -- the actor's `imageLarge`/`imageMedium`/
+    /// `summary` are dropped because nothing here asserts on them. The
+    /// untrimmed element lives in `subject_models_test.dart`.
+    Map<String, dynamic> realItem() => {
+      'index': 0,
+      'character': {
+        'id': 3320,
+        'name': '黒崎一護',
+        'nameCn': '黑崎一护',
+        'imageLarge':
+            'https://api.animeko.org/v2/characters/3320/image?size=large',
+        'imageMedium':
+            'https://api.animeko.org/v2/characters/3320/image?size=medium',
+        'actors': [
+          {'id': 4716, 'name': '森田成一', 'nameCn': '森田成一', 'type': 1},
+        ],
+      },
+      'role': 1,
+    };
+
     test('GETs with withActors=true query param', () async {
       when(
-        () => dio.get<Map<String, dynamic>>(
+        () => dio.get<dynamic>(
           any(),
           queryParameters: any(named: 'queryParameters'),
         ),
-      ).thenAnswer(
-        (_) async => jsonResponse({'items': <Map<String, dynamic>>[]}),
-      );
+      ).thenAnswer((_) async => characterResponse(<dynamic>[]));
 
       await api.getCharacters(400602);
 
       verify(
-        () => dio.get<Map<String, dynamic>>(
+        () => dio.get<dynamic>(
           '/v2/subjects/400602/characters',
           queryParameters: {'withActors': true},
         ),
       ).called(1);
     });
 
-    test('parses a list of related characters', () async {
+    // The real endpoint returns a BARE ARRAY -- no `items` envelope.
+    // Parsing it as one used to throw on every single call.
+    test('parses a bare JSON array of related characters', () async {
       when(
-        () => dio.get<Map<String, dynamic>>(
+        () => dio.get<dynamic>(
           any(),
           queryParameters: any(named: 'queryParameters'),
         ),
       ).thenAnswer(
-        (_) async => jsonResponse({
-          'items': [
-            {
-              'index': 0,
-              'character': {
-                'name': '芙莉莲',
-                'imageUrl': 'https://example.com/f.jpg',
-              },
-              'role': 1,
-            },
-            {
-              'index': 1,
-              'character': {'name': '费伦', 'imageUrl': null},
-              'role': 2,
-            },
-          ],
-        }),
+        (_) async => characterResponse(<dynamic>[
+          realItem(),
+          {
+            'index': 1,
+            'character': {'id': 3321, 'name': '朽木ルキア'},
+            'role': 2,
+          },
+        ]),
       );
 
       final characters = await api.getCharacters(400602);
 
       expect(characters, hasLength(2));
-      expect(characters.first.character.name, '芙莉莲');
-      expect(characters.last.character.imageUrl, isNull);
+      expect(characters.first.character.name, '黒崎一護');
+      expect(characters.first.character.primaryActor?.name, '森田成一');
+      expect(characters.last.character.imageMedium, isNull);
+      expect(characters.last.character.actors, isEmpty);
+      expect(characters.last.character.primaryActor, isNull);
     });
 
-    test('returns an empty list when the response has no items', () async {
+    // Defensive branch: keeps working if the backend ever wraps the
+    // array in the `{items: [...]}` envelope every other list endpoint
+    // in this codebase uses.
+    test('still parses an items envelope if the backend adds one', () async {
       when(
-        () => dio.get<Map<String, dynamic>>(
+        () => dio.get<dynamic>(
           any(),
           queryParameters: any(named: 'queryParameters'),
         ),
       ).thenAnswer(
-        (_) async => jsonResponse({'items': <Map<String, dynamic>>[]}),
-      );
-
-      expect(await api.getCharacters(400602), isEmpty);
-    });
-  });
-
-  group('getStaff', () {
-    test('GETs the exact staff path', () async {
-      when(() => dio.get<Map<String, dynamic>>(any())).thenAnswer(
-        (_) async => jsonResponse({'items': <Map<String, dynamic>>[]}),
-      );
-
-      await api.getStaff(400602);
-
-      verify(
-        () => dio.get<Map<String, dynamic>>('/v2/subjects/400602/staff'),
-      ).called(1);
-    });
-
-    test('parses a list of staff members', () async {
-      when(() => dio.get<Map<String, dynamic>>(any())).thenAnswer(
-        (_) async => jsonResponse({
-          'items': [
-            {
-              'name': '渡边步',
-              'imageUrl': 'https://example.com/s.jpg',
-              'role': '导演',
-            },
-          ],
+        (_) async => characterResponse(<String, dynamic>{
+          'items': <dynamic>[realItem()],
         }),
       );
 
-      final staff = await api.getStaff(400602);
+      final characters = await api.getCharacters(400602);
 
-      expect(staff, hasLength(1));
-      expect(staff.single.name, '渡边步');
-      expect(staff.single.role, '导演');
+      expect(characters, hasLength(1));
+      expect(characters.single.character.nameCn, '黑崎一护');
+    });
+
+    test('returns an empty list when the array is empty', () async {
+      when(
+        () => dio.get<dynamic>(
+          any(),
+          queryParameters: any(named: 'queryParameters'),
+        ),
+      ).thenAnswer((_) async => characterResponse(<dynamic>[]));
+
+      expect(await api.getCharacters(400602), isEmpty);
     });
   });
 
@@ -339,6 +348,66 @@ void main() {
       expect(page.items, hasLength(1));
       expect(page.total, 1);
       expect(page.items.single.nameCn, 'A-cn');
+    });
+  });
+
+  group('getReviews', () {
+    final reviewsJson = {
+      'total': 2,
+      'items': [
+        {
+          'id': 'bangumi:302286:1261526',
+          'subjectId': 302286,
+          'source': 'bangumi',
+          'author': {'id': '1261526', 'nickname': 'Guating'},
+          'contentBbcode': '对比老tv质的飞跃。',
+          'updatedAt': '2026-09-11T13:56:03Z',
+          'rating': 8,
+          'likeCount': 0,
+        },
+      ],
+    };
+
+    test('GETs the reviews path with offset/limit query params', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>(
+          any(),
+          queryParameters: any(named: 'queryParameters'),
+        ),
+      ).thenAnswer((_) async => jsonResponse(reviewsJson));
+
+      await api.getReviews(subjectId: 302286, offset: 40, limit: 5);
+
+      verify(
+        () => dio.get<Map<String, dynamic>>(
+          '/v2/subjects/302286/reviews',
+          // Deliberately distinct values: with offset == limit a
+          // transposed `{'offset': limit, 'limit': offset}` implementation
+          // would still satisfy this expectation.
+          queryParameters: {'offset': 40, 'limit': 5},
+        ),
+      ).called(1);
+    });
+
+    test('parses the response into a PaginatedReviews', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>(
+          any(),
+          queryParameters: any(named: 'queryParameters'),
+        ),
+      ).thenAnswer((_) async => jsonResponse(reviewsJson));
+
+      final page = await api.getReviews(
+        subjectId: 302286,
+        offset: 0,
+        limit: 20,
+      );
+
+      expect(page.items, hasLength(1));
+      expect(page.items.single.author.nickname, 'Guating');
+      expect(page.items.single.rating, 8);
+      // total=2 with 1 item is the backend's limit+1 has-more sentinel.
+      expect(page.hasMore, isTrue);
     });
   });
 }

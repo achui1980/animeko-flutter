@@ -55,7 +55,7 @@ void main() {
     test('returns the list from SubjectApi.getCharacters', () async {
       const character = RelatedCharacter(
         index: 0,
-        character: CharacterInfo(name: 'X'),
+        character: CharacterInfo(id: 3320, name: 'X'),
         role: 1,
       );
       when(() => api.getCharacters(1)).thenAnswer((_) async => [character]);
@@ -72,28 +72,6 @@ void main() {
 
       await expectLater(
         container.read(subjectCharactersProvider(subjectId: 1).future),
-        throwsA(isA<Exception>()),
-      );
-    });
-  });
-
-  group('SubjectStaff', () {
-    test('returns the list from SubjectApi.getStaff', () async {
-      const staff = StaffMember(name: 'Y');
-      when(() => api.getStaff(1)).thenAnswer((_) async => [staff]);
-
-      final result = await container.read(
-        subjectStaffProvider(subjectId: 1).future,
-      );
-
-      expect(result.single.name, 'Y');
-    });
-
-    test('propagates a getStaff failure independently', () async {
-      when(() => api.getStaff(1)).thenThrow(Exception('staff unavailable'));
-
-      await expectLater(
-        container.read(subjectStaffProvider(subjectId: 1).future),
         throwsA(isA<Exception>()),
       );
     });
