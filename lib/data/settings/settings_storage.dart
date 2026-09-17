@@ -10,6 +10,7 @@ const _themeModeKey = 'theme_mode';
 const _playbackSpeedKey = 'playback_speed';
 const _useDynamicColorKey = 'use_dynamic_color';
 const _seedColorKey = 'seed_color';
+const _downloadDirectoryKey = 'download_directory';
 
 /// Thin wrapper around [SharedPreferences] for simple app settings that
 /// don't need [SecureTokenStorage]'s encryption -- a proxy URL is not
@@ -29,6 +30,19 @@ class SettingsStorage {
       await _prefs.remove(_proxyUrlKey);
     } else {
       await _prefs.setString(_proxyUrlKey, url);
+    }
+  }
+
+  /// Returns the persisted custom download directory, if configured.
+  String? getDownloadDirectory() => _prefs.getString(_downloadDirectoryKey);
+
+  /// Persists [path] as the custom download directory. Passing `null`
+  /// reverts to the application-support downloads directory.
+  Future<void> setDownloadDirectory(String? path) async {
+    if (path == null) {
+      await _prefs.remove(_downloadDirectoryKey);
+    } else {
+      await _prefs.setString(_downloadDirectoryKey, path);
     }
   }
 

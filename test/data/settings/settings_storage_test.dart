@@ -30,6 +30,16 @@ void main() {
       expect(storage.getProxyUrl(), isNull);
     });
 
+    test('stores and clears a custom download directory', () async {
+      final prefs = await SharedPreferences.getInstance();
+      final storage = SettingsStorage(prefs);
+      expect(storage.getDownloadDirectory(), isNull);
+      await storage.setDownloadDirectory('/Volumes/Media/Anime');
+      expect(storage.getDownloadDirectory(), '/Volumes/Media/Anime');
+      await storage.setDownloadDirectory(null);
+      expect(storage.getDownloadDirectory(), isNull);
+    });
+
     group('theme mode', () {
       test('getThemeMode returns null when nothing is stored', () async {
         final prefs = await SharedPreferences.getInstance();
