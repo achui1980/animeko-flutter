@@ -116,12 +116,17 @@ Dio _dio(Map<String, Object> responses, {bool waitForCancellation = false}) {
   return dio;
 }
 
-DownloadRequest _request(String sourceId, int subjectId) => DownloadRequest(
+DownloadRequest _request(
+  String sourceId,
+  int subjectId, {
+  required String downloadRoot,
+}) => DownloadRequest(
   subjectId: subjectId,
   subjectName: 'Subject $subjectId',
   sourceId: sourceId,
   episode: _Episode(sourceId, '$subjectId'),
   episodeLabel: '$subjectId',
+  downloadRoot: downloadRoot,
 );
 
 void main() {
@@ -168,13 +173,12 @@ void main() {
         'https://cdn.example/first.mp4': [1],
         'https://cdn.example/second.mp4': [2],
       }),
-      downloadRoot: root.path,
       sourceForId: (id) => sources[id]!,
       repository: repository,
     )..events.listen(events.add);
 
-    worker.enqueue(_request('anime1', 1));
-    worker.enqueue(_request('xifan', 2));
+    worker.enqueue(_request('anime1', 1, downloadRoot: root.path));
+    worker.enqueue(_request('xifan', 2, downloadRoot: root.path));
     await firstResolved.future;
     expect(resolved, ['first']);
 
@@ -188,12 +192,14 @@ void main() {
   test('rejects a request from an unsupported source', () {
     final worker = DownloadWorker(
       dio: _dio({}),
-      downloadRoot: root.path,
       sourceForId: (_) => throw UnimplementedError(),
       repository: repository,
     );
 
-    expect(() => worker.enqueue(_request('rss', 1)), throwsArgumentError);
+    expect(
+      () => worker.enqueue(_request('rss', 1, downloadRoot: root.path)),
+      throwsArgumentError,
+    );
   });
 
   test('prefers an MP4 candidate for a Xifan request', () async {
@@ -202,14 +208,13 @@ void main() {
       dio: _dio({
         'https://cdn.example/video.mp4': [1, 2, 3],
       }),
-      downloadRoot: root.path,
       sourceForId: (_) => _XifanSource(const [
         XifanPlaybackSource(url: 'https://cdn.example/video.m3u8'),
         XifanPlaybackSource(url: 'https://cdn.example/video.mp4'),
       ]),
       repository: repository,
     )..events.listen(events.add);
-    final request = _request('xifan', 1);
+    final request = _request('xifan', 1, downloadRoot: root.path);
 
     worker.enqueue(request);
     await worker.whenIdle;
@@ -224,13 +229,12 @@ void main() {
     final dio = _dio({}, waitForCancellation: true);
     final worker = DownloadWorker(
       dio: dio,
-      downloadRoot: root.path,
       sourceForId: (_) => _Source('anime1', const [
         _PlaybackSource('https://cdn.example/video.mp4'),
       ]),
       repository: repository,
     );
-    final request = _request('anime1', 1);
+    final request = _request('anime1', 1, downloadRoot: root.path);
 
     worker.enqueue(request);
     await (dio.httpClientAdapter as _Adapter).started.future;
@@ -244,13 +248,12 @@ void main() {
   test('persists a failure message when downloading fails', () async {
     final worker = DownloadWorker(
       dio: _dio({}),
-      downloadRoot: root.path,
       sourceForId: (_) => _Source('anime1', const [
         _PlaybackSource('https://cdn.example/video.mp4'),
       ]),
       repository: repository,
     );
-    final request = _request('anime1', 1);
+    final request = _request('anime1', 1, downloadRoot: root.path);
 
     worker.enqueue(request);
     await worker.whenIdle;

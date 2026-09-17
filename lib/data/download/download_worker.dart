@@ -15,6 +15,7 @@ class DownloadRequest {
     required this.sourceId,
     required this.episode,
     required this.episodeLabel,
+    required this.downloadRoot,
   });
 
   final int subjectId;
@@ -22,6 +23,16 @@ class DownloadRequest {
   final String sourceId;
   final MediaEpisode episode;
   final String episodeLabel;
+
+  /// Snapshotted at enqueue time from `DownloadSettingsController`. Reading
+  /// it here (rather than `DownloadWorker` reading a single shared root at
+  /// construction time) means an in-flight download keeps writing to the
+  /// directory the user had configured when they started it, even if they
+  /// change the setting mid-download -- see the design doc's decision to
+  /// stop `DownloadQueueController.build()` from watching the download
+  /// directory (otherwise every settings change would rebuild the worker
+  /// and silently drop the whole queue).
+  final String downloadRoot;
 
   String get episodeKey => '$subjectId::$sourceId::${episode.title}';
 }
@@ -60,16 +71,13 @@ class DownloadCancelled extends DownloadEvent {
 class DownloadWorker {
   DownloadWorker({
     required Dio dio,
-    required String downloadRoot,
     required MediaSource Function(String sourceId) sourceForId,
     required DownloadedEpisodeRepository repository,
   }) : _dio = dio,
-       _downloadRoot = downloadRoot,
        _sourceForId = sourceForId,
        _repository = repository;
 
   final Dio _dio;
-  final String _downloadRoot;
   final MediaSource Function(String) _sourceForId;
   final DownloadedEpisodeRepository _repository;
   final _queue = <DownloadRequest>[];
@@ -117,7 +125,7 @@ class DownloadWorker {
   Future<void> _download(DownloadRequest request) async {
     final directory = Directory(
       p.join(
-        _downloadRoot,
+        request.downloadRoot,
         request.sourceId,
         request.subjectId.toString(),
         request.episodeLabel,
