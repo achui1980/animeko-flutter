@@ -19,6 +19,7 @@ class HlsDownloader {
     required Uri manifestUrl,
     required Directory targetDirectory,
     Map<String, String> headers = const {},
+    CancelToken? cancelToken,
     void Function(int received, int total)? onProgress,
   }) async {
     await targetDirectory.create(recursive: true);
@@ -51,6 +52,7 @@ class HlsDownloader {
       await _dio.downloadUri(
         playlistUrl.resolve(lines[lineIndex]),
         segment.path,
+        cancelToken: cancelToken,
         options: Options(headers: headers),
       );
       received += await segment.length();

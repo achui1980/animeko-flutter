@@ -9,6 +9,7 @@ class _FakeAdapter implements HttpClientAdapter {
   _FakeAdapter(this.responses);
 
   final Map<String, Object> responses;
+  final cancelFutures = <Future<void>?>[];
 
   @override
   Future<ResponseBody> fetch(
@@ -16,6 +17,7 @@ class _FakeAdapter implements HttpClientAdapter {
     Stream<Uint8List>? requestStream,
     Future<void>? cancelFuture,
   ) async {
+    cancelFutures.add(cancelFuture);
     final response = responses[options.uri.toString()];
     if (response is String) return ResponseBody.fromString(response, 200);
     if (response is List<int>) {
@@ -71,5 +73,24 @@ void main() {
 
     expect(await result.playlist.readAsString(), contains('segment_0000.ts'));
     expect(await File('${target.path}/segment_0000.ts').readAsBytes(), [1]);
+  });
+
+  test('passes the cancellation token to segment downloads', () async {
+    final target = await Directory.systemTemp.createTemp('hls_test_');
+    addTearDown(() => target.delete(recursive: true));
+    final dio = fakeDio({
+      'https://cdn.example/episode/index.m3u8': '#EXTM3U\npart-a.ts\n',
+      'https://cdn.example/episode/part-a.ts': [1],
+    });
+    final cancelToken = CancelToken();
+
+    await HlsDownloader(dio).download(
+      manifestUrl: Uri.parse('https://cdn.example/episode/index.m3u8'),
+      targetDirectory: target,
+      cancelToken: cancelToken,
+    );
+
+    final adapter = dio.httpClientAdapter as _FakeAdapter;
+    expect(adapter.cancelFutures.last, same(cancelToken.whenCancel));
   });
 }
