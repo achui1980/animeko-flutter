@@ -116,6 +116,33 @@ class DownloadedEpisodes extends Table {
   TextColumn get errorMessage => text().nullable()();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get completedAt => dateTime().nullable()();
+  /// mp4 downloads: bytes received so far. HLS downloads use
+  /// [downloadedSegments] instead (segment-level progress; mp4-level byte
+  /// counts for HLS would require re-parsing partial .ts files). Defaults
+  /// to 0 so existing rows read back as "no progress" rather than null.
+  IntColumn get receivedBytes =>
+      integer().withDefault(const Constant(0))();
+  /// mp4 downloads: total size from the `Content-Length` header, once
+  /// known. Null for HLS (no single Content-Length) and for mp4 downloads
+  /// before the response headers arrive.
+  IntColumn get totalBytes => integer().nullable()();
+  /// HLS downloads: segments downloaded so far.
+  IntColumn get downloadedSegments => integer().nullable()();
+  /// HLS downloads: total segment count, counted from the manifest before
+  /// downloading starts.
+  IntColumn get totalSegments => integer().nullable()();
+  /// Last time [receivedBytes]/[downloadedSegments] increased. Used by the
+  /// worker's stall detection (see `DownloadWorker`); not shown directly in
+  /// the UI.
+  DateTimeColumn get lastProgressAt => dateTime().nullable()();
+  /// The directory this episode's file(s) live in, written once by
+  /// `DownloadWorker` when it creates the directory. Deletion always uses
+  /// this column, never [localPath] (which is a *file* path for completed
+  /// downloads but historically was the *directory* path for
+  /// downloading/failed ones — see the design spec's bug #7). Null on rows
+  /// created before this migration; deletion falls back to the pre-v5
+  /// heuristic for those (see `DownloadedEpisodeRepository.deleteWithFiles`).
+  TextColumn get episodeDir => text().nullable()();
 }
 
 @DriftDatabase(
@@ -133,7 +160,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   /// SQLite does not enforce declared FOREIGN KEY constraints unless this
   /// pragma is turned on for the connection -- drift does not do this
@@ -151,6 +178,20 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 4) {
         await m.createTable(downloadedEpisodes);
+      }
+      if (from < 5) {
+        await m.addColumn(downloadedEpisodes, downloadedEpisodes.receivedBytes);
+        await m.addColumn(downloadedEpisodes, downloadedEpisodes.totalBytes);
+        await m.addColumn(
+          downloadedEpisodes,
+          downloadedEpisodes.downloadedSegments,
+        );
+        await m.addColumn(downloadedEpisodes, downloadedEpisodes.totalSegments);
+        await m.addColumn(
+          downloadedEpisodes,
+          downloadedEpisodes.lastProgressAt,
+        );
+        await m.addColumn(downloadedEpisodes, downloadedEpisodes.episodeDir);
       }
     },
     beforeOpen: (details) async {

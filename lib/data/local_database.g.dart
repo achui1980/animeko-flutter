@@ -1945,6 +1945,73 @@ class $DownloadedEpisodesTable extends DownloadedEpisodes
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _receivedBytesMeta = const VerificationMeta(
+    'receivedBytes',
+  );
+  @override
+  late final GeneratedColumn<int> receivedBytes = GeneratedColumn<int>(
+    'received_bytes',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _totalBytesMeta = const VerificationMeta(
+    'totalBytes',
+  );
+  @override
+  late final GeneratedColumn<int> totalBytes = GeneratedColumn<int>(
+    'total_bytes',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _downloadedSegmentsMeta =
+      const VerificationMeta('downloadedSegments');
+  @override
+  late final GeneratedColumn<int> downloadedSegments = GeneratedColumn<int>(
+    'downloaded_segments',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _totalSegmentsMeta = const VerificationMeta(
+    'totalSegments',
+  );
+  @override
+  late final GeneratedColumn<int> totalSegments = GeneratedColumn<int>(
+    'total_segments',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _lastProgressAtMeta = const VerificationMeta(
+    'lastProgressAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastProgressAt =
+      GeneratedColumn<DateTime>(
+        'last_progress_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _episodeDirMeta = const VerificationMeta(
+    'episodeDir',
+  );
+  @override
+  late final GeneratedColumn<String> episodeDir = GeneratedColumn<String>(
+    'episode_dir',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1960,6 +2027,12 @@ class $DownloadedEpisodesTable extends DownloadedEpisodes
     errorMessage,
     createdAt,
     completedAt,
+    receivedBytes,
+    totalBytes,
+    downloadedSegments,
+    totalSegments,
+    lastProgressAt,
+    episodeDir,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2081,6 +2154,54 @@ class $DownloadedEpisodesTable extends DownloadedEpisodes
         ),
       );
     }
+    if (data.containsKey('received_bytes')) {
+      context.handle(
+        _receivedBytesMeta,
+        receivedBytes.isAcceptableOrUnknown(
+          data['received_bytes']!,
+          _receivedBytesMeta,
+        ),
+      );
+    }
+    if (data.containsKey('total_bytes')) {
+      context.handle(
+        _totalBytesMeta,
+        totalBytes.isAcceptableOrUnknown(data['total_bytes']!, _totalBytesMeta),
+      );
+    }
+    if (data.containsKey('downloaded_segments')) {
+      context.handle(
+        _downloadedSegmentsMeta,
+        downloadedSegments.isAcceptableOrUnknown(
+          data['downloaded_segments']!,
+          _downloadedSegmentsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('total_segments')) {
+      context.handle(
+        _totalSegmentsMeta,
+        totalSegments.isAcceptableOrUnknown(
+          data['total_segments']!,
+          _totalSegmentsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_progress_at')) {
+      context.handle(
+        _lastProgressAtMeta,
+        lastProgressAt.isAcceptableOrUnknown(
+          data['last_progress_at']!,
+          _lastProgressAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('episode_dir')) {
+      context.handle(
+        _episodeDirMeta,
+        episodeDir.isAcceptableOrUnknown(data['episode_dir']!, _episodeDirMeta),
+      );
+    }
     return context;
   }
 
@@ -2142,6 +2263,30 @@ class $DownloadedEpisodesTable extends DownloadedEpisodes
         DriftSqlType.dateTime,
         data['${effectivePrefix}completed_at'],
       ),
+      receivedBytes: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}received_bytes'],
+      )!,
+      totalBytes: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}total_bytes'],
+      ),
+      downloadedSegments: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}downloaded_segments'],
+      ),
+      totalSegments: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}total_segments'],
+      ),
+      lastProgressAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_progress_at'],
+      ),
+      episodeDir: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}episode_dir'],
+      ),
     );
   }
 
@@ -2166,6 +2311,38 @@ class DownloadedEpisode extends DataClass
   final String? errorMessage;
   final DateTime createdAt;
   final DateTime? completedAt;
+
+  /// mp4 downloads: bytes received so far. HLS downloads use
+  /// [downloadedSegments] instead (segment-level progress; mp4-level byte
+  /// counts for HLS would require re-parsing partial .ts files). Defaults
+  /// to 0 so existing rows read back as "no progress" rather than null.
+  final int receivedBytes;
+
+  /// mp4 downloads: total size from the `Content-Length` header, once
+  /// known. Null for HLS (no single Content-Length) and for mp4 downloads
+  /// before the response headers arrive.
+  final int? totalBytes;
+
+  /// HLS downloads: segments downloaded so far.
+  final int? downloadedSegments;
+
+  /// HLS downloads: total segment count, counted from the manifest before
+  /// downloading starts.
+  final int? totalSegments;
+
+  /// Last time [receivedBytes]/[downloadedSegments] increased. Used by the
+  /// worker's stall detection (see `DownloadWorker`); not shown directly in
+  /// the UI.
+  final DateTime? lastProgressAt;
+
+  /// The directory this episode's file(s) live in, written once by
+  /// `DownloadWorker` when it creates the directory. Deletion always uses
+  /// this column, never [localPath] (which is a *file* path for completed
+  /// downloads but historically was the *directory* path for
+  /// downloading/failed ones — see the design spec's bug #7). Null on rows
+  /// created before this migration; deletion falls back to the pre-v5
+  /// heuristic for those (see `DownloadedEpisodeRepository.deleteWithFiles`).
+  final String? episodeDir;
   const DownloadedEpisode({
     required this.id,
     required this.sourceId,
@@ -2180,6 +2357,12 @@ class DownloadedEpisode extends DataClass
     this.errorMessage,
     required this.createdAt,
     this.completedAt,
+    required this.receivedBytes,
+    this.totalBytes,
+    this.downloadedSegments,
+    this.totalSegments,
+    this.lastProgressAt,
+    this.episodeDir,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2202,6 +2385,22 @@ class DownloadedEpisode extends DataClass
     map['created_at'] = Variable<DateTime>(createdAt);
     if (!nullToAbsent || completedAt != null) {
       map['completed_at'] = Variable<DateTime>(completedAt);
+    }
+    map['received_bytes'] = Variable<int>(receivedBytes);
+    if (!nullToAbsent || totalBytes != null) {
+      map['total_bytes'] = Variable<int>(totalBytes);
+    }
+    if (!nullToAbsent || downloadedSegments != null) {
+      map['downloaded_segments'] = Variable<int>(downloadedSegments);
+    }
+    if (!nullToAbsent || totalSegments != null) {
+      map['total_segments'] = Variable<int>(totalSegments);
+    }
+    if (!nullToAbsent || lastProgressAt != null) {
+      map['last_progress_at'] = Variable<DateTime>(lastProgressAt);
+    }
+    if (!nullToAbsent || episodeDir != null) {
+      map['episode_dir'] = Variable<String>(episodeDir);
     }
     return map;
   }
@@ -2227,6 +2426,22 @@ class DownloadedEpisode extends DataClass
       completedAt: completedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(completedAt),
+      receivedBytes: Value(receivedBytes),
+      totalBytes: totalBytes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(totalBytes),
+      downloadedSegments: downloadedSegments == null && nullToAbsent
+          ? const Value.absent()
+          : Value(downloadedSegments),
+      totalSegments: totalSegments == null && nullToAbsent
+          ? const Value.absent()
+          : Value(totalSegments),
+      lastProgressAt: lastProgressAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastProgressAt),
+      episodeDir: episodeDir == null && nullToAbsent
+          ? const Value.absent()
+          : Value(episodeDir),
     );
   }
 
@@ -2249,6 +2464,12 @@ class DownloadedEpisode extends DataClass
       errorMessage: serializer.fromJson<String?>(json['errorMessage']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       completedAt: serializer.fromJson<DateTime?>(json['completedAt']),
+      receivedBytes: serializer.fromJson<int>(json['receivedBytes']),
+      totalBytes: serializer.fromJson<int?>(json['totalBytes']),
+      downloadedSegments: serializer.fromJson<int?>(json['downloadedSegments']),
+      totalSegments: serializer.fromJson<int?>(json['totalSegments']),
+      lastProgressAt: serializer.fromJson<DateTime?>(json['lastProgressAt']),
+      episodeDir: serializer.fromJson<String?>(json['episodeDir']),
     );
   }
   @override
@@ -2268,6 +2489,12 @@ class DownloadedEpisode extends DataClass
       'errorMessage': serializer.toJson<String?>(errorMessage),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'completedAt': serializer.toJson<DateTime?>(completedAt),
+      'receivedBytes': serializer.toJson<int>(receivedBytes),
+      'totalBytes': serializer.toJson<int?>(totalBytes),
+      'downloadedSegments': serializer.toJson<int?>(downloadedSegments),
+      'totalSegments': serializer.toJson<int?>(totalSegments),
+      'lastProgressAt': serializer.toJson<DateTime?>(lastProgressAt),
+      'episodeDir': serializer.toJson<String?>(episodeDir),
     };
   }
 
@@ -2285,6 +2512,12 @@ class DownloadedEpisode extends DataClass
     Value<String?> errorMessage = const Value.absent(),
     DateTime? createdAt,
     Value<DateTime?> completedAt = const Value.absent(),
+    int? receivedBytes,
+    Value<int?> totalBytes = const Value.absent(),
+    Value<int?> downloadedSegments = const Value.absent(),
+    Value<int?> totalSegments = const Value.absent(),
+    Value<DateTime?> lastProgressAt = const Value.absent(),
+    Value<String?> episodeDir = const Value.absent(),
   }) => DownloadedEpisode(
     id: id ?? this.id,
     sourceId: sourceId ?? this.sourceId,
@@ -2301,6 +2534,18 @@ class DownloadedEpisode extends DataClass
     errorMessage: errorMessage.present ? errorMessage.value : this.errorMessage,
     createdAt: createdAt ?? this.createdAt,
     completedAt: completedAt.present ? completedAt.value : this.completedAt,
+    receivedBytes: receivedBytes ?? this.receivedBytes,
+    totalBytes: totalBytes.present ? totalBytes.value : this.totalBytes,
+    downloadedSegments: downloadedSegments.present
+        ? downloadedSegments.value
+        : this.downloadedSegments,
+    totalSegments: totalSegments.present
+        ? totalSegments.value
+        : this.totalSegments,
+    lastProgressAt: lastProgressAt.present
+        ? lastProgressAt.value
+        : this.lastProgressAt,
+    episodeDir: episodeDir.present ? episodeDir.value : this.episodeDir,
   );
   DownloadedEpisode copyWithCompanion(DownloadedEpisodesCompanion data) {
     return DownloadedEpisode(
@@ -2329,6 +2574,24 @@ class DownloadedEpisode extends DataClass
       completedAt: data.completedAt.present
           ? data.completedAt.value
           : this.completedAt,
+      receivedBytes: data.receivedBytes.present
+          ? data.receivedBytes.value
+          : this.receivedBytes,
+      totalBytes: data.totalBytes.present
+          ? data.totalBytes.value
+          : this.totalBytes,
+      downloadedSegments: data.downloadedSegments.present
+          ? data.downloadedSegments.value
+          : this.downloadedSegments,
+      totalSegments: data.totalSegments.present
+          ? data.totalSegments.value
+          : this.totalSegments,
+      lastProgressAt: data.lastProgressAt.present
+          ? data.lastProgressAt.value
+          : this.lastProgressAt,
+      episodeDir: data.episodeDir.present
+          ? data.episodeDir.value
+          : this.episodeDir,
     );
   }
 
@@ -2347,7 +2610,13 @@ class DownloadedEpisode extends DataClass
           ..write('status: $status, ')
           ..write('errorMessage: $errorMessage, ')
           ..write('createdAt: $createdAt, ')
-          ..write('completedAt: $completedAt')
+          ..write('completedAt: $completedAt, ')
+          ..write('receivedBytes: $receivedBytes, ')
+          ..write('totalBytes: $totalBytes, ')
+          ..write('downloadedSegments: $downloadedSegments, ')
+          ..write('totalSegments: $totalSegments, ')
+          ..write('lastProgressAt: $lastProgressAt, ')
+          ..write('episodeDir: $episodeDir')
           ..write(')'))
         .toString();
   }
@@ -2367,6 +2636,12 @@ class DownloadedEpisode extends DataClass
     errorMessage,
     createdAt,
     completedAt,
+    receivedBytes,
+    totalBytes,
+    downloadedSegments,
+    totalSegments,
+    lastProgressAt,
+    episodeDir,
   );
   @override
   bool operator ==(Object other) =>
@@ -2384,7 +2659,13 @@ class DownloadedEpisode extends DataClass
           other.status == this.status &&
           other.errorMessage == this.errorMessage &&
           other.createdAt == this.createdAt &&
-          other.completedAt == this.completedAt);
+          other.completedAt == this.completedAt &&
+          other.receivedBytes == this.receivedBytes &&
+          other.totalBytes == this.totalBytes &&
+          other.downloadedSegments == this.downloadedSegments &&
+          other.totalSegments == this.totalSegments &&
+          other.lastProgressAt == this.lastProgressAt &&
+          other.episodeDir == this.episodeDir);
 }
 
 class DownloadedEpisodesCompanion extends UpdateCompanion<DownloadedEpisode> {
@@ -2401,6 +2682,12 @@ class DownloadedEpisodesCompanion extends UpdateCompanion<DownloadedEpisode> {
   final Value<String?> errorMessage;
   final Value<DateTime> createdAt;
   final Value<DateTime?> completedAt;
+  final Value<int> receivedBytes;
+  final Value<int?> totalBytes;
+  final Value<int?> downloadedSegments;
+  final Value<int?> totalSegments;
+  final Value<DateTime?> lastProgressAt;
+  final Value<String?> episodeDir;
   const DownloadedEpisodesCompanion({
     this.id = const Value.absent(),
     this.sourceId = const Value.absent(),
@@ -2415,6 +2702,12 @@ class DownloadedEpisodesCompanion extends UpdateCompanion<DownloadedEpisode> {
     this.errorMessage = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.completedAt = const Value.absent(),
+    this.receivedBytes = const Value.absent(),
+    this.totalBytes = const Value.absent(),
+    this.downloadedSegments = const Value.absent(),
+    this.totalSegments = const Value.absent(),
+    this.lastProgressAt = const Value.absent(),
+    this.episodeDir = const Value.absent(),
   });
   DownloadedEpisodesCompanion.insert({
     this.id = const Value.absent(),
@@ -2430,6 +2723,12 @@ class DownloadedEpisodesCompanion extends UpdateCompanion<DownloadedEpisode> {
     this.errorMessage = const Value.absent(),
     required DateTime createdAt,
     this.completedAt = const Value.absent(),
+    this.receivedBytes = const Value.absent(),
+    this.totalBytes = const Value.absent(),
+    this.downloadedSegments = const Value.absent(),
+    this.totalSegments = const Value.absent(),
+    this.lastProgressAt = const Value.absent(),
+    this.episodeDir = const Value.absent(),
   }) : sourceId = Value(sourceId),
        subjectId = Value(subjectId),
        episodeKey = Value(episodeKey),
@@ -2453,6 +2752,12 @@ class DownloadedEpisodesCompanion extends UpdateCompanion<DownloadedEpisode> {
     Expression<String>? errorMessage,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? completedAt,
+    Expression<int>? receivedBytes,
+    Expression<int>? totalBytes,
+    Expression<int>? downloadedSegments,
+    Expression<int>? totalSegments,
+    Expression<DateTime>? lastProgressAt,
+    Expression<String>? episodeDir,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -2468,6 +2773,12 @@ class DownloadedEpisodesCompanion extends UpdateCompanion<DownloadedEpisode> {
       if (errorMessage != null) 'error_message': errorMessage,
       if (createdAt != null) 'created_at': createdAt,
       if (completedAt != null) 'completed_at': completedAt,
+      if (receivedBytes != null) 'received_bytes': receivedBytes,
+      if (totalBytes != null) 'total_bytes': totalBytes,
+      if (downloadedSegments != null) 'downloaded_segments': downloadedSegments,
+      if (totalSegments != null) 'total_segments': totalSegments,
+      if (lastProgressAt != null) 'last_progress_at': lastProgressAt,
+      if (episodeDir != null) 'episode_dir': episodeDir,
     });
   }
 
@@ -2485,6 +2796,12 @@ class DownloadedEpisodesCompanion extends UpdateCompanion<DownloadedEpisode> {
     Value<String?>? errorMessage,
     Value<DateTime>? createdAt,
     Value<DateTime?>? completedAt,
+    Value<int>? receivedBytes,
+    Value<int?>? totalBytes,
+    Value<int?>? downloadedSegments,
+    Value<int?>? totalSegments,
+    Value<DateTime?>? lastProgressAt,
+    Value<String?>? episodeDir,
   }) {
     return DownloadedEpisodesCompanion(
       id: id ?? this.id,
@@ -2500,6 +2817,12 @@ class DownloadedEpisodesCompanion extends UpdateCompanion<DownloadedEpisode> {
       errorMessage: errorMessage ?? this.errorMessage,
       createdAt: createdAt ?? this.createdAt,
       completedAt: completedAt ?? this.completedAt,
+      receivedBytes: receivedBytes ?? this.receivedBytes,
+      totalBytes: totalBytes ?? this.totalBytes,
+      downloadedSegments: downloadedSegments ?? this.downloadedSegments,
+      totalSegments: totalSegments ?? this.totalSegments,
+      lastProgressAt: lastProgressAt ?? this.lastProgressAt,
+      episodeDir: episodeDir ?? this.episodeDir,
     );
   }
 
@@ -2545,6 +2868,24 @@ class DownloadedEpisodesCompanion extends UpdateCompanion<DownloadedEpisode> {
     if (completedAt.present) {
       map['completed_at'] = Variable<DateTime>(completedAt.value);
     }
+    if (receivedBytes.present) {
+      map['received_bytes'] = Variable<int>(receivedBytes.value);
+    }
+    if (totalBytes.present) {
+      map['total_bytes'] = Variable<int>(totalBytes.value);
+    }
+    if (downloadedSegments.present) {
+      map['downloaded_segments'] = Variable<int>(downloadedSegments.value);
+    }
+    if (totalSegments.present) {
+      map['total_segments'] = Variable<int>(totalSegments.value);
+    }
+    if (lastProgressAt.present) {
+      map['last_progress_at'] = Variable<DateTime>(lastProgressAt.value);
+    }
+    if (episodeDir.present) {
+      map['episode_dir'] = Variable<String>(episodeDir.value);
+    }
     return map;
   }
 
@@ -2563,7 +2904,13 @@ class DownloadedEpisodesCompanion extends UpdateCompanion<DownloadedEpisode> {
           ..write('status: $status, ')
           ..write('errorMessage: $errorMessage, ')
           ..write('createdAt: $createdAt, ')
-          ..write('completedAt: $completedAt')
+          ..write('completedAt: $completedAt, ')
+          ..write('receivedBytes: $receivedBytes, ')
+          ..write('totalBytes: $totalBytes, ')
+          ..write('downloadedSegments: $downloadedSegments, ')
+          ..write('totalSegments: $totalSegments, ')
+          ..write('lastProgressAt: $lastProgressAt, ')
+          ..write('episodeDir: $episodeDir')
           ..write(')'))
         .toString();
   }
@@ -4148,6 +4495,12 @@ typedef $$DownloadedEpisodesTableCreateCompanionBuilder =
       Value<String?> errorMessage,
       required DateTime createdAt,
       Value<DateTime?> completedAt,
+      Value<int> receivedBytes,
+      Value<int?> totalBytes,
+      Value<int?> downloadedSegments,
+      Value<int?> totalSegments,
+      Value<DateTime?> lastProgressAt,
+      Value<String?> episodeDir,
     });
 typedef $$DownloadedEpisodesTableUpdateCompanionBuilder =
     DownloadedEpisodesCompanion Function({
@@ -4164,6 +4517,12 @@ typedef $$DownloadedEpisodesTableUpdateCompanionBuilder =
       Value<String?> errorMessage,
       Value<DateTime> createdAt,
       Value<DateTime?> completedAt,
+      Value<int> receivedBytes,
+      Value<int?> totalBytes,
+      Value<int?> downloadedSegments,
+      Value<int?> totalSegments,
+      Value<DateTime?> lastProgressAt,
+      Value<String?> episodeDir,
     });
 
 class $$DownloadedEpisodesTableFilterComposer
@@ -4237,6 +4596,36 @@ class $$DownloadedEpisodesTableFilterComposer
 
   ColumnFilters<DateTime> get completedAt => $composableBuilder(
     column: $table.completedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get receivedBytes => $composableBuilder(
+    column: $table.receivedBytes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get totalBytes => $composableBuilder(
+    column: $table.totalBytes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get downloadedSegments => $composableBuilder(
+    column: $table.downloadedSegments,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get totalSegments => $composableBuilder(
+    column: $table.totalSegments,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastProgressAt => $composableBuilder(
+    column: $table.lastProgressAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get episodeDir => $composableBuilder(
+    column: $table.episodeDir,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -4314,6 +4703,36 @@ class $$DownloadedEpisodesTableOrderingComposer
     column: $table.completedAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get receivedBytes => $composableBuilder(
+    column: $table.receivedBytes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get totalBytes => $composableBuilder(
+    column: $table.totalBytes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get downloadedSegments => $composableBuilder(
+    column: $table.downloadedSegments,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get totalSegments => $composableBuilder(
+    column: $table.totalSegments,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastProgressAt => $composableBuilder(
+    column: $table.lastProgressAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get episodeDir => $composableBuilder(
+    column: $table.episodeDir,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$DownloadedEpisodesTableAnnotationComposer
@@ -4375,6 +4794,36 @@ class $$DownloadedEpisodesTableAnnotationComposer
     column: $table.completedAt,
     builder: (column) => column,
   );
+
+  GeneratedColumn<int> get receivedBytes => $composableBuilder(
+    column: $table.receivedBytes,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get totalBytes => $composableBuilder(
+    column: $table.totalBytes,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get downloadedSegments => $composableBuilder(
+    column: $table.downloadedSegments,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get totalSegments => $composableBuilder(
+    column: $table.totalSegments,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get lastProgressAt => $composableBuilder(
+    column: $table.lastProgressAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get episodeDir => $composableBuilder(
+    column: $table.episodeDir,
+    builder: (column) => column,
+  );
 }
 
 class $$DownloadedEpisodesTableTableManager
@@ -4430,6 +4879,12 @@ class $$DownloadedEpisodesTableTableManager
                 Value<String?> errorMessage = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime?> completedAt = const Value.absent(),
+                Value<int> receivedBytes = const Value.absent(),
+                Value<int?> totalBytes = const Value.absent(),
+                Value<int?> downloadedSegments = const Value.absent(),
+                Value<int?> totalSegments = const Value.absent(),
+                Value<DateTime?> lastProgressAt = const Value.absent(),
+                Value<String?> episodeDir = const Value.absent(),
               }) => DownloadedEpisodesCompanion(
                 id: id,
                 sourceId: sourceId,
@@ -4444,6 +4899,12 @@ class $$DownloadedEpisodesTableTableManager
                 errorMessage: errorMessage,
                 createdAt: createdAt,
                 completedAt: completedAt,
+                receivedBytes: receivedBytes,
+                totalBytes: totalBytes,
+                downloadedSegments: downloadedSegments,
+                totalSegments: totalSegments,
+                lastProgressAt: lastProgressAt,
+                episodeDir: episodeDir,
               ),
           createCompanionCallback:
               ({
@@ -4460,6 +4921,12 @@ class $$DownloadedEpisodesTableTableManager
                 Value<String?> errorMessage = const Value.absent(),
                 required DateTime createdAt,
                 Value<DateTime?> completedAt = const Value.absent(),
+                Value<int> receivedBytes = const Value.absent(),
+                Value<int?> totalBytes = const Value.absent(),
+                Value<int?> downloadedSegments = const Value.absent(),
+                Value<int?> totalSegments = const Value.absent(),
+                Value<DateTime?> lastProgressAt = const Value.absent(),
+                Value<String?> episodeDir = const Value.absent(),
               }) => DownloadedEpisodesCompanion.insert(
                 id: id,
                 sourceId: sourceId,
@@ -4474,6 +4941,12 @@ class $$DownloadedEpisodesTableTableManager
                 errorMessage: errorMessage,
                 createdAt: createdAt,
                 completedAt: completedAt,
+                receivedBytes: receivedBytes,
+                totalBytes: totalBytes,
+                downloadedSegments: downloadedSegments,
+                totalSegments: totalSegments,
+                lastProgressAt: lastProgressAt,
+                episodeDir: episodeDir,
               ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))

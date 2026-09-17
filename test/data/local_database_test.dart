@@ -101,8 +101,9 @@ void main() {
     expect(rows.single.imageUrl, 'https://example.com/a.jpg');
   });
 
-  test('AppDatabase.schemaVersion is 4 (bumped for DownloadedEpisodes)', () {
-    expect(db.schemaVersion, 4);
+  test('AppDatabase.schemaVersion is 5 (bumped for download progress '
+      'columns)', () {
+    expect(db.schemaVersion, 5);
   });
 
   test('mikanSubjectMappings table round-trips a resolved row', () async {
@@ -159,8 +160,31 @@ void main() {
     () async {
       // A fresh in-memory database is created at the current schema, so drop
       // the new table to simulate a schema-2 database, then run the real
-      // onUpgrade callback for the 2 -> 3 step.
+      // onUpgrade callback for the 2 -> 3 step. onUpgrade's cascading
+      // `if (from < X)` checks mean this call also re-runs the later 4->5
+      // step (from=2 < 5), so the download-progress columns it adds via
+      // `addColumn` must be dropped too -- unlike `createTable` (used by the
+      // earlier steps), `addColumn` has no "IF NOT EXISTS" tolerance and
+      // throws "duplicate column name" if they already exist.
       await db.customStatement('DROP TABLE mikan_subject_mappings');
+      await db.customStatement(
+        'ALTER TABLE downloaded_episodes DROP COLUMN received_bytes',
+      );
+      await db.customStatement(
+        'ALTER TABLE downloaded_episodes DROP COLUMN total_bytes',
+      );
+      await db.customStatement(
+        'ALTER TABLE downloaded_episodes DROP COLUMN downloaded_segments',
+      );
+      await db.customStatement(
+        'ALTER TABLE downloaded_episodes DROP COLUMN total_segments',
+      );
+      await db.customStatement(
+        'ALTER TABLE downloaded_episodes DROP COLUMN last_progress_at',
+      );
+      await db.customStatement(
+        'ALTER TABLE downloaded_episodes DROP COLUMN episode_dir',
+      );
 
       await db.migration.onUpgrade(Migrator(db), 2, 3);
 
@@ -174,6 +198,56 @@ void main() {
             ),
           );
       expect(await db.select(db.mikanSubjectMappings).get(), hasLength(1));
+    },
+  );
+
+  test(
+    'onUpgrade from schema 4 adds the download progress columns',
+    () async {
+      // downloadedEpisodes already exists at schema 4 (added by an earlier
+      // migration); simulate a schema-4 database by dropping just the new
+      // columns this migration adds, then run the real onUpgrade callback
+      // for the 4 -> 5 step.
+      await db.customStatement(
+        'ALTER TABLE downloaded_episodes DROP COLUMN received_bytes',
+      );
+      await db.customStatement(
+        'ALTER TABLE downloaded_episodes DROP COLUMN total_bytes',
+      );
+      await db.customStatement(
+        'ALTER TABLE downloaded_episodes DROP COLUMN downloaded_segments',
+      );
+      await db.customStatement(
+        'ALTER TABLE downloaded_episodes DROP COLUMN total_segments',
+      );
+      await db.customStatement(
+        'ALTER TABLE downloaded_episodes DROP COLUMN last_progress_at',
+      );
+      await db.customStatement(
+        'ALTER TABLE downloaded_episodes DROP COLUMN episode_dir',
+      );
+
+      await db.migration.onUpgrade(Migrator(db), 4, 5);
+
+      await db
+          .into(db.downloadedEpisodes)
+          .insert(
+            DownloadedEpisodesCompanion.insert(
+              sourceId: 'anime1',
+              subjectId: 1,
+              episodeKey: '1::anime1::1',
+              subjectName: '测试番剧',
+              episodeLabel: '1',
+              localPath: '/tmp/one.mp4',
+              format: 'mp4',
+              status: 'completed',
+              createdAt: DateTime(2026, 9, 17),
+            ),
+          );
+      final row = await db.select(db.downloadedEpisodes).getSingle();
+      expect(row.receivedBytes, 0);
+      expect(row.totalBytes, isNull);
+      expect(row.episodeDir, isNull);
     },
   );
 
