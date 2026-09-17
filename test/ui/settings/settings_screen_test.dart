@@ -112,6 +112,7 @@ void main() {
         find.byType(RadioGroup<ThemeMode>),
       );
       expect(radioGroup.groupValue, ThemeMode.dark);
+      expect(find.text('Alice'), findsOneWidget);
       // The new dynamic-color toggle + palette picker push this address
       // below the default test viewport's fold -- scroll it into view first
       // (skipOffstage: false since Finder.text can't locate it to scroll to
@@ -121,7 +122,6 @@ void main() {
       );
       await tester.pump();
       expect(find.text('http://127.0.0.1:2222'), findsOneWidget);
-      expect(find.text('Alice'), findsOneWidget);
     },
   );
 
