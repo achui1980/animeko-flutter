@@ -83,4 +83,39 @@ void main() {
 
     expect(await repository.findByKey('3::xifan::3'), isNull);
   });
+
+  test('watchAll emits downloads ordered by newest first', () async {
+    final first = DateTime(2026, 9, 17, 10);
+    var now = first;
+    repository = DownloadedEpisodeRepository(db, now: () => now);
+    await repository.upsert(
+      const DownloadedEpisodeWrite(
+        sourceId: 'anime1',
+        subjectId: 1,
+        episodeKey: '1::anime1::1',
+        subjectName: '第一部',
+        episodeLabel: '1',
+        localPath: '/tmp/one.mp4',
+        format: 'mp4',
+        status: DownloadStatus.completed,
+      ),
+    );
+    now = first.add(const Duration(minutes: 1));
+    await repository.upsert(
+      const DownloadedEpisodeWrite(
+        sourceId: 'xifan',
+        subjectId: 2,
+        episodeKey: '2::xifan::2',
+        subjectName: '第二部',
+        episodeLabel: '2',
+        localPath: '/tmp/two.mp4',
+        format: 'mp4',
+        status: DownloadStatus.failed,
+      ),
+    );
+
+    final rows = await repository.watchAll().first;
+
+    expect(rows.map((row) => row.episodeKey), ['2::xifan::2', '1::anime1::1']);
+  });
 }

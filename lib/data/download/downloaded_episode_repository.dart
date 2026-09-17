@@ -54,6 +54,10 @@ class DownloadedEpisodeRepository {
     _db.downloadedEpisodes,
   )..orderBy([(row) => OrderingTerm.desc(row.createdAt)])).get();
 
+  Stream<List<DownloadedEpisode>> watchAll() => (_db.select(
+    _db.downloadedEpisodes,
+  )..orderBy([(row) => OrderingTerm.desc(row.createdAt)])).watch();
+
   Future<void> upsert(DownloadedEpisodeWrite value) async {
     final existing = await findByKey(value.episodeKey);
     await _db
