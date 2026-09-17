@@ -138,9 +138,9 @@ class DownloadWorker {
           status: DownloadStatus.downloading,
         ),
       );
-      final candidates = await _sourceForId(
-        request.sourceId,
-      ).resolvePlayback(request.episode);
+      final candidates = List<MediaPlaybackSource>.of(
+        await _sourceForId(request.sourceId).resolvePlayback(request.episode),
+      );
       final selected = candidates.firstWhere(
         (item) => item.url.toLowerCase().contains('.mp4'),
         orElse: () => candidates.first,

@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:animeko_flutter/data/download/download_worker.dart';
 import 'package:animeko_flutter/data/download/downloaded_episode_repository.dart';
+import 'package:animeko_flutter/data/xifan/xifan_models.dart';
 import 'package:animeko_flutter/data/local_database.dart';
 import 'package:animeko_flutter/domain/media/media_source.dart';
 import 'package:dio/dio.dart';
@@ -59,6 +60,16 @@ class _Source implements MediaSource {
     onResolve?.call();
     return playbackSources;
   }
+}
+
+class _XifanSource extends _Source {
+  _XifanSource(List<XifanPlaybackSource> playbackSources)
+    : super('xifan', playbackSources);
+
+  @override
+  Future<List<XifanPlaybackSource>> resolvePlayback(
+    MediaEpisode episode,
+  ) async => playbackSources.cast<XifanPlaybackSource>();
 }
 
 class _Adapter implements HttpClientAdapter {
@@ -186,22 +197,24 @@ void main() {
   });
 
   test('prefers an MP4 candidate for a Xifan request', () async {
+    final events = <DownloadEvent>[];
     final worker = DownloadWorker(
       dio: _dio({
         'https://cdn.example/video.mp4': [1, 2, 3],
       }),
       downloadRoot: root.path,
-      sourceForId: (_) => _Source('xifan', const [
-        _PlaybackSource('https://cdn.example/video.m3u8'),
-        _PlaybackSource('https://cdn.example/video.mp4'),
+      sourceForId: (_) => _XifanSource(const [
+        XifanPlaybackSource(url: 'https://cdn.example/video.m3u8'),
+        XifanPlaybackSource(url: 'https://cdn.example/video.mp4'),
       ]),
       repository: repository,
-    );
+    )..events.listen(events.add);
     final request = _request('xifan', 1);
 
     worker.enqueue(request);
     await worker.whenIdle;
 
+    expect(events.whereType<DownloadCompleted>(), hasLength(1));
     final record = await repository.findCompleted(request.episodeKey);
     expect(record!.format, 'mp4');
     expect(await File(record.localPath).readAsBytes(), [1, 2, 3]);
