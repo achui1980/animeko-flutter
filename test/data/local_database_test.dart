@@ -101,8 +101,8 @@ void main() {
     expect(rows.single.imageUrl, 'https://example.com/a.jpg');
   });
 
-  test('AppDatabase.schemaVersion is 3 (bumped for mikanSubjectMappings)', () {
-    expect(db.schemaVersion, 3);
+  test('AppDatabase.schemaVersion is 4 (bumped for DownloadedEpisodes)', () {
+    expect(db.schemaVersion, 4);
   });
 
   test('mikanSubjectMappings table round-trips a resolved row', () async {
