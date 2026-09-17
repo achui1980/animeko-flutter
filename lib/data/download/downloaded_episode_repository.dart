@@ -87,3 +87,10 @@ class DownloadedEpisodeRepository {
 @riverpod
 DownloadedEpisodeRepository downloadedEpisodeRepository(Ref ref) =>
     DownloadedEpisodeRepository(ref.watch(appDatabaseProvider));
+
+@riverpod
+Future<bool> downloadedEpisodeByKey(Ref ref, String episodeKey) async =>
+    await ref
+        .watch(downloadedEpisodeRepositoryProvider)
+        .findCompleted(episodeKey) !=
+    null;

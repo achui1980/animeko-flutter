@@ -12,7 +12,9 @@ import 'package:saver_gallery/saver_gallery.dart';
 import 'package:screen_brightness/screen_brightness.dart';
 
 import '../../app/theme/app_theme.dart';
+import '../../data/download/downloaded_episode_repository.dart';
 import '../../data/play/playback_position_storage.dart';
+import '../../domain/download/download_queue_controller.dart';
 import '../../domain/media/media_registry.dart';
 import '../../domain/media/media_source.dart';
 import '../../domain/play/episode_play_controller.dart';
@@ -782,6 +784,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       });
     });
     final playback = ref.watch(provider);
+    final downloadQueue = ref.watch(downloadQueueControllerProvider).value;
+    final isDownloaded = ref.watch(
+      downloadedEpisodeByKeyProvider(_positionKey),
+    );
+    final downloadState = _downloadButtonState(
+      downloadQueue?[_positionKey]?.status,
+      isDownloaded.value ?? false,
+    );
 
     return Theme(
       data: AppTheme.dark(),
@@ -870,6 +880,19 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                             '${widget.subjectName} · ${_currentEpisode.title}',
                         onBack: () => Navigator.of(context).pop(),
                         onScreenshot: _takeScreenshot,
+                        onDownload:
+                            _isDownloadableSource(_currentEpisode.sourceId)
+                            ? () => ref
+                                  .read(
+                                    downloadQueueControllerProvider.notifier,
+                                  )
+                                  .enqueue(
+                                    subjectId: widget.subjectId,
+                                    subjectName: widget.subjectName,
+                                    episode: _currentEpisode,
+                                  )
+                            : null,
+                        downloadState: downloadState,
                       ),
                     ),
                   if (_controlsVisible)
@@ -945,6 +968,23 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     );
   }
 }
+
+DownloadButtonState _downloadButtonState(
+  DownloadQueueStatus? queueStatus,
+  bool isDownloaded,
+) {
+  if (isDownloaded || queueStatus == DownloadQueueStatus.completed) {
+    return DownloadButtonState.completed;
+  }
+  return switch (queueStatus) {
+    DownloadQueueStatus.queued => DownloadButtonState.queued,
+    DownloadQueueStatus.downloading => DownloadButtonState.downloading,
+    _ => DownloadButtonState.idle,
+  };
+}
+
+bool _isDownloadableSource(String sourceId) =>
+    sourceId == 'anime1' || sourceId == 'xifan';
 
 /// Icon for the volume HUD, chosen from [volume] (0.0-1.0).
 IconData _volumeIcon(double volume) {

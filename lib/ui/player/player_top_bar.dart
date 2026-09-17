@@ -1,6 +1,8 @@
 // lib/ui/player/player_top_bar.dart
 import 'package:flutter/material.dart';
 
+enum DownloadButtonState { idle, queued, downloading, completed }
+
 /// Custom top bar for [PlayerScreen], replacing the floating back button
 /// that used to sit alone in the top-left corner.
 ///
@@ -12,11 +14,15 @@ class PlayerTopBar extends StatelessWidget {
     required this.title,
     required this.onBack,
     required this.onScreenshot,
+    required this.onDownload,
+    required this.downloadState,
   });
 
   final String title;
   final VoidCallback onBack;
   final VoidCallback onScreenshot;
+  final VoidCallback? onDownload;
+  final DownloadButtonState downloadState;
 
   @override
   Widget build(BuildContext context) {
@@ -45,9 +51,22 @@ class PlayerTopBar extends StatelessWidget {
               tooltip: '截图',
               onPressed: onScreenshot,
             ),
+            if (onDownload != null)
+              IconButton(
+                icon: Icon(_downloadIcon, color: Colors.white),
+                tooltip: '下载',
+                onPressed: onDownload,
+              ),
           ],
         ),
       ),
     );
   }
+
+  IconData get _downloadIcon => switch (downloadState) {
+    DownloadButtonState.idle => Icons.download_outlined,
+    DownloadButtonState.queued => Icons.schedule,
+    DownloadButtonState.downloading => Icons.downloading,
+    DownloadButtonState.completed => Icons.download_done,
+  };
 }
