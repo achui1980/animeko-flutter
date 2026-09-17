@@ -47,6 +47,14 @@ class DownloadQueued extends DownloadEvent {
   const DownloadQueued(super.request);
 }
 
+/// Emitted once per stall-triggered retry (not on the final give-up) so the
+/// UI can show "已停滞，正在重试" -- see [DownloadQueueItem.isStalled] in
+/// `download_queue_controller.dart`. Purely transient: never persisted to
+/// the [DownloadedEpisodeRepository].
+class DownloadStalled extends DownloadEvent {
+  const DownloadStalled(super.request);
+}
+
 class DownloadProgress extends DownloadEvent {
   const DownloadProgress(super.request, this.received, this.total);
 
@@ -68,11 +76,21 @@ class DownloadCancelled extends DownloadEvent {
   const DownloadCancelled(super.request);
 }
 
+/// Threaded through [CancelToken.cancel] so `_attempt`'s catch block can
+/// tell a stall-triggered cancellation apart from a real user-initiated
+/// [DownloadWorker.cancel] call.
+enum _StallSignal { retryOnce, giveUp }
+
+enum _AttemptResult { done, stalledRetry }
+
 class DownloadWorker {
   DownloadWorker({
     required Dio dio,
     required MediaSource Function(String sourceId) sourceForId,
     required DownloadedEpisodeRepository repository,
+    this.stallTimeout = const Duration(seconds: 30),
+    this.noProgressTimeout = const Duration(minutes: 2),
+    this.stallCheckInterval = const Duration(seconds: 1),
   }) : _dio = dio,
        _sourceForId = sourceForId,
        _repository = repository;
@@ -80,6 +98,22 @@ class DownloadWorker {
   final Dio _dio;
   final MediaSource Function(String) _sourceForId;
   final DownloadedEpisodeRepository _repository;
+
+  /// How long without a new [DownloadProgress] event before the active
+  /// attempt is considered stalled. Production default 30s per the design
+  /// doc; tests inject millisecond-scale values instead of waiting real
+  /// seconds.
+  final Duration stallTimeout;
+
+  /// Absolute ceiling on how long a request may sit at zero received bytes
+  /// (measured from the moment it is dequeued, not reset by the one
+  /// automatic stall-retry) before it is failed outright. Production
+  /// default 2 minutes.
+  final Duration noProgressTimeout;
+
+  /// How often the watchdog re-checks elapsed time.
+  final Duration stallCheckInterval;
+
   final _queue = <DownloadRequest>[];
   final _events = StreamController<DownloadEvent>.broadcast();
   CancelToken? _cancelToken;
@@ -91,11 +125,8 @@ class DownloadWorker {
 
   void enqueue(DownloadRequest request) {
     if (request.sourceId != 'anime1' && request.sourceId != 'xifan') {
-      throw ArgumentError.value(
-        request.sourceId,
-        'sourceId',
-        'Unsupported source',
-      );
+      unawaited(_failUnsupportedSource(request));
+      return;
     }
     if (_active?.episodeKey == request.episodeKey ||
         _queue.any((item) => item.episodeKey == request.episodeKey)) {
@@ -107,6 +138,25 @@ class DownloadWorker {
     if (_active == null) unawaited(_drain());
   }
 
+  Future<void> _failUnsupportedSource(DownloadRequest request) async {
+    const message = '此来源不支持下载';
+    await _repository.upsert(
+      DownloadedEpisodeWrite(
+        sourceId: request.sourceId,
+        subjectId: request.subjectId,
+        episodeKey: request.episodeKey,
+        subjectName: request.subjectName,
+        episodeLabel: request.episodeLabel,
+        localPath: '',
+        episodeDir: null,
+        format: 'mp4',
+        status: DownloadStatus.failed,
+        errorMessage: message,
+      ),
+    );
+    _events.add(DownloadFailed(request, message));
+  }
+
   void cancel(String episodeKey) {
     _queue.removeWhere((item) => item.episodeKey == episodeKey);
     if (_active?.episodeKey == episodeKey) _cancelToken?.cancel();
@@ -115,14 +165,24 @@ class DownloadWorker {
   Future<void> _drain() async {
     while (_queue.isNotEmpty) {
       _active = _queue.removeAt(0);
-      await _download(_active!);
+      await _downloadWithStallRetry(_active!);
       _active = null;
     }
     _idle?.complete();
     _idle = null;
   }
 
-  Future<void> _download(DownloadRequest request) async {
+  Future<void> _downloadWithStallRetry(DownloadRequest request) async {
+    final first = await _attempt(request, hasRetried: false);
+    if (first == _AttemptResult.stalledRetry) {
+      await _attempt(request, hasRetried: true);
+    }
+  }
+
+  Future<_AttemptResult> _attempt(
+    DownloadRequest request, {
+    required bool hasRetried,
+  }) async {
     final directory = Directory(
       p.join(
         request.downloadRoot,
@@ -132,6 +192,42 @@ class DownloadWorker {
       ),
     );
     _cancelToken = CancelToken();
+    var lastProgressAt = DateTime.now();
+    final startedAt = lastProgressAt;
+    var receivedTotal = 0;
+    // Which watchdog branch below actually triggered the give-up, so the
+    // catch block can pick the right failure message. Deliberately tracked
+    // as its own flag rather than re-derived from `receivedTotal == 0` at
+    // catch time: a stall-repeat give-up (the second `if`, `hasRetried`
+    // true) can *also* have received zero bytes overall (the connection
+    // never delivered anything on either attempt), so `receivedTotal == 0`
+    // alone can't tell the two give-up reasons apart.
+    var gaveUpDueToZeroBytes = false;
+
+    final watchdog = Timer.periodic(stallCheckInterval, (_) {
+      final now = DateTime.now();
+      if (receivedTotal == 0 &&
+          now.difference(startedAt) >= noProgressTimeout) {
+        gaveUpDueToZeroBytes = true;
+        _cancelToken?.cancel(_StallSignal.giveUp);
+        return;
+      }
+      if (now.difference(lastProgressAt) >= stallTimeout) {
+        if (hasRetried) {
+          _cancelToken?.cancel(_StallSignal.giveUp);
+        } else {
+          _events.add(DownloadStalled(request));
+          _cancelToken?.cancel(_StallSignal.retryOnce);
+        }
+      }
+    });
+
+    void onProgress(int received, int total) {
+      receivedTotal = received;
+      lastProgressAt = DateTime.now();
+      _events.add(DownloadProgress(request, received, total));
+    }
+
     try {
       await directory.create(recursive: true);
       await _repository.upsert(
@@ -142,6 +238,7 @@ class DownloadWorker {
           subjectName: request.subjectName,
           episodeLabel: request.episodeLabel,
           localPath: directory.path,
+          episodeDir: directory.path,
           format: 'mp4',
           status: DownloadStatus.downloading,
         ),
@@ -164,10 +261,9 @@ class DownloadWorker {
               targetDirectory: directory,
               headers: selected.headers,
               cancelToken: _cancelToken,
-              onProgress: (received, total) =>
-                  _events.add(DownloadProgress(request, received, total)),
+              onProgress: onProgress,
             )).fileSizeBytes
-          : await _downloadFile(url, localPath, selected.headers, request);
+          : await _downloadFile(url, localPath, selected.headers, onProgress);
       await _repository.upsert(
         DownloadedEpisodeWrite(
           sourceId: request.sourceId,
@@ -176,18 +272,46 @@ class DownloadWorker {
           subjectName: request.subjectName,
           episodeLabel: request.episodeLabel,
           localPath: localPath,
+          episodeDir: directory.path,
           format: isHls ? 'hls' : 'mp4',
           status: DownloadStatus.completed,
           fileSizeBytes: size,
         ),
       );
       _events.add(DownloadCompleted(request));
+      return _AttemptResult.done;
     } catch (error) {
       if (error is DioException && CancelToken.isCancel(error)) {
+        final reason = error.error;
+        if (reason == _StallSignal.retryOnce) {
+          return _AttemptResult.stalledRetry;
+        }
+        if (reason == _StallSignal.giveUp) {
+          final message = gaveUpDueToZeroBytes
+              ? '一直未能连接到下载源，已跳过'
+              : '下载已停滞，重试后仍无进展，已跳过';
+          await _repository.upsert(
+            DownloadedEpisodeWrite(
+              sourceId: request.sourceId,
+              subjectId: request.subjectId,
+              episodeKey: request.episodeKey,
+              subjectName: request.subjectName,
+              episodeLabel: request.episodeLabel,
+              localPath: directory.path,
+              episodeDir: directory.path,
+              format: 'mp4',
+              status: DownloadStatus.failed,
+              errorMessage: message,
+            ),
+          );
+          _events.add(DownloadFailed(request, message));
+          return _AttemptResult.done;
+        }
+        // A real user-initiated cancel() call.
         if (await directory.exists()) await directory.delete(recursive: true);
         await _repository.delete(request.episodeKey);
         _events.add(DownloadCancelled(request));
-        return;
+        return _AttemptResult.done;
       }
       await _repository.upsert(
         DownloadedEpisodeWrite(
@@ -197,13 +321,16 @@ class DownloadWorker {
           subjectName: request.subjectName,
           episodeLabel: request.episodeLabel,
           localPath: directory.path,
+          episodeDir: directory.path,
           format: 'mp4',
           status: DownloadStatus.failed,
           errorMessage: error.toString(),
         ),
       );
       _events.add(DownloadFailed(request, error.toString()));
+      return _AttemptResult.done;
     } finally {
+      watchdog.cancel();
       _cancelToken = null;
     }
   }
@@ -212,15 +339,14 @@ class DownloadWorker {
     String url,
     String path,
     Map<String, String> headers,
-    DownloadRequest request,
+    void Function(int received, int total) onProgress,
   ) async {
     await _dio.download(
       url,
       path,
       cancelToken: _cancelToken,
       options: Options(headers: headers),
-      onReceiveProgress: (received, total) =>
-          _events.add(DownloadProgress(request, received, total)),
+      onReceiveProgress: onProgress,
     );
     return File(path).length();
   }

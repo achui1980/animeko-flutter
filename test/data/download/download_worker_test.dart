@@ -107,6 +107,46 @@ class _Adapter implements HttpClientAdapter {
   void close({bool force = false}) {}
 }
 
+/// Never delivers bytes for the first `stallOnAttempt` calls to any URL --
+/// it just waits on `cancelFuture` and throws the cancellation dio expects,
+/// simulating a connection that hangs until the stall watchdog cancels it.
+/// From the `stallOnAttempt + 1`th call onward it serves [responses]
+/// normally, simulating "the retry succeeds".
+class _StallThenSucceedAdapter implements HttpClientAdapter {
+  _StallThenSucceedAdapter(this.responses, {this.stallOnAttempt = 1});
+
+  final Map<String, Object> responses;
+  final int stallOnAttempt;
+  var _callCount = 0;
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    _callCount++;
+    if (_callCount <= stallOnAttempt) {
+      await cancelFuture;
+      throw DioException.requestCancelled(
+        requestOptions: options,
+        reason: 'stalled',
+      );
+    }
+    final response = responses[options.uri.toString()];
+    if (response is List<int>) {
+      return ResponseBody.fromBytes(Uint8List.fromList(response), 200);
+    }
+    return ResponseBody.fromString(
+      response as String? ?? '',
+      response == null ? 404 : 200,
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
 Dio _dio(Map<String, Object> responses, {bool waitForCancellation = false}) {
   final dio = Dio();
   dio.httpClientAdapter = _Adapter(
@@ -189,18 +229,26 @@ void main() {
     expect(events.whereType<DownloadCompleted>(), hasLength(2));
   });
 
-  test('rejects a request from an unsupported source', () {
-    final worker = DownloadWorker(
-      dio: _dio({}),
-      sourceForId: (_) => throw UnimplementedError(),
-      repository: repository,
-    );
+  test(
+    'writes a failed record instead of throwing for an unsupported source',
+    () async {
+      final events = <DownloadEvent>[];
+      final worker = DownloadWorker(
+        dio: _dio({}),
+        sourceForId: (_) => throw UnimplementedError(),
+        repository: repository,
+      )..events.listen(events.add);
+      final request = _request('rss', 1, downloadRoot: root.path);
 
-    expect(
-      () => worker.enqueue(_request('rss', 1, downloadRoot: root.path)),
-      throwsArgumentError,
-    );
-  });
+      worker.enqueue(request);
+      await Future<void>.delayed(Duration.zero);
+
+      final record = await repository.findByKey(request.episodeKey);
+      expect(record!.status, DownloadStatus.failed.name);
+      expect(record.errorMessage, '此来源不支持下载');
+      expect(events.whereType<DownloadFailed>(), hasLength(1));
+    },
+  );
 
   test('prefers an MP4 candidate for a Xifan request', () async {
     final events = <DownloadEvent>[];
@@ -262,4 +310,89 @@ void main() {
     expect(record!.status, DownloadStatus.failed.name);
     expect(record.errorMessage, isNotEmpty);
   });
+
+  test('retries once after a stall, then succeeds on the retry', () async {
+    final events = <DownloadEvent>[];
+    final dio = Dio()
+      ..httpClientAdapter = _StallThenSucceedAdapter({
+        'https://cdn.example/video.mp4': [1, 2, 3],
+      });
+    final worker = DownloadWorker(
+      dio: dio,
+      sourceForId: (_) => _Source('anime1', const [
+        _PlaybackSource('https://cdn.example/video.mp4'),
+      ]),
+      repository: repository,
+      stallTimeout: const Duration(milliseconds: 20),
+      stallCheckInterval: const Duration(milliseconds: 5),
+      noProgressTimeout: const Duration(seconds: 5),
+    )..events.listen(events.add);
+
+    worker.enqueue(_request('anime1', 1, downloadRoot: root.path));
+    await worker.whenIdle;
+
+    expect(events.whereType<DownloadStalled>(), hasLength(1));
+    expect(events.whereType<DownloadCompleted>(), hasLength(1));
+  });
+
+  test('fails and moves on when a stall persists through the retry', () async {
+    final events = <DownloadEvent>[];
+    final dio = Dio()
+      ..httpClientAdapter = _StallThenSucceedAdapter(
+        const {},
+        stallOnAttempt: 2,
+      );
+    final worker = DownloadWorker(
+      dio: dio,
+      sourceForId: (_) => _Source('anime1', const [
+        _PlaybackSource('https://cdn.example/video.mp4'),
+      ]),
+      repository: repository,
+      stallTimeout: const Duration(milliseconds: 20),
+      stallCheckInterval: const Duration(milliseconds: 5),
+      noProgressTimeout: const Duration(seconds: 5),
+    )..events.listen(events.add);
+    final request = _request('anime1', 1, downloadRoot: root.path);
+
+    worker.enqueue(request);
+    await worker.whenIdle;
+
+    expect(events.whereType<DownloadStalled>(), hasLength(1));
+    final failed = events.whereType<DownloadFailed>().single;
+    expect(failed.message, contains('停滞'));
+    final record = await repository.findByKey(request.episodeKey);
+    expect(record!.status, DownloadStatus.failed.name);
+  });
+
+  test(
+    'gives up at the zero-byte ceiling without waiting for the stall timeout',
+    () async {
+      final events = <DownloadEvent>[];
+      final dio = Dio()
+        ..httpClientAdapter = _StallThenSucceedAdapter(
+          const {},
+          stallOnAttempt: 999,
+        );
+      final worker = DownloadWorker(
+        dio: dio,
+        sourceForId: (_) => _Source('anime1', const [
+          _PlaybackSource('https://cdn.example/video.mp4'),
+        ]),
+        repository: repository,
+        // Deliberately larger than noProgressTimeout so only the
+        // zero-byte ceiling can be the one that fires.
+        stallTimeout: const Duration(seconds: 30),
+        stallCheckInterval: const Duration(milliseconds: 5),
+        noProgressTimeout: const Duration(milliseconds: 20),
+      )..events.listen(events.add);
+      final request = _request('anime1', 1, downloadRoot: root.path);
+
+      worker.enqueue(request);
+      await worker.whenIdle;
+
+      expect(events.whereType<DownloadStalled>(), isEmpty);
+      final failed = events.whereType<DownloadFailed>().single;
+      expect(failed.message, contains('未能连接'));
+    },
+  );
 }
