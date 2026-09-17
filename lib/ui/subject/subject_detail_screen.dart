@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/theme/app_spacing.dart';
 import '../../data/subject/subject_models.dart';
+import '../../domain/download/download_queue_controller.dart';
+import '../../domain/play/subject_episodes_controller.dart';
 import '../../domain/subject/subject_detail_controller.dart';
 import '../../domain/subject/subject_main_episodes_controller.dart';
 import '../common/error_retry_view.dart';
@@ -16,6 +18,16 @@ import 'subject_detail_main_pane.dart';
 import 'subject_detail_side_pane.dart';
 import 'subject_info_table.dart';
 import 'subject_title_block.dart';
+
+/// Returns every episode for the first registered HTTP download source.
+List<MergedEpisode> firstDownloadableSourceEpisodes(
+  List<MergedEpisode> allMerged,
+) {
+  final sourceId = allMerged
+      .map((item) => item.sourceId)
+      .firstWhere((id) => id == 'anime1' || id == 'xifan');
+  return allMerged.where((item) => item.sourceId == sourceId).toList();
+}
 
 /// The subject detail page.
 ///
@@ -64,7 +76,41 @@ class SubjectDetailScreen extends ConsumerWidget {
     );
 
     return Scaffold(
-      appBar: AppBar(),
+      appBar: AppBar(
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.download),
+            tooltip: '全部下载',
+            onPressed: () async {
+              try {
+                final episodes = firstDownloadableSourceEpisodes(
+                  await ref.read(
+                    subjectEpisodesControllerProvider(
+                      subjectId: subjectId,
+                      subjectName: subjectName,
+                    ).future,
+                  ),
+                );
+                for (final episode in episodes) {
+                  ref
+                      .read(downloadQueueControllerProvider.notifier)
+                      .enqueue(
+                        subjectId: subjectId,
+                        subjectName: subjectName,
+                        episode: episode,
+                      );
+                }
+              } on StateError {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(const SnackBar(content: Text('没有可下载的视频源')));
+                }
+              }
+            },
+          ),
+        ],
+      ),
       body: detailAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stackTrace) => Center(
