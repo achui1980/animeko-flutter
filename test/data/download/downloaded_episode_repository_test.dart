@@ -118,4 +118,42 @@ void main() {
 
     expect(rows.map((row) => row.episodeKey), ['2::xifan::2', '1::anime1::1']);
   });
+
+  test(
+    'reconcileInterrupted marks every downloading row as interrupted',
+    () async {
+      await repository.upsert(
+        const DownloadedEpisodeWrite(
+          sourceId: 'anime1',
+          subjectId: 1,
+          episodeKey: '1::anime1::1',
+          subjectName: '测试番剧',
+          episodeLabel: '1',
+          localPath: '/tmp/one',
+          format: 'mp4',
+          status: DownloadStatus.downloading,
+        ),
+      );
+      await repository.upsert(
+        const DownloadedEpisodeWrite(
+          sourceId: 'xifan',
+          subjectId: 2,
+          episodeKey: '2::xifan::2',
+          subjectName: '测试番剧2',
+          episodeLabel: '2',
+          localPath: '/tmp/two.mp4',
+          format: 'mp4',
+          status: DownloadStatus.completed,
+        ),
+      );
+
+      await repository.reconcileInterrupted();
+
+      final rows = await repository.getAll();
+      final one = rows.firstWhere((row) => row.episodeKey == '1::anime1::1');
+      final two = rows.firstWhere((row) => row.episodeKey == '2::xifan::2');
+      expect(one.status, DownloadStatus.interrupted.name);
+      expect(two.status, DownloadStatus.completed.name);
+    },
+  );
 }

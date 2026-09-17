@@ -5,7 +5,7 @@ import '../local_database.dart';
 
 part 'downloaded_episode_repository.g.dart';
 
-enum DownloadStatus { downloading, completed, failed }
+enum DownloadStatus { downloading, completed, failed, interrupted }
 
 class DownloadedEpisodeWrite {
   const DownloadedEpisodeWrite({
@@ -82,6 +82,21 @@ class DownloadedEpisodeRepository {
           ),
         );
   }
+
+  /// Marks every row still in [DownloadStatus.downloading] as
+  /// [DownloadStatus.interrupted]. Call once at app startup (from
+  /// `DownloadQueueController.build()`) — a `downloading` row that survives
+  /// to the next launch means the app was killed/crashed mid-download, so
+  /// nothing is actually still writing to that file.
+  Future<void> reconcileInterrupted() =>
+      (_db.update(
+            _db.downloadedEpisodes,
+          )..where((row) => row.status.equals(DownloadStatus.downloading.name)))
+          .write(
+            DownloadedEpisodesCompanion(
+              status: Value(DownloadStatus.interrupted.name),
+            ),
+          );
 
   Future<void> delete(String episodeKey) => (_db.delete(
     _db.downloadedEpisodes,
