@@ -358,8 +358,8 @@ anime1 已经没有这一集了 → 自动换成 xifan 并成功"这条路径会
 `Directory(localPath).parent`，对于目录类型的行，这会指向 `<subjectId>/`，删除
 时会连带清除同一部番的其他剧集文件。修法：Drift 新增专用列 `episodeDir`（worker
 创建下载目录时写入），删除操作统一改为删除 `Directory(episodeDir)`，`localPath`
-之后只用于确定播放文件路径，不再用于删除。因此 v5 迁移共新增 6 列（详见 2.1），
-而非最初讨论的 5 列。
+之后只用于确定播放文件路径，不再用于删除。`episodeDir` 已计入 2.1 节的 v5 迁移
+范围，共 6 列。
 
 **5.2 "下载失败/下载不了"的根本修复——校验响应内容**：`_downloadFile` 目前既不
 检查 HTTP 状态码也不检查 `content-type`。当 Anime1 的 Referer/Cookie 失效时，
