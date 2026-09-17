@@ -102,6 +102,22 @@ class MikanSubjectMappings extends Table {
   Set<Column> get primaryKey => {subjectId};
 }
 
+class DownloadedEpisodes extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get sourceId => text()();
+  IntColumn get subjectId => integer()();
+  TextColumn get episodeKey => text().unique()();
+  TextColumn get subjectName => text()();
+  TextColumn get episodeLabel => text()();
+  TextColumn get localPath => text()();
+  TextColumn get format => text()();
+  IntColumn get fileSizeBytes => integer().nullable()();
+  TextColumn get status => text()();
+  TextColumn get errorMessage => text().nullable()();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get completedAt => dateTime().nullable()();
+}
+
 @DriftDatabase(
   tables: [
     Subjects,
@@ -110,13 +126,14 @@ class MikanSubjectMappings extends Table {
     SearchHistory,
     SubjectImageCache,
     MikanSubjectMappings,
+    DownloadedEpisodes,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   /// SQLite does not enforce declared FOREIGN KEY constraints unless this
   /// pragma is turned on for the connection -- drift does not do this
@@ -131,6 +148,9 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 3) {
         await m.createTable(mikanSubjectMappings);
+      }
+      if (from < 4) {
+        await m.createTable(downloadedEpisodes);
       }
     },
     beforeOpen: (details) async {
