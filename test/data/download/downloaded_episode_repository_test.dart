@@ -218,4 +218,64 @@ void main() {
     await repository.deleteWithFiles('missing::key::1');
     // No exception -- nothing to assert beyond "did not throw".
   });
+
+  test('updateProgress writes byte progress and bumps lastProgressAt', () async {
+    var now = DateTime(2026, 9, 17, 10);
+    repository = DownloadedEpisodeRepository(db, now: () => now);
+    await repository.upsert(
+      const DownloadedEpisodeWrite(
+        sourceId: 'anime1',
+        subjectId: 1,
+        episodeKey: '1::anime1::1',
+        subjectName: '测试番剧',
+        episodeLabel: '1',
+        localPath: '/tmp/one',
+        episodeDir: '/tmp/one',
+        format: 'mp4',
+        status: DownloadStatus.downloading,
+      ),
+    );
+
+    now = now.add(const Duration(seconds: 5));
+    await repository.updateProgress(
+      '1::anime1::1',
+      receivedBytes: 512,
+      totalBytes: 2048,
+    );
+
+    final row = await repository.findByKey('1::anime1::1');
+    expect(row!.receivedBytes, 512);
+    expect(row.totalBytes, 2048);
+    expect(row.downloadedSegments, isNull);
+    expect(row.totalSegments, isNull);
+    expect(row.lastProgressAt, now);
+  });
+
+  test('updateProgress writes segment progress for HLS downloads', () async {
+    await repository.upsert(
+      const DownloadedEpisodeWrite(
+        sourceId: 'anime1',
+        subjectId: 1,
+        episodeKey: '1::anime1::1',
+        subjectName: '测试番剧',
+        episodeLabel: '1',
+        localPath: '/tmp/one',
+        episodeDir: '/tmp/one',
+        format: 'hls',
+        status: DownloadStatus.downloading,
+      ),
+    );
+
+    await repository.updateProgress(
+      '1::anime1::1',
+      downloadedSegments: 3,
+      totalSegments: 12,
+    );
+
+    final row = await repository.findByKey('1::anime1::1');
+    expect(row!.downloadedSegments, 3);
+    expect(row.totalSegments, 12);
+    expect(row.receivedBytes, 0);
+    expect(row.totalBytes, isNull);
+  });
 }

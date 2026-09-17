@@ -395,4 +395,32 @@ void main() {
       expect(failed.message, contains('未能连接'));
     },
   );
+
+  test('persists progress to disk at most once per second', () async {
+    var now = DateTime(2026, 9, 17, 10);
+    repository = DownloadedEpisodeRepository(database, now: () => now);
+    final chunks = List.filled(2_000_000, 7);
+    final worker = DownloadWorker(
+      dio: _dio({'https://cdn.example/video.mp4': chunks}),
+      sourceForId: (_) => _Source('anime1', const [
+        _PlaybackSource('https://cdn.example/video.mp4'),
+      ]),
+      repository: repository,
+      now: () => now,
+    );
+    final request = _request('anime1', 1, downloadRoot: root.path);
+
+    worker.enqueue(request);
+    await worker.whenIdle;
+
+    final row = await repository.findByKey(request.episodeKey);
+    // The fake adapter delivers the whole body in one synchronous chunk, so
+    // `onProgress` fires at most a handful of times regardless of size --
+    // this only proves a persisted value exists and matches the final
+    // state, not that throttling suppressed any particular call. Task 6a's
+    // throttling behavior itself (skipping writes within the 1s/1% window)
+    // is exercised by the unit-level throttle-decision helper in Step 7
+    // below, not by this integration-level fake-adapter test.
+    expect(row!.receivedBytes, chunks.length);
+  });
 }

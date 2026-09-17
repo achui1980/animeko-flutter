@@ -91,13 +91,16 @@ class DownloadWorker {
     this.stallTimeout = const Duration(seconds: 30),
     this.noProgressTimeout = const Duration(minutes: 2),
     this.stallCheckInterval = const Duration(seconds: 1),
+    DateTime Function() now = DateTime.now,
   }) : _dio = dio,
        _sourceForId = sourceForId,
-       _repository = repository;
+       _repository = repository,
+       _now = now;
 
   final Dio _dio;
   final MediaSource Function(String) _sourceForId;
   final DownloadedEpisodeRepository _repository;
+  final DateTime Function() _now;
 
   /// How long without a new [DownloadProgress] event before the active
   /// attempt is considered stalled. Production default 30s per the design
@@ -192,7 +195,7 @@ class DownloadWorker {
       ),
     );
     _cancelToken = CancelToken();
-    var lastProgressAt = DateTime.now();
+    var lastProgressAt = _now();
     final startedAt = lastProgressAt;
     var receivedTotal = 0;
     // Which watchdog branch below actually triggered the give-up, so the
@@ -205,7 +208,7 @@ class DownloadWorker {
     var gaveUpDueToZeroBytes = false;
 
     final watchdog = Timer.periodic(stallCheckInterval, (_) {
-      final now = DateTime.now();
+      final now = _now();
       if (receivedTotal == 0 &&
           now.difference(startedAt) >= noProgressTimeout) {
         gaveUpDueToZeroBytes = true;
@@ -222,10 +225,33 @@ class DownloadWorker {
       }
     });
 
+    var isHls = false;
+    DateTime? lastPersistedAt;
+    var lastPersistedPercent = -1;
+
     void onProgress(int received, int total) {
       receivedTotal = received;
-      lastProgressAt = DateTime.now();
+      lastProgressAt = _now();
       _events.add(DownloadProgress(request, received, total));
+
+      final percent = total > 0 ? received * 100 ~/ total : -1;
+      final dueByTime =
+          lastPersistedAt == null ||
+          lastProgressAt.difference(lastPersistedAt!) >=
+              const Duration(seconds: 1);
+      final dueByPercent = percent >= 0 && percent != lastPersistedPercent;
+      if (!dueByTime && !dueByPercent) return;
+      lastPersistedAt = lastProgressAt;
+      lastPersistedPercent = percent;
+      unawaited(
+        _repository.updateProgress(
+          request.episodeKey,
+          receivedBytes: isHls ? null : received,
+          totalBytes: isHls ? null : (total > 0 ? total : null),
+          downloadedSegments: isHls ? received : null,
+          totalSegments: isHls ? (total > 0 ? total : null) : null,
+        ),
+      );
     }
 
     try {
@@ -251,7 +277,7 @@ class DownloadWorker {
         orElse: () => candidates.first,
       );
       final url = await selected.prepare();
-      final isHls = Uri.parse(url).path.toLowerCase().endsWith('.m3u8');
+      isHls = Uri.parse(url).path.toLowerCase().endsWith('.m3u8');
       final localPath = isHls
           ? p.join(directory.path, 'playlist.m3u8')
           : p.join(directory.path, 'video.mp4');

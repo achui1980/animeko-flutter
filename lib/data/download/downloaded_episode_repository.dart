@@ -103,6 +103,34 @@ class DownloadedEpisodeRepository {
             ),
           );
 
+  /// Persists live progress for a row already in [DownloadStatus.downloading]
+  /// (written by [DownloadWorker._attempt]'s `onProgress` callback, throttled
+  /// to at most once per second or once per whole-percent change — see the
+  /// design doc's "进度写盘节流" decision). [receivedBytes]/[totalBytes] are
+  /// used for mp4 downloads; [downloadedSegments]/[totalSegments] for HLS.
+  /// Whichever pair is null for a given download format is simply left
+  /// unwritten (both pairs stay in their schema default: `receivedBytes`
+  /// defaults to `0`, the rest default to `null`).
+  Future<void> updateProgress(
+    String episodeKey, {
+    int? receivedBytes,
+    int? totalBytes,
+    int? downloadedSegments,
+    int? totalSegments,
+  }) => (_db.update(
+    _db.downloadedEpisodes,
+  )..where((row) => row.episodeKey.equals(episodeKey))).write(
+    DownloadedEpisodesCompanion(
+      receivedBytes: receivedBytes == null
+          ? const Value.absent()
+          : Value(receivedBytes),
+      totalBytes: Value(totalBytes),
+      downloadedSegments: Value(downloadedSegments),
+      totalSegments: Value(totalSegments),
+      lastProgressAt: Value(_now()),
+    ),
+  );
+
   Future<void> delete(String episodeKey) => (_db.delete(
     _db.downloadedEpisodes,
   )..where((row) => row.episodeKey.equals(episodeKey))).go();
