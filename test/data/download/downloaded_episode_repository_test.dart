@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:animeko_flutter/data/download/downloaded_episode_repository.dart';
 import 'package:animeko_flutter/data/local_database.dart';
 import 'package:drift/native.dart';
@@ -156,4 +158,64 @@ void main() {
       expect(two.status, DownloadStatus.completed.name);
     },
   );
+
+  test('findCompletedForEpisode ignores sourceId', () async {
+    await repository.upsert(
+      const DownloadedEpisodeWrite(
+        sourceId: 'anime1',
+        subjectId: 1,
+        episodeKey: '1::anime1::第6话',
+        subjectName: '测试番剧',
+        episodeLabel: '第6话',
+        localPath: '/tmp/six.mp4',
+        format: 'mp4',
+        status: DownloadStatus.completed,
+      ),
+    );
+
+    // Currently playing from a *different* source (e.g. mikan) than the
+    // one the file was actually downloaded from (anime1) -- automatic
+    // source selection (see download_source_resolver.dart) means this
+    // mismatch is expected, not a bug.
+    final found = await repository.findCompletedForEpisode(1, '第6话');
+    expect(found, isNotNull);
+    expect(found!.sourceId, 'anime1');
+
+    expect(await repository.findCompletedForEpisode(1, '第7话'), isNull);
+    expect(await repository.findCompletedForEpisode(2, '第6话'), isNull);
+  });
+
+  test('deleteWithFiles removes the record and its directory', () async {
+    final dir = await Directory.systemTemp.createTemp('repo_delete_test_');
+    addTearDown(() async {
+      if (await dir.exists()) {
+        await dir.delete(recursive: true);
+      }
+    });
+    final file = File('${dir.path}/video.mp4');
+    await file.writeAsBytes([1, 2, 3]);
+    await repository.upsert(
+      DownloadedEpisodeWrite(
+        sourceId: 'anime1',
+        subjectId: 1,
+        episodeKey: '1::anime1::1',
+        subjectName: '测试番剧',
+        episodeLabel: '1',
+        localPath: file.path,
+        format: 'mp4',
+        status: DownloadStatus.completed,
+        episodeDir: dir.path,
+      ),
+    );
+
+    await repository.deleteWithFiles('1::anime1::1');
+
+    expect(await repository.findByKey('1::anime1::1'), isNull);
+    expect(await dir.exists(), isFalse);
+  });
+
+  test('deleteWithFiles is a no-op for an unknown key', () async {
+    await repository.deleteWithFiles('missing::key::1');
+    // No exception -- nothing to assert beyond "did not throw".
+  });
 }

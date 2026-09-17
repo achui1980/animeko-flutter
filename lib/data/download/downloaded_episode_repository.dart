@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:drift/drift.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -19,6 +21,7 @@ class DownloadedEpisodeWrite {
     required this.status,
     this.fileSizeBytes,
     this.errorMessage,
+    this.episodeDir,
   });
 
   final String sourceId;
@@ -31,6 +34,7 @@ class DownloadedEpisodeWrite {
   final DownloadStatus status;
   final int? fileSizeBytes;
   final String? errorMessage;
+  final String? episodeDir;
 }
 
 class DownloadedEpisodeRepository {
@@ -75,6 +79,7 @@ class DownloadedEpisodeRepository {
             fileSizeBytes: Value(value.fileSizeBytes),
             status: value.status.name,
             errorMessage: Value(value.errorMessage),
+            episodeDir: Value(value.episodeDir),
             createdAt: existing?.createdAt ?? _now(),
             completedAt: Value(
               value.status == DownloadStatus.completed ? _now() : null,
@@ -101,6 +106,48 @@ class DownloadedEpisodeRepository {
   Future<void> delete(String episodeKey) => (_db.delete(
     _db.downloadedEpisodes,
   )..where((row) => row.episodeKey.equals(episodeKey))).go();
+
+  /// Finds a completed download of [episodeTitle] under [subjectId],
+  /// regardless of which source it was downloaded from. Used wherever the
+  /// app needs to know "is this episode available offline" without also
+  /// knowing/caring which source produced the file — automatic source
+  /// selection (see `download_source_resolver.dart`) means the file on disk
+  /// may not match whichever source the episode is *currently* being
+  /// browsed/played from.
+  Future<DownloadedEpisode?> findCompletedForEpisode(
+    int subjectId,
+    String episodeTitle,
+  ) => (_db.select(_db.downloadedEpisodes)
+        ..where((row) => row.subjectId.equals(subjectId))
+        ..where((row) => row.episodeLabel.equals(episodeTitle))
+        ..where((row) => row.status.equals(DownloadStatus.completed.name)))
+      .getSingleOrNull();
+
+  /// Deletes the DB record for [episodeKey] and, best-effort, its backing
+  /// files. Used by the UI's manual delete action and by
+  /// `DownloadQueueController.retry` when it cleans up a stale download left
+  /// behind after automatically switching to a different source.
+  ///
+  /// Uses [DownloadedEpisode.episodeDir] when present. Rows written before
+  /// schema v5 have a null `episodeDir` -- for those, falls back to the
+  /// pre-v5 heuristic (`localPath` is a file for `completed` rows, a
+  /// directory for every other status), matching the old (buggy, see design
+  /// spec bug #7) `DownloadListItem.deleteLocalPath` behavior exactly so
+  /// legacy rows don't regress.
+  Future<void> deleteWithFiles(String episodeKey) async {
+    final row = await findByKey(episodeKey);
+    if (row == null) return;
+    final dirPath = row.episodeDir ??
+        (row.status == DownloadStatus.completed.name
+            ? Directory(row.localPath).parent.path
+            : row.localPath);
+    try {
+      await Directory(dirPath).delete(recursive: true);
+    } on FileSystemException {
+      // Files may already be gone; the DB row still needs removing.
+    }
+    await delete(episodeKey);
+  }
 }
 
 @riverpod
