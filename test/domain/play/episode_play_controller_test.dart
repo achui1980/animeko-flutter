@@ -1,8 +1,12 @@
 // test/domain/play/episode_play_controller_test.dart
+import 'package:animeko_flutter/data/download/downloaded_episode_repository.dart';
+import 'package:animeko_flutter/data/local_database.dart';
+import 'package:animeko_flutter/domain/download/local_file_playback_source.dart';
 import 'package:animeko_flutter/domain/media/media_registry.dart';
 import 'package:animeko_flutter/domain/media/media_source.dart';
 import 'package:animeko_flutter/domain/play/episode_play_controller.dart';
 import 'package:animeko_flutter/domain/play/subject_episodes_controller.dart';
+import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:riverpod/riverpod.dart';
@@ -34,19 +38,25 @@ void main() {
     late MockMediaSource sourceA;
     late MockMediaSource sourceB;
     late ProviderContainer container;
+    late AppDatabase db;
+    late DownloadedEpisodeRepository repository;
 
     setUp(() {
       sourceA = MockMediaSource();
       sourceB = MockMediaSource();
+      db = AppDatabase(NativeDatabase.memory());
+      repository = DownloadedEpisodeRepository(db);
       when(() => sourceA.id).thenReturn('a');
       when(() => sourceB.id).thenReturn('b');
       container = ProviderContainer(
         overrides: [
           mediaSourcesProvider.overrideWithValue([sourceA, sourceB]),
+          downloadedEpisodeRepositoryProvider.overrideWithValue(repository),
         ],
         retry: (retryCount, error) => null,
       );
       addTearDown(container.dispose);
+      addTearDown(db.close);
     });
 
     test(
@@ -61,7 +71,7 @@ void main() {
         );
 
         final source = await container.read(
-          episodePlayControllerProvider(episode: episode).future,
+          episodePlayControllerProvider(episode: episode, subjectId: 1).future,
         );
 
         expect(source, hasLength(1));
@@ -80,9 +90,41 @@ void main() {
       ).thenThrow(Exception('resolve failed'));
 
       await expectLater(
-        container.read(episodePlayControllerProvider(episode: episode).future),
+        container.read(
+          episodePlayControllerProvider(episode: episode, subjectId: 1).future,
+        ),
         throwsA(isA<Exception>()),
       );
     });
+
+    test(
+      'inserts a completed local download before resolved candidates',
+      () async {
+        final episode = MergedEpisode(
+          episode: const _FakeEpisode('b', '1'),
+          sourceId: 'b',
+        );
+        await repository.upsert(
+          const DownloadedEpisodeWrite(
+            sourceId: 'xifan',
+            subjectId: 42,
+            episodeKey: '42::b::1',
+            subjectName: '测试番剧',
+            episodeLabel: '1',
+            localPath: '/offline/video.mp4',
+            format: 'mp4',
+            status: DownloadStatus.completed,
+          ),
+        );
+        when(() => sourceB.resolvePlayback(episode.episode)).thenAnswer(
+          (_) async => const [_FakePlaybackSource('https://cdn/video.mp4')],
+        );
+        final candidates = await container.read(
+          episodePlayControllerProvider(episode: episode, subjectId: 42).future,
+        );
+        expect(candidates.first, isA<LocalFilePlaybackSource>());
+        expect(candidates.first.url, '/offline/video.mp4');
+      },
+    );
   });
 }

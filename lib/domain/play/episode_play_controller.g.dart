@@ -20,7 +20,7 @@ final class EpisodePlayControllerProvider
         > {
   EpisodePlayControllerProvider._({
     required EpisodePlayControllerFamily super.from,
-    required MergedEpisode super.argument,
+    required ({MergedEpisode episode, int subjectId}) super.argument,
   }) : super(
          retry: null,
          name: r'episodePlayControllerProvider',
@@ -36,7 +36,7 @@ final class EpisodePlayControllerProvider
   String toString() {
     return r'episodePlayControllerProvider'
         ''
-        '($argument)';
+        '$argument';
   }
 
   @$internal
@@ -55,7 +55,7 @@ final class EpisodePlayControllerProvider
 }
 
 String _$episodePlayControllerHash() =>
-    r'a36650394764c0f903418c2d20fb2df1821c8230';
+    r'5de89423edd2553b3630a1ba894eac3d4755b4ff';
 
 final class EpisodePlayControllerFamily extends $Family
     with
@@ -64,7 +64,7 @@ final class EpisodePlayControllerFamily extends $Family
           AsyncValue<List<MediaPlaybackSource>>,
           List<MediaPlaybackSource>,
           FutureOr<List<MediaPlaybackSource>>,
-          MergedEpisode
+          ({MergedEpisode episode, int subjectId})
         > {
   EpisodePlayControllerFamily._()
     : super(
@@ -75,8 +75,13 @@ final class EpisodePlayControllerFamily extends $Family
         isAutoDispose: true,
       );
 
-  EpisodePlayControllerProvider call({required MergedEpisode episode}) =>
-      EpisodePlayControllerProvider._(argument: episode, from: this);
+  EpisodePlayControllerProvider call({
+    required MergedEpisode episode,
+    required int subjectId,
+  }) => EpisodePlayControllerProvider._(
+    argument: (episode: episode, subjectId: subjectId),
+    from: this,
+  );
 
   @override
   String toString() => r'episodePlayControllerProvider';
@@ -84,10 +89,14 @@ final class EpisodePlayControllerFamily extends $Family
 
 abstract class _$EpisodePlayController
     extends $AsyncNotifier<List<MediaPlaybackSource>> {
-  late final _$args = ref.$arg as MergedEpisode;
-  MergedEpisode get episode => _$args;
+  late final _$args = ref.$arg as ({MergedEpisode episode, int subjectId});
+  MergedEpisode get episode => _$args.episode;
+  int get subjectId => _$args.subjectId;
 
-  FutureOr<List<MediaPlaybackSource>> build({required MergedEpisode episode});
+  FutureOr<List<MediaPlaybackSource>> build({
+    required MergedEpisode episode,
+    required int subjectId,
+  });
   @$mustCallSuper
   @override
   void runBuild() {
@@ -108,6 +117,9 @@ abstract class _$EpisodePlayController
               Object?,
               Object?
             >;
-    element.handleCreate(ref, () => build(episode: _$args));
+    element.handleCreate(
+      ref,
+      () => build(episode: _$args.episode, subjectId: _$args.subjectId),
+    );
   }
 }

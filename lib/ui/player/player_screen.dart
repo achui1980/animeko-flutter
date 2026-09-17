@@ -570,7 +570,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     // about-to-be-superseded player state while the provider is
     // re-resolving -- see that listener's `candidates == null` guard.
     _candidates = null;
-    ref.invalidate(episodePlayControllerProvider(episode: _currentEpisode));
+    ref.invalidate(
+      episodePlayControllerProvider(
+        episode: _currentEpisode,
+        subjectId: widget.subjectId,
+      ),
+    );
   }
 
   Future<void> _openCandidate(MediaPlaybackSource source) async {
@@ -753,7 +758,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final provider = episodePlayControllerProvider(episode: _currentEpisode);
+    final provider = episodePlayControllerProvider(
+      episode: _currentEpisode,
+      subjectId: widget.subjectId,
+    );
     // `player.open` is a command, not a declarative value -- it must run
     // as a side effect exactly once per successful resolution, not on
     // every `build()` (see design doc "数据流" step 3).
