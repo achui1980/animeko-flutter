@@ -1,6 +1,8 @@
 PODS:
   - dynamic_color (0.0.3):
     - FlutterMacOS
+  - file_selector_macos (0.0.1):
+    - FlutterMacOS
   - flutter_secure_storage_darwin (10.0.0):
     - Flutter
     - FlutterMacOS
@@ -25,6 +27,7 @@ PODS:
 
 DEPENDENCIES:
   - dynamic_color (from `Flutter/ephemeral/.symlinks/plugins/dynamic_color/macos`)
+  - file_selector_macos (from `Flutter/ephemeral/.symlinks/plugins/file_selector_macos/macos`)
   - flutter_secure_storage_darwin (from `Flutter/ephemeral/.symlinks/plugins/flutter_secure_storage_darwin/darwin`)
   - flutter_volume_controller (from `Flutter/ephemeral/.symlinks/plugins/flutter_volume_controller/macos`)
   - FlutterMacOS (from `Flutter/ephemeral`)
@@ -39,6 +42,8 @@ DEPENDENCIES:
 EXTERNAL SOURCES:
   dynamic_color:
     :path: Flutter/ephemeral/.symlinks/plugins/dynamic_color/macos
+  file_selector_macos:
+    :path: Flutter/ephemeral/.symlinks/plugins/file_selector_macos/macos
   flutter_secure_storage_darwin:
     :path: Flutter/ephemeral/.symlinks/plugins/flutter_secure_storage_darwin/darwin
   flutter_volume_controller:
@@ -62,6 +67,7 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   dynamic_color: 4f4c0d2861eb7ff36a2a5e8e2d441e1b6c681ddf
+  file_selector_macos: 9e9e068e90ebee155097d00e89ae91edb2374db7
   flutter_secure_storage_darwin: 46e401699982ee74142909676535e0f6a7321e58
   flutter_volume_controller: a2df0f7bd6032155fc517fd3989617f02c2c278b
   FlutterMacOS: d0db08ddef1a9af05a5ec4b724367152bb0500b1
