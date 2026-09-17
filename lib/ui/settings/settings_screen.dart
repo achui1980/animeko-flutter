@@ -1,8 +1,10 @@
 // lib/ui/settings/settings_screen.dart
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../domain/settings/download_settings_controller.dart';
 import '../../domain/settings/dynamic_color_controller.dart';
 import '../../domain/settings/proxy_settings_controller.dart';
 import '../../domain/settings/seed_color_controller.dart';
@@ -15,7 +17,9 @@ import 'settings_split_group.dart';
 /// the Settings/bottom-nav redesign design doc for why account info
 /// moved here instead of staying on a separate `/account` page.
 class SettingsScreen extends ConsumerWidget {
-  const SettingsScreen({super.key});
+  const SettingsScreen({super.key, this.selectDirectory = getDirectoryPath});
+
+  final Future<String?> Function({String? initialDirectory}) selectDirectory;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -24,6 +28,7 @@ class SettingsScreen extends ConsumerWidget {
     final useDynamicColor =
         ref.watch(dynamicColorControllerProvider).value ?? false;
     final seedColor = ref.watch(seedColorControllerProvider).value;
+    final downloadDirectory = ref.watch(downloadSettingsControllerProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('设置')),
@@ -110,6 +115,34 @@ class SettingsScreen extends ConsumerWidget {
                 subtitle: Text(proxy.value ?? '未设置'),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push('/settings/proxy'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          SettingsSplitGroup(
+            title: '存储',
+            children: [
+              ListTile(
+                title: const Text('下载目录'),
+                subtitle: Text(downloadDirectory.value ?? '加载中'),
+                trailing: const Icon(Icons.folder_open),
+                onTap: downloadDirectory.hasValue
+                    ? () async {
+                        final path = await selectDirectory(
+                          initialDirectory: downloadDirectory.value,
+                        );
+                        if (path != null) {
+                          await ref
+                              .read(downloadSettingsControllerProvider.notifier)
+                              .setDownloadDirectory(path);
+                        }
+                      }
+                    : null,
+              ),
+              ListTile(
+                title: const Text('下载管理'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/downloads'),
               ),
             ],
           ),
