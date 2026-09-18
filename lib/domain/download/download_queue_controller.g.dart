@@ -78,7 +78,7 @@ final class DownloadQueueControllerProvider
 }
 
 String _$downloadQueueControllerHash() =>
-    r'3bf26b8f6983e1d2f86a24b9020d99527b93de08';
+    r'5ecd95ec69746e2f7924baf365007eb7151d0b54';
 
 abstract class _$DownloadQueueController
     extends $AsyncNotifier<Map<String, DownloadQueueItem>> {
