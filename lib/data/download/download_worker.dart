@@ -76,6 +76,21 @@ class DownloadCancelled extends DownloadEvent {
   const DownloadCancelled(super.request);
 }
 
+/// Thrown by [DownloadWorker._downloadFile] when the HTTP response is
+/// well-formed (no network/cancel error) but clearly isn't the video it
+/// claimed to be -- an expired-cookie/anti-leech HTML error page, a
+/// non-2xx status, or a response too small to plausibly be a video.
+/// Caught by the same generic failure path as any other download
+/// error; [toString] is what ends up in the persisted `errorMessage`.
+class DownloadValidationException implements Exception {
+  const DownloadValidationException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 /// Threaded through [CancelToken.cancel] so `_attempt`'s catch block can
 /// tell a stall-triggered cancellation apart from a real user-initiated
 /// [DownloadWorker.cancel] call.
@@ -367,13 +382,31 @@ class DownloadWorker {
     Map<String, String> headers,
     void Function(int received, int total) onProgress,
   ) async {
-    await _dio.download(
+    final response = await _dio.download(
       url,
       path,
       cancelToken: _cancelToken,
-      options: Options(headers: headers),
+      options: Options(headers: headers, validateStatus: (_) => true),
       onReceiveProgress: onProgress,
     );
-    return File(path).length();
+
+    if (response.statusCode == null ||
+        response.statusCode! < 200 ||
+        response.statusCode! >= 300) {
+      throw DownloadValidationException('下载失败（HTTP ${response.statusCode}）');
+    }
+
+    final contentType = response.headers.value('content-type') ?? '';
+    if (contentType.toLowerCase().contains('text/html')) {
+      throw const DownloadValidationException('源返回了网页而非视频（可能是防盗链或登录失效）');
+    }
+
+    final size = await File(path).length();
+    final hasContentLength = response.headers.value('content-length') != null;
+    if (size < 100 * 1024 && !hasContentLength) {
+      throw const DownloadValidationException('返回内容过小，可能不是视频');
+    }
+
+    return size;
   }
 }

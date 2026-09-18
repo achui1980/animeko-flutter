@@ -72,6 +72,18 @@ class _XifanSource extends _Source {
   ) async => playbackSources.cast<XifanPlaybackSource>();
 }
 
+class _HttpResponse {
+  const _HttpResponse({
+    required this.statusCode,
+    required this.body,
+    this.headers = const {},
+  });
+
+  final int statusCode;
+  final Object body; // List<int> or String
+  final Map<String, String> headers;
+}
+
 class _Adapter implements HttpClientAdapter {
   _Adapter(this.responses, {this.waitForCancellation = false});
 
@@ -94,6 +106,23 @@ class _Adapter implements HttpClientAdapter {
       );
     }
     final response = responses[options.uri.toString()];
+    if (response is _HttpResponse) {
+      final headers = Headers.fromMap(
+        response.headers.map((key, value) => MapEntry(key, [value])),
+      );
+      if (response.body is List<int>) {
+        return ResponseBody.fromBytes(
+          Uint8List.fromList(response.body as List<int>),
+          response.statusCode,
+          headers: headers.map,
+        );
+      }
+      return ResponseBody.fromString(
+        response.body as String,
+        response.statusCode,
+        headers: headers.map,
+      );
+    }
     if (response is List<int>) {
       return ResponseBody.fromBytes(Uint8List.fromList(response), 200);
     }
@@ -134,6 +163,23 @@ class _StallThenSucceedAdapter implements HttpClientAdapter {
       );
     }
     final response = responses[options.uri.toString()];
+    if (response is _HttpResponse) {
+      final headers = Headers.fromMap(
+        response.headers.map((key, value) => MapEntry(key, [value])),
+      );
+      if (response.body is List<int>) {
+        return ResponseBody.fromBytes(
+          Uint8List.fromList(response.body as List<int>),
+          response.statusCode,
+          headers: headers.map,
+        );
+      }
+      return ResponseBody.fromString(
+        response.body as String,
+        response.statusCode,
+        headers: headers.map,
+      );
+    }
     if (response is List<int>) {
       return ResponseBody.fromBytes(Uint8List.fromList(response), 200);
     }
@@ -210,8 +256,16 @@ void main() {
     final events = <DownloadEvent>[];
     final worker = DownloadWorker(
       dio: _dio({
-        'https://cdn.example/first.mp4': [1],
-        'https://cdn.example/second.mp4': [2],
+        'https://cdn.example/first.mp4': const _HttpResponse(
+          statusCode: 200,
+          body: [1],
+          headers: {'content-length': '1'},
+        ),
+        'https://cdn.example/second.mp4': const _HttpResponse(
+          statusCode: 200,
+          body: [2],
+          headers: {'content-length': '1'},
+        ),
       }),
       sourceForId: (id) => sources[id]!,
       repository: repository,
@@ -254,7 +308,11 @@ void main() {
     final events = <DownloadEvent>[];
     final worker = DownloadWorker(
       dio: _dio({
-        'https://cdn.example/video.mp4': [1, 2, 3],
+        'https://cdn.example/video.mp4': const _HttpResponse(
+          statusCode: 200,
+          body: [1, 2, 3],
+          headers: {'content-length': '3'},
+        ),
       }),
       sourceForId: (_) => _XifanSource(const [
         XifanPlaybackSource(url: 'https://cdn.example/video.m3u8'),
@@ -311,11 +369,91 @@ void main() {
     expect(record.errorMessage, isNotEmpty);
   });
 
+  test('fails when the server returns a non-2xx status', () async {
+    final worker = DownloadWorker(
+      dio: _dio({
+        'https://cdn.example/video.mp4': const _HttpResponse(
+          statusCode: 403,
+          body: 'forbidden',
+        ),
+      }),
+      sourceForId: (_) => _Source('anime1', const [
+        _PlaybackSource('https://cdn.example/video.mp4'),
+      ]),
+      repository: repository,
+    );
+    final request = _request('anime1', 1, downloadRoot: root.path);
+
+    worker.enqueue(request);
+    await worker.whenIdle;
+
+    final record = await repository.findByKey(request.episodeKey);
+    expect(record!.status, DownloadStatus.failed.name);
+    expect(record.errorMessage, contains('403'));
+  });
+
+  test(
+    'fails when the server returns an HTML page instead of a video',
+    () async {
+      final worker = DownloadWorker(
+        dio: _dio({
+          'https://cdn.example/video.mp4': const _HttpResponse(
+            statusCode: 200,
+            body: '<html><body>login required</body></html>',
+            headers: {'content-type': 'text/html; charset=utf-8'},
+          ),
+        }),
+        sourceForId: (_) => _Source('anime1', const [
+          _PlaybackSource('https://cdn.example/video.mp4'),
+        ]),
+        repository: repository,
+      );
+      final request = _request('anime1', 1, downloadRoot: root.path);
+
+      worker.enqueue(request);
+      await worker.whenIdle;
+
+      final record = await repository.findByKey(request.episodeKey);
+      expect(record!.status, DownloadStatus.failed.name);
+      expect(record.errorMessage, contains('网页'));
+    },
+  );
+
+  test(
+    'fails when the response is suspiciously small with no content-length',
+    () async {
+      final worker = DownloadWorker(
+        dio: _dio({
+          'https://cdn.example/video.mp4': const _HttpResponse(
+            statusCode: 200,
+            body: [1, 2, 3],
+          ),
+        }),
+        sourceForId: (_) => _Source('anime1', const [
+          _PlaybackSource('https://cdn.example/video.mp4'),
+        ]),
+        repository: repository,
+      );
+      final request = _request('anime1', 1, downloadRoot: root.path);
+
+      worker.enqueue(request);
+      await worker.whenIdle;
+
+      final record = await repository.findByKey(request.episodeKey);
+      expect(record!.status, DownloadStatus.failed.name);
+      expect(record.errorMessage, contains('过小'));
+    },
+  );
+
   test('retries once after a stall, then succeeds on the retry', () async {
     final events = <DownloadEvent>[];
     final dio = Dio()
       ..httpClientAdapter = _StallThenSucceedAdapter({
-        'https://cdn.example/video.mp4': [1, 2, 3],
+        'https://cdn.example/video.mp4': const _HttpResponse(
+          statusCode: 200,
+          body: [1, 2, 3],
+          headers: {'content-length': '3'},
+        ),
       });
     final worker = DownloadWorker(
       dio: dio,
