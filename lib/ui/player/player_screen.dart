@@ -958,40 +958,44 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                                         downloadActiveCount:
                                             activeDownloadCount,
                                         onDownloadTap: () {
-                                          if (preferredDownloadSource == null) {
-                                            ScaffoldMessenger.of(
-                                              context,
-                                            ).showSnackBar(
-                                              const SnackBar(
-                                                content: Text('此集暂无可下载来源'),
-                                              ),
-                                            );
-                                            return;
+                                          final alreadyDownloaded =
+                                              downloadState ==
+                                              DownloadButtonState.completed;
+                                          if (shouldEnqueueOnDownloadTap(
+                                            alreadyDownloaded:
+                                                alreadyDownloaded,
+                                            preferredSource:
+                                                preferredDownloadSource,
+                                          )) {
+                                            ref
+                                                .read(
+                                                  downloadQueueControllerProvider
+                                                      .notifier,
+                                                )
+                                                .enqueue(
+                                                  subjectId: widget.subjectId,
+                                                  subjectName:
+                                                      widget.subjectName,
+                                                  episode:
+                                                      preferredDownloadSource!,
+                                                );
                                           }
-                                          ref
-                                              .read(
-                                                downloadQueueControllerProvider
-                                                    .notifier,
-                                              )
-                                              .enqueue(
-                                                subjectId: widget.subjectId,
-                                                subjectName: widget.subjectName,
-                                                episode:
-                                                    preferredDownloadSource,
-                                              );
-                                          if (preferredDownloadSource
-                                                  .sourceId !=
-                                              _currentEpisode.sourceId) {
-                                            ScaffoldMessenger.of(
-                                              context,
-                                            ).showSnackBar(
-                                              SnackBar(
-                                                content: Text(
-                                                  '已加入下载队列（将从 ${preferredDownloadSource.sourceId} 下载）',
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                downloadTapMessage(
+                                                  alreadyDownloaded:
+                                                      alreadyDownloaded,
+                                                  preferredSource:
+                                                      preferredDownloadSource,
+                                                  currentSourceId:
+                                                      _currentEpisode.sourceId,
                                                 ),
                                               ),
-                                            );
-                                          }
+                                            ),
+                                          );
                                         },
                                         onLineSwitch:
                                             (_candidates?.length ?? 0) > 1 &&
@@ -1033,6 +1037,43 @@ DownloadButtonState _downloadButtonState(
     DownloadQueueStatus.downloading => DownloadButtonState.downloading,
     _ => DownloadButtonState.idle,
   };
+}
+
+/// Whether tapping the player's download button should actually enqueue a
+/// download, given the button's current state. Extracted as a pure
+/// function (alongside [downloadTapMessage]) so this branching is
+/// unit-testable without a real `Player`/widget tree.
+///
+/// Never enqueues when the episode is already downloaded (avoids silently
+/// re-downloading over a completed file) or when no registered HTTP source
+/// has this episode at all.
+bool shouldEnqueueOnDownloadTap({
+  required bool alreadyDownloaded,
+  required MergedEpisode? preferredSource,
+}) => !alreadyDownloaded && preferredSource != null;
+
+/// The SnackBar message to show after the player's download button is
+/// tapped.
+///
+/// Bug fix: previously, tapping the button while watching from a source
+/// that is itself directly downloadable (e.g. xifan) enqueued the download
+/// but showed no feedback at all -- the only "confirmation" was the
+/// button's icon quietly changing, which is easy to miss (see the "点击
+/// 下载按钮没有效果" bug report). This function is called unconditionally
+/// on every tap so every outcome -- already downloaded, no source
+/// available, enqueued from the current source, or enqueued from a
+/// different source -- always shows something.
+String downloadTapMessage({
+  required bool alreadyDownloaded,
+  required MergedEpisode? preferredSource,
+  required String currentSourceId,
+}) {
+  if (alreadyDownloaded) return '已下载';
+  if (preferredSource == null) return '此集暂无可下载来源';
+  if (preferredSource.sourceId != currentSourceId) {
+    return '已加入下载队列（将从 ${preferredSource.sourceId} 下载）';
+  }
+  return '已加入下载队列';
 }
 
 /// Icon for the volume HUD, chosen from [volume] (0.0-1.0).
