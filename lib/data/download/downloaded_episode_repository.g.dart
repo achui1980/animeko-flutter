@@ -128,3 +128,80 @@ final class DownloadedEpisodeByKeyFamily extends $Family
   @override
   String toString() => r'downloadedEpisodeByKeyProvider';
 }
+
+@ProviderFor(downloadedEpisodeForEpisode)
+final downloadedEpisodeForEpisodeProvider =
+    DownloadedEpisodeForEpisodeFamily._();
+
+final class DownloadedEpisodeForEpisodeProvider
+    extends $FunctionalProvider<AsyncValue<bool>, bool, FutureOr<bool>>
+    with $FutureModifier<bool>, $FutureProvider<bool> {
+  DownloadedEpisodeForEpisodeProvider._({
+    required DownloadedEpisodeForEpisodeFamily super.from,
+    required (int, String) super.argument,
+  }) : super(
+         retry: null,
+         name: r'downloadedEpisodeForEpisodeProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$downloadedEpisodeForEpisodeHash();
+
+  @override
+  String toString() {
+    return r'downloadedEpisodeForEpisodeProvider'
+        ''
+        '$argument';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<bool> create(Ref ref) {
+    final argument = this.argument as (int, String);
+    return downloadedEpisodeForEpisode(ref, argument.$1, argument.$2);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is DownloadedEpisodeForEpisodeProvider &&
+        other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$downloadedEpisodeForEpisodeHash() =>
+    r'2cc9685199b15f611e4e8dec45c9fc27ea75a5a0';
+
+final class DownloadedEpisodeForEpisodeFamily extends $Family
+    with $FunctionalFamilyOverride<FutureOr<bool>, (int, String)> {
+  DownloadedEpisodeForEpisodeFamily._()
+    : super(
+        retry: null,
+        name: r'downloadedEpisodeForEpisodeProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  DownloadedEpisodeForEpisodeProvider call(
+    int subjectId,
+    String episodeTitle,
+  ) => DownloadedEpisodeForEpisodeProvider._(
+    argument: (subjectId, episodeTitle),
+    from: this,
+  );
+
+  @override
+  String toString() => r'downloadedEpisodeForEpisodeProvider';
+}

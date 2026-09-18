@@ -4,6 +4,7 @@ import 'package:animeko_flutter/data/download/downloaded_episode_repository.dart
 import 'package:animeko_flutter/data/local_database.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:riverpod/riverpod.dart';
 
 void main() {
   late AppDatabase db;
@@ -277,5 +278,36 @@ void main() {
     expect(row.totalSegments, 12);
     expect(row.receivedBytes, 0);
     expect(row.totalBytes, isNull);
+  });
+
+  test('downloadedEpisodeForEpisodeProvider ignores sourceId', () async {
+    await repository.upsert(
+      const DownloadedEpisodeWrite(
+        sourceId: 'anime1',
+        subjectId: 5,
+        episodeKey: '5::anime1::第2话',
+        subjectName: '测试番剧',
+        episodeLabel: '第2话',
+        localPath: '/tmp/two.mp4',
+        format: 'mp4',
+        status: DownloadStatus.completed,
+      ),
+    );
+    final container = ProviderContainer(
+      overrides: [
+        downloadedEpisodeRepositoryProvider.overrideWithValue(repository),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final found = await container.read(
+      downloadedEpisodeForEpisodeProvider(5, '第2话').future,
+    );
+    final missing = await container.read(
+      downloadedEpisodeForEpisodeProvider(5, '第3话').future,
+    );
+
+    expect(found, isTrue);
+    expect(missing, isFalse);
   });
 }

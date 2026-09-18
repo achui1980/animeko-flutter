@@ -188,3 +188,14 @@ Future<bool> downloadedEpisodeByKey(Ref ref, String episodeKey) async =>
         .watch(downloadedEpisodeRepositoryProvider)
         .findCompleted(episodeKey) !=
     null;
+
+@riverpod
+Future<bool> downloadedEpisodeForEpisode(
+  Ref ref,
+  int subjectId,
+  String episodeTitle,
+) async =>
+    await ref
+        .watch(downloadedEpisodeRepositoryProvider)
+        .findCompletedForEpisode(subjectId, episodeTitle) !=
+    null;
