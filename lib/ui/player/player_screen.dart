@@ -15,6 +15,7 @@ import '../../app/theme/app_theme.dart';
 import '../../data/download/downloaded_episode_repository.dart';
 import '../../data/play/playback_position_storage.dart';
 import '../../domain/download/download_queue_controller.dart';
+import '../../domain/download/download_source_resolver.dart';
 import '../../domain/media/media_registry.dart';
 import '../../domain/media/media_source.dart';
 import '../../domain/play/episode_play_controller.dart';
@@ -22,6 +23,7 @@ import '../../domain/play/subject_episodes_controller.dart';
 import '../../domain/settings/playback_speed_controller.dart';
 import '../../domain/settings/proxy_settings_controller.dart';
 import '../common/error_retry_view.dart';
+import '../download/download_badge_button.dart';
 import '../home/trending_carousel.dart' show isDesktopPlatform;
 import '../subject/episode_source_grid.dart';
 import 'line_switch_sheet.dart';
@@ -784,14 +786,38 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       });
     });
     final playback = ref.watch(provider);
-    final downloadQueue = ref.watch(downloadQueueControllerProvider).value;
+    final downloadQueue =
+        ref.watch(downloadQueueControllerProvider).value ??
+        const <String, DownloadQueueItem>{};
     final isDownloaded = ref.watch(
-      downloadedEpisodeByKeyProvider(_positionKey),
+      downloadedEpisodeForEpisodeProvider(
+        widget.subjectId,
+        _currentEpisode.title,
+      ),
     );
+    final mergedEpisodes = ref
+        .watch(
+          subjectEpisodesControllerProvider(
+            subjectId: widget.subjectId,
+            subjectName: widget.subjectName,
+          ),
+        )
+        .value;
+    final preferredDownloadSource = mergedEpisodes == null
+        ? null
+        : resolvePreferredDownloadSource(mergedEpisodes, _currentEpisode.title);
+    final preferredEpisodeKey = preferredDownloadSource == null
+        ? null
+        : '${widget.subjectId}::${preferredDownloadSource.sourceId}::${preferredDownloadSource.title}';
     final downloadState = _downloadButtonState(
-      downloadQueue?[_positionKey]?.status,
+      preferredEpisodeKey == null
+          ? null
+          : downloadQueue[preferredEpisodeKey]?.status,
       isDownloaded.value ?? false,
     );
+    final activeDownloadCount = downloadQueue.keys
+        .where((key) => key.startsWith('${widget.subjectId}::'))
+        .length;
 
     return Theme(
       data: AppTheme.dark(),
@@ -880,19 +906,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                             '${widget.subjectName} · ${_currentEpisode.title}',
                         onBack: () => Navigator.of(context).pop(),
                         onScreenshot: _takeScreenshot,
-                        onDownload:
-                            _isDownloadableSource(_currentEpisode.sourceId)
-                            ? () => ref
-                                  .read(
-                                    downloadQueueControllerProvider.notifier,
-                                  )
-                                  .enqueue(
-                                    subjectId: widget.subjectId,
-                                    subjectName: widget.subjectName,
-                                    episode: _currentEpisode,
-                                  )
-                            : null,
-                        downloadState: downloadState,
                       ),
                     ),
                   if (_controlsVisible)
@@ -941,6 +954,45 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                                               )
                                               .setPlaybackSpeed(value);
                                         },
+                                        downloadState: downloadState,
+                                        downloadActiveCount:
+                                            activeDownloadCount,
+                                        onDownloadTap: () {
+                                          if (preferredDownloadSource == null) {
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text('此集暂无可下载来源'),
+                                              ),
+                                            );
+                                            return;
+                                          }
+                                          ref
+                                              .read(
+                                                downloadQueueControllerProvider
+                                                    .notifier,
+                                              )
+                                              .enqueue(
+                                                subjectId: widget.subjectId,
+                                                subjectName: widget.subjectName,
+                                                episode:
+                                                    preferredDownloadSource,
+                                              );
+                                          if (preferredDownloadSource
+                                                  .sourceId !=
+                                              _currentEpisode.sourceId) {
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  '已加入下载队列（将从 ${preferredDownloadSource.sourceId} 下载）',
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                        },
                                         onLineSwitch:
                                             (_candidates?.length ?? 0) > 1 &&
                                                 !_isSwitchingCandidate
@@ -982,9 +1034,6 @@ DownloadButtonState _downloadButtonState(
     _ => DownloadButtonState.idle,
   };
 }
-
-bool _isDownloadableSource(String sourceId) =>
-    sourceId == 'anime1' || sourceId == 'xifan';
 
 /// Icon for the volume HUD, chosen from [volume] (0.0-1.0).
 IconData _volumeIcon(double volume) {
