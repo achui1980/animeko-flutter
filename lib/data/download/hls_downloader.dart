@@ -40,7 +40,10 @@ class HlsDownloader {
       }
     }
 
-    var received = 0;
+    final totalSegments = segmentLineIndexes.length;
+    var downloadedSegments = 0;
+    var totalBytes = 0;
+    onProgress?.call(downloadedSegments, totalSegments);
     for (var index = 0; index < segmentLineIndexes.length; index++) {
       final segment = File(
         p.join(
@@ -49,20 +52,28 @@ class HlsDownloader {
         ),
       );
       final lineIndex = segmentLineIndexes[index];
-      await _dio.downloadUri(
-        playlistUrl.resolve(lines[lineIndex]),
-        segment.path,
-        cancelToken: cancelToken,
-        options: Options(headers: headers),
-      );
-      received += await segment.length();
+      final alreadyDownloaded =
+          segment.existsSync() && segment.lengthSync() > 0;
+      if (!alreadyDownloaded) {
+        await _dio.downloadUri(
+          playlistUrl.resolve(lines[lineIndex]),
+          segment.path,
+          cancelToken: cancelToken,
+          options: Options(headers: headers),
+        );
+      }
+      totalBytes += await segment.length();
       output[lineIndex] = segment.uri.pathSegments.last;
-      onProgress?.call(received, 0);
+      downloadedSegments++;
+      onProgress?.call(downloadedSegments, totalSegments);
     }
 
     final playlist = File(p.join(targetDirectory.path, 'playlist.m3u8'));
     await playlist.writeAsString(output.join('\n'));
-    return HlsDownloadResult(playlist, received + await playlist.length());
+    return HlsDownloadResult(
+      playlist,
+      totalBytes + await playlist.length(),
+    );
   }
 
   Future<String> _getText(Uri url, Map<String, String> headers) async =>
