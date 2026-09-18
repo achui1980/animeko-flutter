@@ -4,12 +4,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../app/theme/app_spacing.dart';
+import '../../domain/download/download_queue_controller.dart';
 import '../../domain/home/home_recommendations_controller.dart';
 import '../../domain/home/trending_controller.dart';
 import '../../domain/subject_card.dart';
 import '../common/anime_cover_card.dart';
 import '../common/app_action_bar.dart';
 import '../common/error_retry_view.dart';
+import '../download/download_badge_button.dart';
+import '../download/download_panel.dart';
 import '../subject/subject_navigation.dart';
 import 'trending_carousel.dart';
 
@@ -69,7 +72,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         },
         child: CustomScrollView(
           slivers: [
-            _CollapsingHomeAppBar(actions: buildStandardActions(context)),
+            _CollapsingHomeAppBar(
+              actions: [
+                ...buildStandardActions(context),
+                Builder(
+                  builder: (context) {
+                    final queue =
+                        ref.watch(downloadQueueControllerProvider).value ??
+                        const <String, DownloadQueueItem>{};
+                    return DownloadBadgeButton(
+                      downloadState: queue.isEmpty
+                          ? DownloadButtonState.idle
+                          : DownloadButtonState.downloading,
+                      activeCount: queue.length,
+                      onTap: () => showModalBottomSheet<void>(
+                        context: context,
+                        isScrollControlled: true,
+                        builder: (_) => SizedBox(
+                          height: MediaQuery.of(context).size.height * 0.8,
+                          child: const DownloadPanel(subjectId: null),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
             SliverToBoxAdapter(
               child: _TrendingSection(
                 trending: trending,
