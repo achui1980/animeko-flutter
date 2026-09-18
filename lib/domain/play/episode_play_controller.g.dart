@@ -55,7 +55,7 @@ final class EpisodePlayControllerProvider
 }
 
 String _$episodePlayControllerHash() =>
-    r'5de89423edd2553b3630a1ba894eac3d4755b4ff';
+    r'45db4c82eda75ff18d75633a59087e856396fa03';
 
 final class EpisodePlayControllerFamily extends $Family
     with

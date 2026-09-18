@@ -284,8 +284,38 @@ class DownloadWorker {
           status: DownloadStatus.downloading,
         ),
       );
+      // `sourceForId` throws `StateError` (`Iterable.firstWhere`'s default
+      // no-match behavior) when the caller's media-source registry no
+      // longer has an entry for `request.sourceId` -- see the design doc's
+      // decision (5.3) to turn this into a friendly failed record instead
+      // of letting the raw `StateError` message reach the UI. Resolved as
+      // its own try/catch (rather than folding into the outer catch below)
+      // so only this lookup gets the friendly message; every other
+      // failure in this attempt still reports its real error text.
+      MediaSource source;
+      try {
+        source = _sourceForId(request.sourceId);
+      } on StateError {
+        const message = '来源已不可用';
+        await _repository.upsert(
+          DownloadedEpisodeWrite(
+            sourceId: request.sourceId,
+            subjectId: request.subjectId,
+            episodeKey: request.episodeKey,
+            subjectName: request.subjectName,
+            episodeLabel: request.episodeLabel,
+            localPath: directory.path,
+            episodeDir: directory.path,
+            format: 'mp4',
+            status: DownloadStatus.failed,
+            errorMessage: message,
+          ),
+        );
+        _events.add(DownloadFailed(request, message));
+        return _AttemptResult.done;
+      }
       final candidates = List<MediaPlaybackSource>.of(
-        await _sourceForId(request.sourceId).resolvePlayback(request.episode),
+        await source.resolvePlayback(request.episode),
       );
       final selected = candidates.firstWhere(
         (item) => item.url.toLowerCase().contains('.mp4'),

@@ -126,5 +126,43 @@ void main() {
         expect(candidates.first.url, '/offline/video.mp4');
       },
     );
+
+    test(
+      'finds a local download made from a different source than the one '
+      'currently being played (design doc 2.4 -- cross-source lookup by '
+      'subjectId+title, not the exact episodeKey)',
+      () async {
+        // Playing from source "b" (e.g. mikan, not downloadable), but the
+        // completed download on disk was auto-selected from source "a"
+        // (e.g. anime1) for the same subject+title -- its episodeKey
+        // therefore does NOT match `'42::b::1'`.
+        final episode = MergedEpisode(
+          episode: const _FakeEpisode('b', '1'),
+          sourceId: 'b',
+        );
+        await repository.upsert(
+          const DownloadedEpisodeWrite(
+            sourceId: 'a',
+            subjectId: 42,
+            episodeKey: '42::a::1',
+            subjectName: '测试番剧',
+            episodeLabel: '1',
+            localPath: '/offline/video.mp4',
+            format: 'mp4',
+            status: DownloadStatus.completed,
+          ),
+        );
+        when(() => sourceB.resolvePlayback(episode.episode)).thenAnswer(
+          (_) async => const [_FakePlaybackSource('https://cdn/video.mp4')],
+        );
+
+        final candidates = await container.read(
+          episodePlayControllerProvider(episode: episode, subjectId: 42).future,
+        );
+
+        expect(candidates.first, isA<LocalFilePlaybackSource>());
+        expect(candidates.first.url, '/offline/video.mp4');
+      },
+    );
   });
 }
