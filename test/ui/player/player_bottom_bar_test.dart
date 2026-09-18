@@ -1,4 +1,5 @@
 // test/ui/player/player_bottom_bar_test.dart
+import 'package:animeko_flutter/ui/download/download_badge_button.dart';
 import 'package:animeko_flutter/ui/player/player_bottom_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -12,6 +13,9 @@ void main() {
     ValueChanged<Duration>? onSeek,
     double currentSpeed = 1.0,
     ValueChanged<double>? onSpeedSelected,
+    DownloadButtonState downloadState = DownloadButtonState.idle,
+    int downloadActiveCount = 0,
+    VoidCallback? onDownloadTap,
     VoidCallback? onLineSwitch,
     VoidCallback? onDrawerToggle,
     VoidCallback? onFullscreenToggle,
@@ -28,6 +32,9 @@ void main() {
           currentSpeed: currentSpeed,
           speedOptions: const [0.5, 0.75, 1.0, 1.25, 1.5, 2.0],
           onSpeedSelected: onSpeedSelected ?? (_) {},
+          downloadState: downloadState,
+          downloadActiveCount: downloadActiveCount,
+          onDownloadTap: onDownloadTap ?? () {},
           onLineSwitch: onLineSwitch,
           onDrawerToggle: onDrawerToggle ?? () {},
           onFullscreenToggle: onFullscreenToggle ?? () {},
@@ -164,5 +171,30 @@ void main() {
     await tester.tap(find.byIcon(Icons.fullscreen));
 
     expect(tapped, isTrue);
+  });
+
+  testWidgets('shows the download icon for the given state', (tester) async {
+    await tester.pumpWidget(
+      buildBar(downloadState: DownloadButtonState.downloading),
+    );
+
+    expect(find.byIcon(Icons.downloading), findsOneWidget);
+  });
+
+  testWidgets('tapping the download button invokes onDownloadTap', (
+    tester,
+  ) async {
+    var tapped = false;
+    await tester.pumpWidget(buildBar(onDownloadTap: () => tapped = true));
+
+    await tester.tap(find.byTooltip('下载'));
+
+    expect(tapped, isTrue);
+  });
+
+  testWidgets('shows the active-download badge count', (tester) async {
+    await tester.pumpWidget(buildBar(downloadActiveCount: 2));
+
+    expect(find.text('2'), findsOneWidget);
   });
 }

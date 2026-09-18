@@ -1,6 +1,8 @@
 // lib/ui/player/player_bottom_bar.dart
 import 'package:flutter/material.dart';
 
+import '../download/download_badge_button.dart';
+
 /// Custom bottom bar for [PlayerScreen], replacing both media_kit_video's
 /// default `AdaptiveVideoControls` bar and the app's old floating
 /// top-right button row (`_SourceButton`/`_SpeedButton`/`_ScreenshotButton`).
@@ -20,6 +22,9 @@ class PlayerBottomBar extends StatelessWidget {
     required this.currentSpeed,
     required this.speedOptions,
     required this.onSpeedSelected,
+    required this.downloadState,
+    required this.downloadActiveCount,
+    required this.onDownloadTap,
     this.onLineSwitch,
     required this.onDrawerToggle,
     required this.onFullscreenToggle,
@@ -34,6 +39,9 @@ class PlayerBottomBar extends StatelessWidget {
   final double currentSpeed;
   final List<double> speedOptions;
   final ValueChanged<double> onSpeedSelected;
+  final DownloadButtonState downloadState;
+  final int downloadActiveCount;
+  final VoidCallback onDownloadTap;
   final VoidCallback? onLineSwitch;
   final VoidCallback onDrawerToggle;
   final VoidCallback onFullscreenToggle;
@@ -106,6 +114,12 @@ class PlayerBottomBar extends StatelessWidget {
                   ),
                 ),
               ),
+            ),
+            DownloadBadgeButton(
+              downloadState: downloadState,
+              activeCount: downloadActiveCount,
+              onTap: onDownloadTap,
+              iconColor: Colors.white,
             ),
             IconButton(
               icon: const Icon(Icons.alt_route, color: Colors.white),
