@@ -287,4 +287,68 @@ void main() {
     );
     expect(await repository.findByKey('7::anime1::第1集'), isNotNull);
   });
+
+  test(
+    'retry deletes the stale record on the old source when the '
+    're-resolved preferred source has changed',
+    () async {
+      final repository = DownloadedEpisodeRepository(database);
+      await repository.upsert(
+        const DownloadedEpisodeWrite(
+          sourceId: 'anime1',
+          subjectId: 8,
+          episodeKey: '8::anime1::第1集',
+          subjectName: '测试番剧',
+          episodeLabel: '第1集',
+          localPath: '/tmp/eight-anime1',
+          format: 'mp4',
+          status: DownloadStatus.failed,
+          errorMessage: 'boom',
+        ),
+      );
+      // anime1 no longer has this episode (simulated by simply omitting it
+      // from the merged episode list) -- xifan is the only remaining
+      // downloadable candidate, so resolvePreferredDownloadSource must
+      // return it instead of the stale row's original source.
+      final episode = MergedEpisode(
+        episode: const _Episode('xifan', '第1集'),
+        sourceId: 'xifan',
+      );
+      final testContainer = ProviderContainer(
+        overrides: [
+          settingsStorageProvider.overrideWith((ref) async => settingsStorage),
+          mediaSourcesProvider.overrideWithValue([_StubMediaSource('xifan')]),
+          downloadDioProvider.overrideWithValue(Dio()),
+          downloadedEpisodeRepositoryProvider.overrideWithValue(repository),
+          subjectEpisodesControllerProvider(
+            subjectId: 8,
+            subjectName: '测试番剧',
+          ).overrideWith(() => _StubEpisodesController([episode])),
+        ],
+      );
+      addTearDown(testContainer.dispose);
+      final subscription = testContainer.listen(
+        downloadQueueControllerProvider,
+        (_, _) {},
+      );
+      addTearDown(subscription.close);
+      await testContainer.read(downloadQueueControllerProvider.future);
+      final queueController = testContainer.read(
+        downloadQueueControllerProvider.notifier,
+      );
+
+      await queueController.retry('8::anime1::第1集');
+      await testContainer.pump();
+
+      // The stale anime1 record must be gone -- retry() detected the
+      // preferred source changed and cleaned it up via deleteWithFiles.
+      expect(await repository.findByKey('8::anime1::第1集'), isNull);
+      // A new download must have been enqueued against the newly-resolved
+      // xifan source.
+      expect(
+        testContainer.read(downloadQueueControllerProvider).value,
+        contains('8::xifan::第1集'),
+      );
+    },
+  );
 }

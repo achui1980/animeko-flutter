@@ -221,19 +221,31 @@ class DownloadWorker {
     // never delivered anything on either attempt), so `receivedTotal == 0`
     // alone can't tell the two give-up reasons apart.
     var gaveUpDueToZeroBytes = false;
+    // Guards against the watchdog firing its give-up/retry decision more
+    // than once for the same attempt. `_cancelToken?.cancel(...)` doesn't
+    // synchronously unwind the in-flight I/O -- if it doesn't react within
+    // one more `stallCheckInterval` tick (the timer itself is only
+    // cancelled afterwards, in the `finally` block below, once the attempt
+    // has actually unwound), the callback would otherwise re-evaluate the
+    // same true condition and call `.cancel(...)` a second time.
+    var decided = false;
 
     final watchdog = Timer.periodic(stallCheckInterval, (_) {
+      if (decided) return;
       final now = _now();
       if (receivedTotal == 0 &&
           now.difference(startedAt) >= noProgressTimeout) {
         gaveUpDueToZeroBytes = true;
+        decided = true;
         _cancelToken?.cancel(_StallSignal.giveUp);
         return;
       }
       if (now.difference(lastProgressAt) >= stallTimeout) {
         if (hasRetried) {
+          decided = true;
           _cancelToken?.cancel(_StallSignal.giveUp);
         } else {
+          decided = true;
           _events.add(DownloadStalled(request));
           _cancelToken?.cancel(_StallSignal.retryOnce);
         }

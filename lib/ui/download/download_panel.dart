@@ -96,9 +96,19 @@ class _ListTab extends ConsumerWidget {
           onCancel: () => ref
               .read(downloadQueueControllerProvider.notifier)
               .cancel(row.episodeKey),
-          onRetry: () => ref
-              .read(downloadQueueControllerProvider.notifier)
-              .retry(row.episodeKey),
+          onRetry: () async {
+            try {
+              await ref
+                  .read(downloadQueueControllerProvider.notifier)
+                  .retry(row.episodeKey);
+            } catch (error) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text('$error')));
+              }
+            }
+          },
           onDelete: () => ref
               .read(downloadedEpisodeRepositoryProvider)
               .deleteWithFiles(row.episodeKey),
