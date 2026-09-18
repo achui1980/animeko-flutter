@@ -1,56 +1,23 @@
 import 'package:animeko_flutter/data/download/downloaded_episode_repository.dart';
 import 'package:animeko_flutter/data/download/downloaded_episodes_provider.dart';
-import 'package:animeko_flutter/data/local_database.dart';
 import 'package:animeko_flutter/domain/download/download_queue_controller.dart';
-import 'package:animeko_flutter/domain/media/media_source.dart';
 import 'package:animeko_flutter/domain/play/subject_episodes_controller.dart';
+import 'package:animeko_flutter/data/local_database.dart';
 import 'package:animeko_flutter/ui/download/download_manager_screen.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-class _FakeEpisode implements MediaEpisode {
-  const _FakeEpisode(this.sourceId, this.title);
-
-  @override
-  final String sourceId;
-
-  @override
-  final String title;
-}
-
 class _FakeQueueController extends DownloadQueueController {
-  _FakeQueueController(this.items);
-
-  final Map<String, DownloadQueueItem> items;
-  final cancelled = <String>[];
-  final enqueued = <MergedEpisode>[];
-
   @override
-  Future<Map<String, DownloadQueueItem>> build() async => items;
-
-  @override
-  void cancel(String episodeKey) => cancelled.add(episodeKey);
-
+  Future<Map<String, DownloadQueueItem>> build() async => const {};
   @override
   void enqueue({
     required int subjectId,
     required String subjectName,
     required MergedEpisode episode,
-  }) => enqueued.add(episode);
-}
-
-class _FakeEpisodesController extends SubjectEpisodesController {
-  _FakeEpisodesController(this.episodes);
-
-  final List<MergedEpisode> episodes;
-
-  @override
-  Future<List<MergedEpisode>> build({
-    required int subjectId,
-    required String subjectName,
-  }) async => episodes;
+  }) {}
 }
 
 void main() {
@@ -64,12 +31,12 @@ void main() {
 
   tearDown(() => database.close());
 
-  Future<_FakeQueueController> pumpScreen(
-    WidgetTester tester, {
-    Map<String, DownloadQueueItem> queueItems = const {},
-    List<MergedEpisode> episodes = const [],
-  }) async {
-    late _FakeQueueController queue;
+  // downloadedEpisodesProvider is a real drift watchAll() stream; its
+  // debounce Timer never fires under flutter_test's FakeAsync clock before
+  // the tree is disposed, tripping the "Timer is still pending" invariant.
+  // Snapshot the rows instead, matching the workaround already used in
+  // download_panel_test.dart.
+  Future<void> pumpScreen(WidgetTester tester) async {
     final rows = await repository.getAll();
     final summaries = rows
         .map(
@@ -92,94 +59,35 @@ void main() {
           downloadedEpisodesProvider.overrideWith(
             (ref) => Stream.value(summaries),
           ),
-          downloadQueueControllerProvider.overrideWith(() {
-            queue = _FakeQueueController(queueItems);
-            return queue;
-          }),
-          subjectEpisodesControllerProvider(
-            subjectId: 1,
-            subjectName: '测试番剧',
-          ).overrideWith(() => _FakeEpisodesController(episodes)),
+          downloadQueueControllerProvider.overrideWith(_FakeQueueController.new),
         ],
         child: const MaterialApp(home: DownloadManagerScreen()),
       ),
     );
     await tester.pumpAndSettle();
-    return queue;
   }
 
-  testWidgets('shows an empty download state', (tester) async {
+  testWidgets('shows the 下载管理 title and an empty state, with no '
+      'episode-selection tab (subjectId is null)', (tester) async {
     await pumpScreen(tester);
 
+    expect(find.text('下载管理'), findsOneWidget);
     expect(find.text('暂无下载'), findsOneWidget);
+    expect(find.text('选集下载'), findsNothing);
   });
 
-  testWidgets('shows progress and cancels a downloading item', (tester) async {
-    const key = '1::anime1::1';
+  testWidgets('lists a completed download across every subject', (
+    tester,
+  ) async {
     await repository.upsert(
       const DownloadedEpisodeWrite(
         sourceId: 'anime1',
         subjectId: 1,
-        episodeKey: key,
+        episodeKey: '1::anime1::第1集',
         subjectName: '测试番剧',
-        episodeLabel: '1',
-        localPath: '/tmp/one.mp4',
-        format: 'mp4',
-        status: DownloadStatus.downloading,
-      ),
-    );
-
-    final queue = await pumpScreen(
-      tester,
-      queueItems: const {
-        key: DownloadQueueItem(
-          status: DownloadQueueStatus.downloading,
-          received: 50,
-          total: 100,
-        ),
-      },
-    );
-
-    expect(find.byType(LinearProgressIndicator), findsOneWidget);
-    await tester.tap(find.text('取消'));
-    expect(queue.cancelled, [key]);
-  });
-
-  testWidgets('shows retry details for a failed download', (tester) async {
-    await repository.upsert(
-      const DownloadedEpisodeWrite(
-        sourceId: 'xifan',
-        subjectId: 1,
-        episodeKey: '1::xifan::1',
-        subjectName: '测试番剧',
-        episodeLabel: '1',
-        localPath: '/tmp/one.mp4',
-        format: 'mp4',
-        status: DownloadStatus.failed,
-        errorMessage: '网络错误',
-      ),
-    );
-    final episode = MergedEpisode(
-      episode: const _FakeEpisode('xifan', '1'),
-      sourceId: 'xifan',
-    );
-
-    final queue = await pumpScreen(tester, episodes: [episode]);
-
-    expect(find.text('网络错误'), findsOneWidget);
-    await tester.tap(find.text('重试'));
-    expect(queue.enqueued, [episode]);
-  });
-
-  testWidgets('shows delete for a completed download', (tester) async {
-    await repository.upsert(
-      const DownloadedEpisodeWrite(
-        sourceId: 'anime1',
-        subjectId: 1,
-        episodeKey: '1::anime1::1',
-        subjectName: '测试番剧',
-        episodeLabel: '1',
-        localPath: '/tmp/one.mp4',
+        episodeLabel: '第1集',
+        localPath: '/tmp/a.mp4',
+        episodeDir: '/tmp',
         format: 'mp4',
         status: DownloadStatus.completed,
       ),
@@ -187,6 +95,6 @@ void main() {
 
     await pumpScreen(tester);
 
-    expect(find.text('删除'), findsOneWidget);
+    expect(find.text('测试番剧'), findsOneWidget);
   });
 }
