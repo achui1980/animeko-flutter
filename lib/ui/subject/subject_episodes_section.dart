@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../domain/download/download_queue_controller.dart';
 import '../../domain/play/subject_episodes_controller.dart';
 import '../../domain/subject/subject_detail_controller.dart';
 import '../../domain/subject/subject_main_episodes_controller.dart';
 import '../common/error_retry_view.dart';
+import '../download/download_badge_button.dart';
+import '../download/download_panel.dart';
 import 'episode_number_grid.dart';
 import 'episode_playback_sheet.dart';
 import 'subject_meta_text.dart';
@@ -74,6 +77,35 @@ class SubjectEpisodesSection extends ConsumerWidget {
                 children: [
                   Text('选集', style: theme.textTheme.titleSmall),
                   const Spacer(),
+                  Consumer(
+                    builder: (context, ref, _) {
+                      final queue =
+                          ref.watch(downloadQueueControllerProvider).value ??
+                          const <String, DownloadQueueItem>{};
+                      final activeCount = queue.keys
+                          .where((key) => key.startsWith('$subjectId::'))
+                          .length;
+                      final state = activeCount > 0
+                          ? DownloadButtonState.downloading
+                          : DownloadButtonState.idle;
+                      return DownloadBadgeButton(
+                        downloadState: state,
+                        activeCount: activeCount,
+                        onTap: () => showModalBottomSheet<void>(
+                          context: context,
+                          isScrollControlled: true,
+                          builder: (_) => SizedBox(
+                            height: MediaQuery.of(context).size.height * 0.8,
+                            child: DownloadPanel(
+                              subjectId: subjectId,
+                              subjectName: subjectName,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  if (progress != null) const SizedBox(width: 8),
                   if (progress != null)
                     Text(
                       progress,
