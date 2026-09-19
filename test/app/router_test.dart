@@ -3,6 +3,8 @@ import 'package:animeko_flutter/app/router.dart';
 import 'package:animeko_flutter/data/user/user_models.dart';
 import 'package:animeko_flutter/domain/auth/auth_controller.dart';
 import 'package:animeko_flutter/domain/auth/auth_state.dart';
+import 'package:animeko_flutter/domain/home/home_recommendations_controller.dart';
+import 'package:animeko_flutter/domain/home/trending_controller.dart';
 import 'package:animeko_flutter/domain/settings/proxy_settings_controller.dart';
 import 'package:animeko_flutter/domain/settings/theme_mode_controller.dart';
 import 'package:animeko_flutter/domain/user/self_user_controller.dart';
@@ -29,13 +31,38 @@ class _FakeProxySettingsController extends ProxySettingsController {
   Future<String?> build() async => null;
 }
 
+/// The router's initial route is `/home`, so every test in this file
+/// builds `HomeScreen` at least once. Without this, `trendingProvider`
+/// (always watched) and, once a test transitions to authenticated,
+/// `homeRecommendationsControllerProvider` would issue real un-mocked
+/// network requests whose internal Dio timeout Timers can still be
+/// pending when the test tears down, tripping flutter_test's
+/// "A Timer is still pending" assertion.
+class _FakeHomeRecommendationsController
+    extends HomeRecommendationsController {
+  @override
+  Future<HomeRecommendationsPage> build() async =>
+      const HomeRecommendationsPage(items: [], hasMore: false);
+}
+
+final _homeNetworkOverrides = [
+  trendingProvider.overrideWith((ref) async => const []),
+  homeRecommendationsControllerProvider.overrideWith(
+    () => _FakeHomeRecommendationsController(),
+  ),
+];
+
 void main() {
   testWidgets(
-    'unauthenticated user sees the login screen, authenticated user sees Home',
+    'guest (unauthenticated) user lands directly on Home -- no forced '
+    'login wall',
     (tester) async {
       final fake = _FakeAuthController();
       final container = ProviderContainer(
-        overrides: [authControllerProvider.overrideWith(() => fake)],
+        overrides: [
+          authControllerProvider.overrideWith(() => fake),
+          ..._homeNetworkOverrides,
+        ],
       );
       addTearDown(container.dispose);
 
@@ -48,24 +75,101 @@ void main() {
           ),
         ),
       );
-      await tester.pumpAndSettle();
+      // Not pumpAndSettle(): TrendingCarousel's auto-advance Timer keeps
+      // scheduling a new animation frame every simulated 5 seconds for as
+      // long as it's mounted -- pumpAndSettle() never sees "no more frames
+      // scheduled" and times out. A couple of bounded pumps is enough for
+      // the initial route to render.
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+
+      // Guests land on /home directly; there is no global redirect to
+      // /login anymore (see auth_gate.dart's requireLogin() for the
+      // on-demand replacement).
+      expect(find.text('AniMeow'), findsOneWidget);
+      expect(find.text('Log in with Bangumi'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'navigating to /login on demand shows the login button, and a '
+    'successful login pops back to Home',
+    (tester) async {
+      final fake = _FakeAuthController();
+      final container = ProviderContainer(
+        overrides: [
+          authControllerProvider.overrideWith(() => fake),
+          ..._homeNetworkOverrides,
+        ],
+      );
+      addTearDown(container.dispose);
+
+      GoRouter? router;
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: Consumer(
+            builder: (context, ref, _) {
+              router = ref.watch(appRouterProvider);
+              return MaterialApp.router(routerConfig: router!);
+            },
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+
+      router!.push('/login');
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
 
       expect(find.text('Log in with Bangumi'), findsOneWidget);
 
       fake.state = const AuthAuthenticated('user-1');
-      // Not pumpAndSettle(): HomeScreen's trendingProvider and
-      // homeRecommendationsControllerProvider make real (un-mocked) network
-      // calls and stay in AsyncLoading, and TrendingCarousel's auto-advance
-      // Timer keeps scheduling a new animation frame every simulated 5
-      // seconds for as long as it's mounted -- pumpAndSettle() never sees
-      // "no more frames scheduled" and times out. A couple of bounded pumps
-      // is enough for the refreshListenable-triggered redirect and the
-      // route transition to complete.
       await tester.pump();
       await tester.pump(const Duration(seconds: 1));
 
-      expect(find.text('AniMeow'), findsOneWidget);
       expect(find.text('Log in with Bangumi'), findsNothing);
+      expect(find.text('AniMeow'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'guest (unauthenticated) user can still reach /collection directly '
+    '(the route itself is not gated)',
+    (tester) async {
+      final fake = _FakeAuthController();
+      final container = ProviderContainer(
+        overrides: [
+          authControllerProvider.overrideWith(() => fake),
+          ..._homeNetworkOverrides,
+        ],
+      );
+      addTearDown(container.dispose);
+
+      GoRouter? router;
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: Consumer(
+            builder: (context, ref, _) {
+              router = ref.watch(appRouterProvider);
+              return MaterialApp.router(routerConfig: router!);
+            },
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+
+      router!.push('/collection');
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+
+      // Not redirected to /login; MyCollectionScreen renders its own
+      // LoginPromptView for the guest case.
+      expect(find.text('Log in with Bangumi'), findsNothing);
+      expect(find.text('我的收藏'), findsOneWidget);
     },
   );
 
@@ -74,7 +178,10 @@ void main() {
     (tester) async {
       final fake = _FakeAuthController();
       final container = ProviderContainer(
-        overrides: [authControllerProvider.overrideWith(() => fake)],
+        overrides: [
+          authControllerProvider.overrideWith(() => fake),
+          ..._homeNetworkOverrides,
+        ],
       );
       addTearDown(container.dispose);
 
@@ -119,6 +226,7 @@ void main() {
         proxySettingsControllerProvider.overrideWith(
           () => _FakeProxySettingsController(),
         ),
+        ..._homeNetworkOverrides,
       ],
     );
     addTearDown(container.dispose);
@@ -171,6 +279,7 @@ void main() {
               isBangumiSessionValid: true,
             ),
           ),
+          ..._homeNetworkOverrides,
         ],
       );
       addTearDown(container.dispose);

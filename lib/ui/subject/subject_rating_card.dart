@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../domain/auth/auth_gate.dart';
 import '../../domain/subject/subject_collection_controller.dart';
 import '../../domain/subject/subject_detail_controller.dart';
 import '../common/rating_stars.dart';
@@ -54,13 +55,16 @@ class SubjectRatingCard extends ConsumerWidget {
     return SubjectSideCard(
       title: '评分',
       trailing: TextButton(
-        onPressed: () => showSubjectRatingDialog(
-          context,
-          subjectId: subjectId,
-          initialScore: myScore ?? 5,
-          initialComment: selfRating?.comment,
-          initialIsPrivate: selfRating?.isPrivate ?? false,
-        ),
+        onPressed: () {
+          if (!requireLogin(context, ref)) return;
+          showSubjectRatingDialog(
+            context,
+            subjectId: subjectId,
+            initialScore: myScore ?? 5,
+            initialComment: selfRating?.comment,
+            initialIsPrivate: selfRating?.isPrivate ?? false,
+          );
+        },
         child: Text(myScore == null ? '☆ 打分' : '☆ 已评 $myScore 分'),
       ),
       child: Column(

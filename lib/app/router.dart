@@ -3,8 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../domain/auth/auth_controller.dart';
-import '../domain/auth/auth_state.dart';
 import '../domain/play/subject_episodes_controller.dart';
 import '../ui/auth/login_screen.dart';
 import '../ui/collection/my_collection_screen.dart';
@@ -20,35 +18,15 @@ import '../ui/subject/subject_detail_screen.dart';
 
 part 'router.g.dart';
 
-/// Bridges Riverpod's [authControllerProvider] state changes into
-/// go_router's `refreshListenable`, which is what triggers the `redirect:`
-/// callback to be re-evaluated on an *external* state change (e.g. login
-/// succeeding while the user is still sitting on the `/login` route).
-/// Without this, go_router only re-runs `redirect:` on navigation events,
-/// so a successful login would never automatically navigate the user away
-/// from the login screen.
-class _RouterRefreshNotifier extends ChangeNotifier {
-  void notify() => notifyListeners();
-}
-
+/// Most of the app is browsable without logging in. There is no global
+/// auth gate: guest users land straight on `/home`, and only the specific
+/// actions/screens that actually require a Bangumi session send the user
+/// to `/login` on demand (see `domain/auth/auth_gate.dart`'s
+/// `requireLogin()`).
 @riverpod
 GoRouter appRouter(Ref ref) {
-  final notifier = _RouterRefreshNotifier();
-  ref.listen(authControllerProvider, (_, _) => notifier.notify());
-  ref.onDispose(notifier.dispose);
-
   final router = GoRouter(
-    initialLocation: '/login',
-    refreshListenable: notifier,
-    redirect: (context, state) {
-      final authState = ref.read(authControllerProvider);
-      final isAuthenticated = authState is AuthAuthenticated;
-      final isLoggingIn = state.matchedLocation == '/login';
-
-      if (!isAuthenticated && !isLoggingIn) return '/login';
-      if (isAuthenticated && isLoggingIn) return '/home';
-      return null;
-    },
+    initialLocation: '/home',
     routes: [
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(

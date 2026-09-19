@@ -5,11 +5,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/subject/collection_type.dart';
 import '../../data/subject/subject_api.dart';
 import '../../data/subject/subject_models.dart';
+import '../../domain/auth/auth_controller.dart';
+import '../../domain/auth/auth_state.dart';
 import '../../domain/subject/my_collections_controller.dart';
 import '../../domain/subject_card.dart';
 import '../common/anime_list_item.dart';
 import '../common/empty_view.dart';
 import '../common/error_retry_view.dart';
+import '../common/login_prompt_view.dart';
 import '../subject/subject_navigation.dart';
 
 class MyCollectionScreen extends ConsumerStatefulWidget {
@@ -33,6 +36,16 @@ class _MyCollectionScreenState extends ConsumerState<MyCollectionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isAuthenticated =
+        ref.watch(authControllerProvider) is AuthAuthenticated;
+
+    if (!isAuthenticated) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('我的收藏')),
+        body: const LoginPromptView(message: '登录后即可查看你的收藏'),
+      );
+    }
+
     final provider = myCollectionsControllerProvider(type: _selected);
     final items = ref.watch(provider);
 

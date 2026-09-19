@@ -1,5 +1,6 @@
 import 'package:animeko_flutter/app/main.dart';
 import 'package:animeko_flutter/app/theme/app_theme.dart';
+import 'package:animeko_flutter/domain/home/trending_controller.dart';
 import 'package:animeko_flutter/domain/settings/dynamic_color_controller.dart';
 import 'package:animeko_flutter/domain/settings/seed_color_controller.dart';
 import 'package:animeko_flutter/domain/settings/theme_mode_controller.dart';
@@ -37,6 +38,14 @@ void main() {
         seedColorControllerProvider.overrideWith(
           () => _FakeSeedColorController(),
         ),
+        // The router's initial route is now `/home` (there's no more
+        // forced login wall), so this test's full-app pump reaches
+        // HomeScreen and its always-on trendingProvider. Without this
+        // override that fires a real, un-mocked network request whose
+        // internal Dio timeout Timer is still pending when the test
+        // tears down, tripping flutter_test's "A Timer is still
+        // pending" assertion.
+        trendingProvider.overrideWith((ref) async => const []),
       ],
     );
     addTearDown(container.dispose);

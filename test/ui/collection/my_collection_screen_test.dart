@@ -1,10 +1,13 @@
 import 'package:animeko_flutter/data/subject/collection_type.dart';
 import 'package:animeko_flutter/data/subject/subject_api.dart';
 import 'package:animeko_flutter/data/subject/subject_models.dart';
+import 'package:animeko_flutter/domain/auth/auth_controller.dart';
+import 'package:animeko_flutter/domain/auth/auth_state.dart';
 import 'package:animeko_flutter/domain/subject/my_collections_controller.dart';
 import 'package:animeko_flutter/ui/collection/my_collection_screen.dart';
 import 'package:animeko_flutter/ui/common/anime_list_item.dart';
 import 'package:animeko_flutter/ui/common/empty_view.dart';
+import 'package:animeko_flutter/ui/common/login_prompt_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -22,9 +25,23 @@ class _FakeMyCollectionsController extends MyCollectionsController {
       _page;
 }
 
+/// This screen's guest-vs-logged-in split is covered separately below;
+/// the collection-list-rendering tests all assume an already-logged-in
+/// user, matching their original intent before that split existed.
+class _FakeAuthenticatedController extends AuthController {
+  @override
+  AuthState build() => const AuthAuthenticated('user-1');
+}
+
+class _FakeUnauthenticatedController extends AuthController {
+  @override
+  AuthState build() => const AuthUnauthenticated();
+}
+
 Widget _wrap(MyCollectionsPage page, {SubjectApi? subjectApi}) {
   return ProviderScope(
     overrides: [
+      authControllerProvider.overrideWith(() => _FakeAuthenticatedController()),
       myCollectionsControllerProvider.overrideWith2(
         (type) => _FakeMyCollectionsController(page),
       ),
@@ -140,5 +157,38 @@ void main() {
 
       verify(() => api.deleteCollection(1)).called(1);
     });
+
+    testWidgets(
+      'guest (unauthenticated) sees a login prompt instead of the list',
+      (tester) async {
+        const page = MyCollectionsPage(
+          items: [
+            MyCollectionSubject(subjectId: 1, name: 'Foo', nameCn: 'Foo CN'),
+          ],
+          hasMore: false,
+        );
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              authControllerProvider.overrideWith(
+                () => _FakeUnauthenticatedController(),
+              ),
+              myCollectionsControllerProvider.overrideWith2(
+                (type) => _FakeMyCollectionsController(page),
+              ),
+            ],
+            child: const MaterialApp(home: MyCollectionScreen()),
+          ),
+        );
+        await tester.pump();
+
+        expect(find.byType(LoginPromptView), findsOneWidget);
+        // The route itself is still reachable -- no collection items or
+        // edit affordance are rendered, but nothing crashes either.
+        expect(find.byType(AnimeListItem), findsNothing);
+        expect(find.byIcon(Icons.edit), findsNothing);
+      },
+    );
   });
 }

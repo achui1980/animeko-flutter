@@ -4,6 +4,8 @@ import 'package:animeko_flutter/data/subject/collection_type.dart';
 import 'package:animeko_flutter/data/subject/subject_api.dart';
 import 'package:animeko_flutter/data/subject/subject_image_cache_repository.dart';
 import 'package:animeko_flutter/data/subject/subject_models.dart';
+import 'package:animeko_flutter/domain/auth/auth_controller.dart';
+import 'package:animeko_flutter/domain/auth/auth_state.dart';
 import 'package:animeko_flutter/ui/subject/subject_collection_action_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,6 +17,15 @@ class MockSubjectApi extends Mock implements SubjectApi {}
 
 class MockSubjectImageCacheRepository extends Mock
     implements SubjectImageCacheRepository {}
+
+/// This widget's actions are guarded by `requireLogin()`; these tests
+/// exercise the collection logic assuming an already-logged-in user (the
+/// unauthenticated/guest path -- pushing `/login` -- is covered by
+/// `auth_gate_test.dart` and `router_test.dart` instead).
+class _FakeAuthenticatedController extends AuthController {
+  @override
+  AuthState build() => const AuthAuthenticated('user-1');
+}
 
 SubjectDetail detailWith(CollectionType? type) => SubjectDetail(
   id: 1,
@@ -29,7 +40,10 @@ SubjectDetail detailWith(CollectionType? type) => SubjectDetail(
 
 Widget wrap(Widget child, {required List<Override> overrides}) {
   return ProviderScope(
-    overrides: overrides,
+    overrides: [
+      authControllerProvider.overrideWith(() => _FakeAuthenticatedController()),
+      ...overrides,
+    ],
     child: MaterialApp(home: Scaffold(body: child)),
   );
 }

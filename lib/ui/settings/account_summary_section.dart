@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/auth/auth_controller.dart';
+import '../../domain/auth/auth_state.dart';
 import '../../domain/user/self_user_controller.dart';
 import '../common/error_retry_view.dart';
 import '../common/loading_view.dart';
+import '../common/login_prompt_view.dart';
 
 /// Account summary shown at the top of the Settings page. Extracted from
 /// the old standalone `AccountScreen` (now deleted, see Task 3) so it can
@@ -16,6 +18,12 @@ class AccountSummarySection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isAuthenticated =
+        ref.watch(authControllerProvider) is AuthAuthenticated;
+    if (!isAuthenticated) {
+      return const LoginPromptView(message: '登录后即可查看账户信息');
+    }
+
     final selfUser = ref.watch(selfUserProvider);
 
     return selfUser.when(

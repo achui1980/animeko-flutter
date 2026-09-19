@@ -1,3 +1,5 @@
+import 'package:animeko_flutter/domain/auth/auth_controller.dart';
+import 'package:animeko_flutter/domain/auth/auth_state.dart';
 import 'package:animeko_flutter/domain/home/home_recommendations_controller.dart';
 import 'package:animeko_flutter/domain/home/trending_controller.dart';
 import 'package:animeko_flutter/domain/subject_card.dart';
@@ -7,6 +9,16 @@ import 'package:animeko_flutter/ui/home/trending_carousel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+class _FakeAuthenticatedController extends AuthController {
+  @override
+  AuthState build() => const AuthAuthenticated('user-1');
+}
+
+class _FakeUnauthenticatedController extends AuthController {
+  @override
+  AuthState build() => const AuthUnauthenticated();
+}
 
 class _FakeHomeRecommendationsController extends HomeRecommendationsController {
   @override
@@ -58,6 +70,7 @@ class _RecordingHomeRecommendationsController
 Widget _wrap(Widget child) {
   return ProviderScope(
     overrides: [
+      authControllerProvider.overrideWith(() => _FakeAuthenticatedController()),
       trendingProvider.overrideWith(
         (ref) async => const [
           SubjectCard(
@@ -114,6 +127,9 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            authControllerProvider.overrideWith(
+              () => _FakeAuthenticatedController(),
+            ),
             trendingProvider.overrideWith(
               (ref) async => const [
                 SubjectCard(
@@ -156,6 +172,46 @@ void main() {
             'Scrollable must not be mistaken for the user scrolling the '
             "outer CustomScrollView near the grid's bottom.",
       );
+    },
+  );
+
+  testWidgets(
+    'guest (unauthenticated) does not see the recommendations section',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authControllerProvider.overrideWith(
+              () => _FakeUnauthenticatedController(),
+            ),
+            trendingProvider.overrideWith(
+              (ref) async => const [
+                SubjectCard(
+                  id: 1,
+                  name: 'Foo',
+                  nameCn: 'Foo',
+                  imageUrl: 'https://example.com/1.png',
+                ),
+              ],
+            ),
+            homeRecommendationsControllerProvider.overrideWith(
+              () => _FakeHomeRecommendationsController(),
+            ),
+          ],
+          child: MaterialApp(home: const HomeScreen()),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      // The public "最近热门" trending carousel is unaffected...
+      expect(find.text('最近热门'), findsOneWidget);
+      expect(find.byType(TrendingCarousel), findsOneWidget);
+      // ...but the auth-jwt-gated "为你推荐" section is skipped entirely,
+      // not just shown empty/prompting -- there's no useful "log in to
+      // see this" affordance in a scrolling feed.
+      expect(find.text('为你推荐'), findsNothing);
+      expect(find.byType(AnimeCoverCard), findsNothing);
     },
   );
 }

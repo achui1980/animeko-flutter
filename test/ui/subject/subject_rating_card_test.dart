@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:animeko_flutter/data/subject/subject_api.dart';
 import 'package:animeko_flutter/data/subject/subject_models.dart';
+import 'package:animeko_flutter/domain/auth/auth_controller.dart';
+import 'package:animeko_flutter/domain/auth/auth_state.dart';
 import 'package:animeko_flutter/ui/subject/subject_rating_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,6 +12,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockSubjectApi extends Mock implements SubjectApi {}
+
+/// The "打分" button is guarded by `requireLogin()`; these tests exercise
+/// the rating card assuming an already-logged-in user (the guest path is
+/// covered by `auth_gate_test.dart` instead).
+class _FakeAuthenticatedController extends AuthController {
+  @override
+  AuthState build() => const AuthAuthenticated('user-1');
+}
 
 SubjectDetail detail({
   String? score,
@@ -35,7 +45,10 @@ SubjectDetail detail({
 
 Widget wrap(Widget child, {required List<Override> overrides}) {
   return ProviderScope(
-    overrides: overrides,
+    overrides: [
+      authControllerProvider.overrideWith(() => _FakeAuthenticatedController()),
+      ...overrides,
+    ],
     child: MaterialApp(home: Scaffold(body: child)),
   );
 }
