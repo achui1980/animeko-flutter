@@ -90,6 +90,32 @@ dart format lib test
 发布走 `.github/workflows/release.yml`：推送 `v*` tag 或手动触发 workflow_dispatch，
 会构建 macOS DMG、Windows zip 和按 ABI 拆分的 Android APK 并上传到 GitHub Release。
 
+## 安装（发布版）
+
+前往 [Releases](../../releases) 下载对应平台的安装包。
+
+#### macOS 安装说明（未签名应用）
+
+本应用未经 Apple 公证，从浏览器下载后会被系统标记隔离，首次打开需手动去除：
+
+1. 双击 DMG → 拖 `AniMeow.app` 到「应用程序」文件夹
+2. **打开「终端」执行（最可靠）**：
+   ```bash
+   sudo xattr -rd com.apple.quarantine /Applications/AniMeow.app
+   ```
+3. 然后正常双击打开（若仍提示，可再尝试右键点击 app → 打开 → 确认）
+
+> 较新 macOS（Sequoia 等）收紧了「右键打开」绕过，若直接双击提示「已损坏」或「无法验证开发者」，请务必先执行上面的终端命令。
+
+#### Windows 安装说明
+
+1. 解压 zip 到任意目录
+2. 双击 `AniMeow.exe` 运行
+
+## 使用提示
+
+- 播放页支持多个数据源切换（anime1.me / 稀饭动漫 / AGE动漫 / Mikan 等），建议**优先选择「稀饭动漫」**作为播放源，其余数据源可在稀饭动漫无法播放时作为备选。
+
 ## 目录结构
 
 ```
