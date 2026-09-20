@@ -1,6 +1,8 @@
 // test/domain/media/media_registry_test.dart
 import 'dart:io';
 
+import 'package:animeko_flutter/data/agedm/agedm_api.dart';
+import 'package:animeko_flutter/data/agedm/agedm_models.dart';
 import 'package:animeko_flutter/data/anime1/anime1_api.dart';
 import 'package:animeko_flutter/data/anime1/anime1_models.dart';
 import 'package:animeko_flutter/data/dilidili/dilidili_api.dart';
@@ -26,6 +28,8 @@ class MockXifanApi extends Mock implements XifanApi {}
 class MockYinghuaApi extends Mock implements YinghuaApi {}
 
 class MockDilidiliApi extends Mock implements DilidiliApi {}
+
+class MockAgedmApi extends Mock implements AgedmApi {}
 
 class MockDio extends Mock implements Dio {}
 
@@ -290,6 +294,75 @@ void main() {
     );
   });
 
+  group('AgedmMediaSource', () {
+    late MockAgedmApi api;
+    late AgedmMediaSource source;
+
+    setUp(() {
+      api = MockAgedmApi();
+      source = AgedmMediaSource(api);
+    });
+
+    test('id and displayName', () {
+      expect(source.id, 'agedm');
+      expect(source.displayName, 'AGE动漫');
+    });
+
+    test('search delegates to AgedmApi.search', () async {
+      when(
+        () => api.search('海贼王'),
+      ).thenAnswer((_) async => [const AgedmAnime(id: 20000001, title: '海贼王')]);
+
+      final result = await source.search('海贼王');
+
+      expect(result, hasLength(1));
+    });
+
+    test(
+      "listEpisodes delegates to listEpisodes using the candidate's numeric id",
+      () async {
+        when(() => api.listEpisodes(20000001)).thenAnswer(
+          (_) async => const [AgedmEpisode(title: '第01集', lines: [])],
+        );
+
+        final result = await source.listEpisodes(
+          const AgedmAnime(id: 20000001, title: 'x'),
+        );
+
+        expect(result, hasLength(1));
+      },
+    );
+
+    test('resolvePlayback delegates to resolvePlayback', () async {
+      const episode = AgedmEpisode(
+        title: '第01集',
+        lines: [
+          AgedmLine(
+            key: 'hnm3u8',
+            label: '红牛',
+            playPageUrl: 'https://jx.wuzhoupai.com:8443/m3u8/?url=age_a',
+          ),
+        ],
+      );
+      when(() => api.resolvePlayback(episode)).thenAnswer(
+        (_) async => const [
+          AgedmPlaybackSource(
+            url: 'https://hn.bfvvs.com/play/penZrB7e/index.m3u8',
+            label: '红牛',
+          ),
+        ],
+      );
+
+      final result = await source.resolvePlayback(episode);
+
+      expect(result, hasLength(1));
+      expect(
+        result.single.url,
+        'https://hn.bfvvs.com/play/penZrB7e/index.m3u8',
+      );
+    });
+  });
+
   test('mediaSourcesProvider returns the registered sources '
       '(yinghua and dilidili are intentionally disabled -- see '
       'mediaSources doc comment)', () {
@@ -300,7 +373,7 @@ void main() {
     );
     addTearDown(container.dispose);
     final sources = container.read(mediaSourcesProvider);
-    expect(sources.map((s) => s.id), ['anime1', 'xifan', 'mikan']);
+    expect(sources.map((s) => s.id), ['anime1', 'xifan', 'agedm', 'mikan']);
   });
 
   // Guards the *production wiring*, not RssMediaSource itself: dropping

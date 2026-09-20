@@ -77,4 +77,13 @@ void main() {
     const source = _FakePlaybackSource();
     expect(source.label, isNull);
   });
+
+  // The default must stay false: `PlayerScreen._configureProxy` forwards
+  // the app's proxy for every candidate that doesn't opt out, and 稀饭动漫's
+  // CDN is only reachable *through* the proxy. Only sources measured to
+  // need a direct connection override this (see `AgedmPlaybackSource`).
+  test('MediaPlaybackSource.prefersDirectConnection defaults to false', () {
+    const source = _FakePlaybackSource();
+    expect(source.prefersDirectConnection, isFalse);
+  });
 }

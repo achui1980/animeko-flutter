@@ -248,18 +248,34 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   }
 
   /// Forwards the app's configured proxy to libmpv's `http-proxy`
-  /// property, *unless* [forUrl] is a loopback address (`127.0.0.1`,
-  /// `::1`, or `localhost`) -- e.g. a BT candidate's local rqbit stream
-  /// URL. Loopback traffic must never be routed through the proxy: most
-  /// proxies refuse to forward requests to loopback/private addresses,
-  /// which would turn a healthy local stream into a "Failed to open"
-  /// error. When [forUrl] is loopback, any previously-set proxy is
-  /// explicitly cleared (empty string) so a prior remote candidate's
-  /// proxy setting can't leak into this one.
-  Future<void> _configureProxy(String forUrl) async {
+  /// property, *unless* this candidate must be reached directly. Two
+  /// independent reasons to bypass it:
+  ///
+  ///  * [playableUrl] is a loopback address (`127.0.0.1`, `::1`, or
+  ///    `localhost`) -- e.g. a BT candidate's local rqbit stream URL.
+  ///    Loopback traffic must never be routed through the proxy: most
+  ///    proxies refuse to forward requests to loopback/private
+  ///    addresses, which would turn a healthy local stream into a
+  ///    "Failed to open" error.
+  ///  * [source] sets [MediaPlaybackSource.prefersDirectConnection],
+  ///    i.e. its CDN is mainland-China-only and unroutable via a typical
+  ///    overseas proxy exit (see `AgedmPlaybackSource`).
+  ///
+  /// In either case any previously-set proxy is explicitly cleared (empty
+  /// string) so a prior remote candidate's proxy setting can't leak into
+  /// this one.
+  ///
+  /// [playableUrl] must be [MediaPlaybackSource.prepare]'s return value,
+  /// not `source.url` -- the latter throws for BT candidates until
+  /// `prepare()` has run, and it is precisely the prepared URL that is
+  /// loopback.
+  Future<void> _configureProxy(
+    MediaPlaybackSource source,
+    String playableUrl,
+  ) async {
     final platform = _player.platform;
     if (platform is! NativePlayer) return;
-    if (_isLoopbackUrl(forUrl)) {
+    if (source.prefersDirectConnection || _isLoopbackUrl(playableUrl)) {
       await platform.setProperty('http-proxy', '');
       return;
     }
@@ -591,7 +607,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     // overlay would incorrectly disappear.
     if (mounted) setState(() => _isBuffering = true);
     final playableUrl = await source.prepare();
-    await _configureProxy(playableUrl);
+    await _configureProxy(source, playableUrl);
     await _player.open(Media(playableUrl, httpHeaders: source.headers));
     final speed = await ref.read(playbackSpeedControllerProvider.future);
     await _player.setRate(speed);

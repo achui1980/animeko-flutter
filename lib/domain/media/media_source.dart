@@ -45,6 +45,20 @@ abstract class MediaPlaybackSource {
   /// list returned by [MediaSource.resolvePlayback].
   String? get label => null;
 
+  /// Whether this candidate's CDN must be reached *without* the app's
+  /// configured proxy (see `PlayerScreen._configureProxy`, which otherwise
+  /// forwards the proxy to libmpv's `http-proxy` property for every
+  /// non-loopback candidate).
+  ///
+  /// Defaults to false because the proxy forwarding exists for the
+  /// opposite reason: 稀饭动漫's `moedot.net` CDN is only reachable
+  /// *through* the proxy. Sources whose CDNs are mainland-China-only --
+  /// and therefore unroutable via a typical overseas proxy exit -- opt
+  /// out by overriding this to true (see `AgedmPlaybackSource`). A global
+  /// proxy toggle cannot satisfy both requirements, hence the
+  /// per-candidate flag.
+  bool get prefersDirectConnection => false;
+
   /// Returns the URL that should actually be handed to the player. HTTP
   /// sources return [url] unchanged (the default implementation below). BT
   /// sources override this to download the `.torrent`, hand it to the

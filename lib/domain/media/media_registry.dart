@@ -1,6 +1,8 @@
 // lib/domain/media/media_registry.dart
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../data/agedm/agedm_api.dart';
+import '../../data/agedm/agedm_models.dart';
 import '../../data/anime1/anime1_api.dart';
 import '../../data/anime1/anime1_models.dart';
 import '../../data/dilidili/dilidili_api.dart';
@@ -122,6 +124,31 @@ class DilidiliMediaSource implements MediaSource {
       _api.resolvePlaybackUrl((episode as DilidiliEpisode).watchPageUrl);
 }
 
+/// Adapts [AgedmApi] to the shared [MediaSource] interface. See
+/// [Anime1MediaSource]'s doc comment for the downcast-safety rationale.
+class AgedmMediaSource implements MediaSource {
+  AgedmMediaSource(this._api);
+  final AgedmApi _api;
+
+  @override
+  String get id => 'agedm';
+
+  @override
+  String get displayName => 'AGE动漫';
+
+  @override
+  Future<List<MediaCandidate>> search(String title, {int? subjectId}) =>
+      _api.search(title);
+
+  @override
+  Future<List<MediaEpisode>> listEpisodes(MediaCandidate candidate) =>
+      _api.listEpisodes((candidate as AgedmAnime).id);
+
+  @override
+  Future<List<MediaPlaybackSource>> resolvePlayback(MediaEpisode episode) =>
+      _api.resolvePlayback(episode as AgedmEpisode);
+}
+
 /// Every registered [MediaSource], queried concurrently by
 /// `SubjectEpisodesController`. Add a new source here (and nowhere else)
 /// to make it participate in the merged search/episode-list flow.
@@ -151,6 +178,7 @@ class DilidiliMediaSource implements MediaSource {
 List<MediaSource> mediaSources(Ref ref) => [
   Anime1MediaSource(ref.watch(anime1ApiProvider)),
   XifanMediaSource(ref.watch(xifanApiProvider)),
+  AgedmMediaSource(ref.watch(agedmApiProvider)),
   RssMediaSource(
     mikanRssSourceConfig,
     ref.watch(mikanRssDioProvider),
