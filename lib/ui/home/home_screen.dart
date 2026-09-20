@@ -13,6 +13,7 @@ import '../../domain/subject_card.dart';
 import '../common/anime_cover_card.dart';
 import '../common/app_action_bar.dart';
 import '../common/error_retry_view.dart';
+import '../common/login_prompt_view.dart';
 import '../download/download_badge_button.dart';
 import '../download/download_panel.dart';
 import '../subject/subject_navigation.dart';
@@ -43,14 +44,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
   }
 
+  /// Refreshes all home page content: the trending carousel and (if signed
+  /// in) the recommendations list, which resets pagination back to page 1
+  /// since [HomeRecommendationsController.build] always requests offset: 0.
+  void _refresh() {
+    ref.invalidate(trendingProvider);
+    if (ref.read(authControllerProvider) is AuthAuthenticated) {
+      ref.invalidate(homeRecommendationsControllerProvider);
+    }
+    setState(() {
+      _loadingMore = false;
+      _loadMoreFailed = false;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final trending = ref.watch(trendingProvider);
     // "为你推荐" calls an auth-jwt-gated endpoint (see
-    // `home_recommendations_api.dart`), so it's simply not shown to guests
-    // -- there's no useful "log in to see this" prompt in a scrolling feed
-    // like there is for a dedicated screen. Avoid watching the provider at
-    // all when signed out so it doesn't fire a doomed-to-401 request.
+    // `home_recommendations_api.dart`), so guests can't fetch real
+    // recommendations. Matching the original Animeko app's behavior, the
+    // section heading still shows, but a login prompt replaces the grid
+    // instead of a doomed-to-401 request. Avoid watching the provider at
+    // all when signed out.
     final isAuthenticated =
         ref.watch(authControllerProvider) is AuthAuthenticated;
     final recommendations = isAuthenticated
@@ -85,6 +101,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           slivers: [
             _CollapsingHomeAppBar(
               actions: [
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  tooltip: '刷新',
+                  onPressed: _refresh,
+                ),
                 ...buildStandardActions(context),
                 Builder(
                   builder: (context) {
@@ -115,8 +136,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 onRetry: () => ref.invalidate(trendingProvider),
               ),
             ),
-            if (isAuthenticated) ...[
-              const SliverToBoxAdapter(child: _SectionTitle('为你推荐')),
+            const SliverToBoxAdapter(child: _SectionTitle('为你推荐')),
+            if (!isAuthenticated)
+              const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.all(32),
+                  child: LoginPromptView(message: '登录后即可查看推荐内容'),
+                ),
+              )
+            else
               ...recommendations!.when(
                 loading: () => const [
                   SliverToBoxAdapter(
@@ -169,7 +197,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                 ],
               ),
-            ],
           ],
         ),
       ),

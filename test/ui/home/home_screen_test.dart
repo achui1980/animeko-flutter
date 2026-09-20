@@ -176,7 +176,8 @@ void main() {
   );
 
   testWidgets(
-    'guest (unauthenticated) does not see the recommendations section',
+    'guest (unauthenticated) sees a login prompt instead of the '
+    'recommendations grid',
     (tester) async {
       await tester.pumpWidget(
         ProviderScope(
@@ -207,10 +208,12 @@ void main() {
       // The public "最近热门" trending carousel is unaffected...
       expect(find.text('最近热门'), findsOneWidget);
       expect(find.byType(TrendingCarousel), findsOneWidget);
-      // ...but the auth-jwt-gated "为你推荐" section is skipped entirely,
-      // not just shown empty/prompting -- there's no useful "log in to
-      // see this" affordance in a scrolling feed.
-      expect(find.text('为你推荐'), findsNothing);
+      // ...the auth-jwt-gated "为你推荐" section heading still shows
+      // (matching the original Animeko app's behavior)...
+      expect(find.text('为你推荐'), findsOneWidget);
+      // ...but a login prompt replaces the grid instead of a doomed-to-401
+      // fetch, and no recommendation cards are shown.
+      expect(find.text('登录后即可查看推荐内容'), findsOneWidget);
       expect(find.byType(AnimeCoverCard), findsNothing);
     },
   );
