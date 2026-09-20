@@ -52,7 +52,13 @@ class ScheduleController extends _$ScheduleController {
           (day) => ScheduleDay(
             date: day.date,
             subjects: day.list
-                .map((e) => SubjectCard.fromScheduledSubject(e.subject))
+                .map(
+                  (episode) => SubjectCard.fromScheduledSubject(
+                    episode.subject,
+                    episodeSort: episode.episode.sort,
+                    airingTime: episode.airingTime,
+                  ),
+                )
                 .toList(),
           ),
         )

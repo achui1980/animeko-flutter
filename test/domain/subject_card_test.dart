@@ -12,6 +12,8 @@ void main() {
     expect(card.score, isNull);
     expect(card.tags, isNull);
     expect(card.airDate, isNull);
+    expect(card.episodeSort, isNull);
+    expect(card.airingTime, isNull);
   });
 
   test('SubjectCard stores all fields when provided', () {
@@ -23,12 +25,16 @@ void main() {
       score: '8.5',
       tags: ['Comedy', 'Drama'],
       airDate: '2024-01-01',
+      episodeSort: '3',
+      airingTime: '2024-01-01T22:00:00Z',
     );
     expect(card.nameCn, '完整动漫');
     expect(card.imageUrl, 'https://example.com/img.jpg');
     expect(card.score, '8.5');
     expect(card.tags, ['Comedy', 'Drama']);
     expect(card.airDate, '2024-01-01');
+    expect(card.episodeSort, '3');
+    expect(card.airingTime, '2024-01-01T22:00:00Z');
   });
 
   test('fromMyCollectionSubject assigns the given imageUrl when provided', () {

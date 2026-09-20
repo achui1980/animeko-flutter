@@ -23,6 +23,8 @@ class SubjectCard {
     this.score,
     this.tags,
     this.airDate,
+    this.episodeSort,
+    this.airingTime,
   });
 
   final int? id;
@@ -32,6 +34,8 @@ class SubjectCard {
   final String? score;
   final List<String>? tags;
   final String? airDate;
+  final String? episodeSort;
+  final String? airingTime;
 
   factory SubjectCard.fromTrending(TrendingSubject t) => SubjectCard(
     id: t.bangumiId,
@@ -58,13 +62,18 @@ class SubjectCard {
     airDate: s.airDate,
   );
 
-  factory SubjectCard.fromScheduledSubject(ScheduledAnimeSubject s) =>
-      SubjectCard(
-        id: s.subjectId,
-        name: s.name,
-        nameCn: s.nameCn,
-        imageUrl: s.imageLarge,
-      );
+  factory SubjectCard.fromScheduledSubject(
+    ScheduledAnimeSubject s, {
+    String? episodeSort,
+    String? airingTime,
+  }) => SubjectCard(
+    id: s.subjectId,
+    name: s.name,
+    nameCn: s.nameCn,
+    imageUrl: s.imageLarge,
+    episodeSort: episodeSort,
+    airingTime: airingTime,
+  );
 
   factory SubjectCard.fromMyCollectionSubject(
     MyCollectionSubject s, {

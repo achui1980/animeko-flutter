@@ -91,6 +91,8 @@ void main() {
       expect(result.single.date, '2026-08-28');
       expect(result.single.subjects.single.nameCn, '芙莉莲');
       expect(result.single.subjects.single.id, 100);
+      expect(result.single.subjects.single.episodeSort, '1');
+      expect(result.single.subjects.single.airingTime, '2026-08-28T22:00:00Z');
     });
 
     test('limits the result to at most 7 days', () async {

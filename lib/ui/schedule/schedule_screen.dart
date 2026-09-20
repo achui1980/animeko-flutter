@@ -4,11 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/theme/app_spacing.dart';
 import '../../domain/schedule/schedule_controller.dart';
+import '../../domain/schedule/schedule_subject_score.dart';
 import '../common/anime_cover_card.dart';
 import '../common/app_action_bar.dart';
 import '../common/error_retry_view.dart';
 import '../common/tag_chip.dart';
 import '../subject/subject_navigation.dart';
+import '../subject/subject_meta_text.dart';
 
 const _weekdayNames = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日'];
 
@@ -24,6 +26,22 @@ String formatScheduleDate(String isoDate) {
   }
 }
 
+String? formatScheduleEpisodeMetadata({
+  required String? episodeSort,
+  required String? airingTime,
+}) {
+  final episode = num.tryParse(episodeSort ?? '');
+  final time = airingTime == null ? null : DateTime.tryParse(airingTime);
+  if (episode == null || !episode.isFinite || time == null || !time.isUtc) {
+    return null;
+  }
+
+  final local = time.toLocal();
+  final hour = local.hour.toString().padLeft(2, '0');
+  final minute = local.minute.toString().padLeft(2, '0');
+  return '第${formatEpisodeNumber(episode)}话 · $hour:$minute';
+}
+
 class ScheduleScreen extends ConsumerWidget {
   const ScheduleScreen({super.key});
 
@@ -33,7 +51,7 @@ class ScheduleScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Schedule'),
+        title: const Text('追番日历'),
         actions: buildStandardActions(context),
       ),
       body: days.when(
@@ -74,10 +92,7 @@ class ScheduleScreen extends ConsumerWidget {
                     ),
                   ),
                   SizedBox(
-                    // Raised from 210 to reserve extra vertical space for
-                    // AnimeCoverCard's title, which now wraps to 2 lines
-                    // instead of 1 (see anime_cover_card.dart).
-                    height: 240,
+                    height: 260,
                     child: ListView.builder(
                       scrollDirection: Axis.horizontal,
                       padding: EdgeInsets.symmetric(horizontal: padding),
@@ -88,10 +103,33 @@ class ScheduleScreen extends ConsumerWidget {
                           padding: const EdgeInsets.only(right: 8),
                           child: SizedBox(
                             width: 120,
-                            child: AnimeCoverCard(
-                              imageUrl: card.imageUrl ?? '',
-                              title: card.nameCn ?? card.name,
-                              onTap: () => openSubjectDetail(context, card),
+                            child: Consumer(
+                              builder: (context, ref, child) {
+                                final scoreBadge = card.id == null
+                                    ? null
+                                    : switch (ref.watch(
+                                        scheduleSubjectScoreProvider(card.id!),
+                                      )) {
+                                        AsyncData(
+                                          :final value,
+                                          isLoading: false,
+                                        ) =>
+                                          value,
+                                        AsyncData() ||
+                                        AsyncLoading() ||
+                                        AsyncError() => null,
+                                      };
+                                return AnimeCoverCard(
+                                  imageUrl: card.imageUrl ?? '',
+                                  title: card.nameCn ?? card.name,
+                                  subtitle: formatScheduleEpisodeMetadata(
+                                    episodeSort: card.episodeSort,
+                                    airingTime: card.airingTime,
+                                  ),
+                                  scoreBadge: scoreBadge,
+                                  onTap: () => openSubjectDetail(context, card),
+                                );
+                              },
                             ),
                           ),
                         );
