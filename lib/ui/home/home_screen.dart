@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../app/theme/app_spacing.dart';
+import '../../domain/auth/auth_controller.dart';
+import '../../domain/auth/auth_state.dart';
 import '../../domain/download/download_queue_controller.dart';
 import '../../domain/home/home_recommendations_controller.dart';
 import '../../domain/home/trending_controller.dart';
@@ -44,7 +46,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final trending = ref.watch(trendingProvider);
-    final recommendations = ref.watch(homeRecommendationsControllerProvider);
+    // "为你推荐" calls an auth-jwt-gated endpoint (see
+    // `home_recommendations_api.dart`), so it's simply not shown to guests
+    // -- there's no useful "log in to see this" prompt in a scrolling feed
+    // like there is for a dedicated screen. Avoid watching the provider at
+    // all when signed out so it doesn't fire a doomed-to-401 request.
+    final isAuthenticated =
+        ref.watch(authControllerProvider) is AuthAuthenticated;
+    final recommendations = isAuthenticated
+        ? ref.watch(homeRecommendationsControllerProvider)
+        : null;
     final padding = pagePadding(context);
     final width = MediaQuery.of(context).size.width;
 
@@ -60,7 +71,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           // and must be ignored: their metrics describe the carousel's own
           // scroll position, not the user's position in this vertical grid.
           if (notification.depth != 0) return false;
-          final page = recommendations.value;
+          final page = recommendations?.value;
           final metrics = notification.metrics;
           if (page != null &&
               page.hasMore &&
@@ -104,58 +115,61 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 onRetry: () => ref.invalidate(trendingProvider),
               ),
             ),
-            const SliverToBoxAdapter(child: _SectionTitle('为你推荐')),
-            ...recommendations.when(
-              loading: () => const [
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.all(32),
-                    child: Center(child: CircularProgressIndicator()),
-                  ),
-                ),
-              ],
-              error: (error, stack) => [
-                SliverToBoxAdapter(
-                  child: ErrorRetryView(
-                    message: 'Failed to load recommendations: $error',
-                    onRetry: () =>
-                        ref.invalidate(homeRecommendationsControllerProvider),
-                  ),
-                ),
-              ],
-              data: (recPage) => [
-                SliverPadding(
-                  padding: EdgeInsets.symmetric(horizontal: padding),
-                  sliver: SliverGrid(
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: _gridColumns(width),
-                      // Lowered from 0.55 to reserve extra vertical space for
-                      // AnimeCoverCard's title, which now wraps to 2 lines
-                      // instead of 1 (see anime_cover_card.dart).
-                      childAspectRatio: 0.5,
-                      mainAxisSpacing: 8,
-                      crossAxisSpacing: 8,
+            if (isAuthenticated) ...[
+              const SliverToBoxAdapter(child: _SectionTitle('为你推荐')),
+              ...recommendations!.when(
+                loading: () => const [
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.all(32),
+                      child: Center(child: CircularProgressIndicator()),
                     ),
-                    delegate: SliverChildBuilderDelegate((context, index) {
-                      final card = recPage.items[index];
-                      return AnimeCoverCard(
-                        imageUrl: card.imageUrl ?? '',
-                        title: card.nameCn ?? card.name,
-                        onTap: () => openSubjectDetail(context, card),
-                      );
-                    }, childCount: recPage.items.length),
                   ),
-                ),
-                SliverToBoxAdapter(
-                  child: _RecommendationsFooter(
-                    hasMore: recPage.hasMore,
-                    loading: _loadingMore,
-                    failed: _loadMoreFailed,
-                    onRetry: _loadMore,
+                ],
+                error: (error, stack) => [
+                  SliverToBoxAdapter(
+                    child: ErrorRetryView(
+                      message: 'Failed to load recommendations: $error',
+                      onRetry: () => ref.invalidate(
+                        homeRecommendationsControllerProvider,
+                      ),
+                    ),
                   ),
-                ),
-              ],
-            ),
+                ],
+                data: (recPage) => [
+                  SliverPadding(
+                    padding: EdgeInsets.symmetric(horizontal: padding),
+                    sliver: SliverGrid(
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: _gridColumns(width),
+                        // Lowered from 0.55 to reserve extra vertical space for
+                        // AnimeCoverCard's title, which now wraps to 2 lines
+                        // instead of 1 (see anime_cover_card.dart).
+                        childAspectRatio: 0.5,
+                        mainAxisSpacing: 8,
+                        crossAxisSpacing: 8,
+                      ),
+                      delegate: SliverChildBuilderDelegate((context, index) {
+                        final card = recPage.items[index];
+                        return AnimeCoverCard(
+                          imageUrl: card.imageUrl ?? '',
+                          title: card.nameCn ?? card.name,
+                          onTap: () => openSubjectDetail(context, card),
+                        );
+                      }, childCount: recPage.items.length),
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: _RecommendationsFooter(
+                      hasMore: recPage.hasMore,
+                      loading: _loadingMore,
+                      failed: _loadMoreFailed,
+                      onRetry: _loadMore,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),

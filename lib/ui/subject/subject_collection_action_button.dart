@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/subject/collection_type.dart';
+import '../../domain/auth/auth_gate.dart';
 import '../../domain/subject/subject_collection_controller.dart';
 
 /// 收藏状态控件：未收藏时是单个「＋ 追番」主按钮（一键置为
@@ -59,6 +60,7 @@ class _SubjectCollectionActionButtonState
   bool _busy = false;
 
   Future<void> _setType(CollectionType type) async {
+    if (!requireLogin(context, ref)) return;
     // `enabled`/`onPressed` 只在下一帧才反映 [_busy]，所以同一帧里的第二次点击
     // 还是会走到这里，得自己再拦一次。
     if (_busy) return;
@@ -89,6 +91,7 @@ class _SubjectCollectionActionButtonState
     // framework 自己的 `if (!mounted) return null;`（`popup_menu.dart` 里
     // `showMenu(...)` 的 `.then`）兜底，`PopupMenuItemState.handleTap` 没有。
     if (!mounted) return;
+    if (!requireLogin(context, ref)) return;
     setState(() => _busy = true);
     try {
       await ref

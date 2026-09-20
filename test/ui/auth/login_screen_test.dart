@@ -6,6 +6,7 @@ import 'package:animeko_flutter/ui/auth/login_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 
 class _FakeAuthController extends AuthController {
   _FakeAuthController(this._initial);
@@ -81,4 +82,84 @@ void main() {
 
     expect(find.textContaining('network down'), findsOneWidget);
   });
+
+  testWidgets('pops back to the screen that pushed /login on success', (
+    tester,
+  ) async {
+    final fake = _FakeAuthController(const AuthUnauthenticated());
+    final router = GoRouter(
+      initialLocation: '/',
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (context, state) => Scaffold(
+            body: Center(
+              child: ElevatedButton(
+                onPressed: () => context.push('/login'),
+                child: const Text('Open login'),
+              ),
+            ),
+          ),
+        ),
+        GoRoute(
+          path: '/login',
+          builder: (context, state) => const LoginScreen(),
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [authControllerProvider.overrideWith(() => fake)],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+
+    await tester.tap(find.text('Open login'));
+    await tester.pumpAndSettle();
+    expect(find.text('Log in with Bangumi'), findsOneWidget);
+
+    fake.state = const AuthAuthenticated('user-1');
+    await tester.pumpAndSettle();
+
+    // Back on the screen that pushed /login, not hard-navigated to a
+    // fixed route -- per design, a completed login does not retry
+    // whatever action the user originally tapped.
+    expect(find.text('Open login'), findsOneWidget);
+    expect(find.text('Log in with Bangumi'), findsNothing);
+  });
+
+  testWidgets(
+    'falls back to /home when there is nothing to pop back to (e.g. a '
+    'direct deep link to /login)',
+    (tester) async {
+      final fake = _FakeAuthController(const AuthUnauthenticated());
+      final router = GoRouter(
+        initialLocation: '/login',
+        routes: [
+          GoRoute(
+            path: '/login',
+            builder: (context, state) => const LoginScreen(),
+          ),
+          GoRoute(
+            path: '/home',
+            builder: (context, state) => const Scaffold(body: Text('Home')),
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [authControllerProvider.overrideWith(() => fake)],
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      fake.state = const AuthAuthenticated('user-1');
+      await tester.pumpAndSettle();
+
+      expect(find.text('Home'), findsOneWidget);
+    },
+  );
 }
