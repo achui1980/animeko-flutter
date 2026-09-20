@@ -34,7 +34,7 @@ final class ScheduleControllerProvider
 }
 
 String _$scheduleControllerHash() =>
-    r'36a1a3fcb6da7a99ef342b9482d31f13789840cb';
+    r'd9e43c39739770dc4802ceedafb579e2d9c79b4a';
 
 abstract class _$ScheduleController extends $AsyncNotifier<List<ScheduleDay>> {
   FutureOr<List<ScheduleDay>> build();

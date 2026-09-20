@@ -8,13 +8,29 @@ part of 'router.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
+/// Most of the app is browsable without logging in. There is no global
+/// auth gate: guest users land straight on `/home`, and only the specific
+/// actions/screens that actually require a Bangumi session send the user
+/// to `/login` on demand (see `domain/auth/auth_gate.dart`'s
+/// `requireLogin()`).
 
 @ProviderFor(appRouter)
 final appRouterProvider = AppRouterProvider._();
 
+/// Most of the app is browsable without logging in. There is no global
+/// auth gate: guest users land straight on `/home`, and only the specific
+/// actions/screens that actually require a Bangumi session send the user
+/// to `/login` on demand (see `domain/auth/auth_gate.dart`'s
+/// `requireLogin()`).
+
 final class AppRouterProvider
     extends $FunctionalProvider<GoRouter, GoRouter, GoRouter>
     with $Provider<GoRouter> {
+  /// Most of the app is browsable without logging in. There is no global
+  /// auth gate: guest users land straight on `/home`, and only the specific
+  /// actions/screens that actually require a Bangumi session send the user
+  /// to `/login` on demand (see `domain/auth/auth_gate.dart`'s
+  /// `requireLogin()`).
   AppRouterProvider._()
     : super(
         from: null,
@@ -48,4 +64,4 @@ final class AppRouterProvider
   }
 }
 
-String _$appRouterHash() => r'b1230951d4e4e2a557c7f498091a728de96a3a1c';
+String _$appRouterHash() => r'3a50760792e3f7a95ed293a1eb2f0198370f5a3b';
