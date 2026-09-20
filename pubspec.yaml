@@ -42,6 +42,11 @@ dependencies:
   go_router: ^17.5.0
   uuid: ^4.6.0
   drift: 2.31.0
+  # Ships libsqlite3.so for every Android ABI (and a bundled sqlite3 for iOS).
+  # Without it, drift's NativeDatabase cannot dlopen sqlite3 on Android and every
+  # DB access throws "Failed to load dynamic library '.../lib/libsqlite3.so'".
+  # macOS/Linux link the OS-provided libsqlite3, which is why desktop worked.
+  sqlite3_flutter_libs: ^0.5.41
   path_provider: ^2.1.6
   path: ^1.9.1
   json_annotation: ^4.11.0

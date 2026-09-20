@@ -57,13 +57,18 @@ class AuthController extends _$AuthController {
   Future<void> login({required bool isRegister}) async {
     final requestId = _generateRequestId();
     state = AuthAwaitingBrowser(requestId);
-    final platform = ref.read(platformInfoProvider);
 
-    final api = ref.read(bangumiOAuthApiProvider);
-    final launcher = ref.read(browserLauncherProvider);
-    final storage = ref.read(secureTokenStorageProvider);
-
+    // Read the dependencies *inside* the try: `platformInfoProvider` throws
+    // on an unsupported ABI, and a throw out here would escape as an
+    // unhandled error while the state stayed `AuthAwaitingBrowser`, leaving
+    // the login screen spinning on "Waiting for Bangumi authorization..."
+    // forever instead of surfacing the failure.
     try {
+      final platform = ref.read(platformInfoProvider);
+      final api = ref.read(bangumiOAuthApiProvider);
+      final launcher = ref.read(browserLauncherProvider);
+      final storage = ref.read(secureTokenStorageProvider);
+
       final redirect = isRegister
           ? await api.oauth(
               requestId: requestId,
