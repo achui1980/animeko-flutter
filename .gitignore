@@ -44,5 +44,13 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# Gradle output for the Android target. The root /build/ rule above only covers
+# the repo root, and android/.gitignore does not list this directory.
+/android/build/
+
 # Superpowers scratch files (task briefs, brainstorm mockups, progress ledgers)
 .superpowers/
+
+# Codebase-analysis tool artifacts (graphify / codegraph)
+.codegraph/
+.graphifyignore
