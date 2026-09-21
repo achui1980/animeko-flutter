@@ -48,4 +48,4 @@ final class PlatformInfoProvider
   }
 }
 
-String _$platformInfoHash() => r'723964a73faceeda47f1acf0c21f1280a33a4b22';
+String _$platformInfoHash() => r'3f0c3c1f1b4ff0b7dc88e06777fd83839d3b7ce5';
