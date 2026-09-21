@@ -13,45 +13,49 @@ import '../../data/subject/subject_models.dart';
 /// 直径，不需要 large）」—— 默认 [radius] 32 正好是那个 64。
 ///
 /// 加载失败退占位图标同样出自设计文档，「加载 / 错误 / 空态」一节：「封面 /
-/// 角色头像 / 评价者头像 加载失败 → 占位图标」。所以这是个
-/// [StatefulWidget]：`CircleAvatar.backgroundImage` 没有 `errorBuilder`，
-/// 想换成占位图标只能靠 `onBackgroundImageError` 回调 + `setState`。
-/// 这个回调还必须给：不接它时加载失败会把异常抛到 `FlutterError`，在 widget
-/// 测试里会直接把测试判成失败。
+/// 角色头像 / 评价者头像 加载失败 → 占位图标」。
 ///
-/// 注意 `CircleAvatar` 把 `child` 画在 `backgroundImage` **之上**，所以占位
-/// 图标只能在没有可用 URL 时才渲染，不能无条件塞进 `child`。
-class CharacterAvatar extends StatefulWidget {
+/// **裁切必须对齐顶部。** Bangumi 的角色图是竖构图立绘：`imageMedium` 只是把
+/// `large` 按比例缩到宽 400，实测同一部作品里就有 400x533 / 400x623 /
+/// 400x1139 / 400x1164，长宽比从 1:1.3 一直到 1:2.9。用 [BoxFit.cover] 配默认
+/// 的居中对齐时，圆形窗口取的是缩放后图片正中间那一条，落在衣服或腿上 ——
+/// 整行头像会变成一排布料而不是脸。所以这里用
+/// `alignment: Alignment.topCenter` 取顶部那一条。
+///
+/// 这也是为什么不能用 `CircleAvatar`：它内部自己拼 `DecorationImage`，不暴露
+/// `alignment`，也没有 `errorBuilder`。换成 `ClipOval` + [Image.network] 之后
+/// 两个问题一起解决 —— `errorBuilder` 直接就能渲染占位图标，不再需要
+/// `onBackgroundImageError` + `setState` 去记「这张图挂了」，于是这个 widget
+/// 也不用再是 [StatefulWidget]（顺带消掉了一个坑：横向行的 cell 没有 key，
+/// Flutter 会把 [State] 复用到同一位置的另一个角色上）。
+class CharacterAvatar extends StatelessWidget {
   const CharacterAvatar({super.key, required this.character, this.radius = 32});
 
   final CharacterInfo character;
   final double radius;
 
   @override
-  State<CharacterAvatar> createState() => _CharacterAvatarState();
-}
-
-class _CharacterAvatarState extends State<CharacterAvatar> {
-  /// 已经加载失败过的那张图的 URL。记 URL 而不是一个 bool，是因为横向行的
-  /// cell 没有 key：Flutter 会把这个 [State] 复用到同一位置的另一个角色上，
-  /// 存 bool 会把上一个角色的失败状态带过去，让新角色也只显示占位图标。
-  String? _failedUrl;
-
-  @override
   Widget build(BuildContext context) {
-    final source = widget.character.imageMedium ?? widget.character.imageLarge;
-    final url = source == _failedUrl ? null : source;
-    return CircleAvatar(
-      radius: widget.radius,
-      backgroundImage: url == null ? null : NetworkImage(url),
-      onBackgroundImageError: url == null
-          ? null
-          // 图片流是异步回调的，widget 可能已经被移除了 —— 不加 `mounted`
-          // 守卫就是一个 `setState() called after dispose` 崩溃。
-          : (_, _) {
-              if (mounted) setState(() => _failedUrl = url);
-            },
-      child: url == null ? Icon(Icons.person, size: widget.radius) : null,
+    final url = character.imageMedium ?? character.imageLarge;
+    final diameter = radius * 2;
+    return ClipOval(
+      child: SizedBox(
+        width: diameter,
+        height: diameter,
+        child: url == null
+            ? _placeholder(context)
+            : Image.network(
+                url,
+                fit: BoxFit.cover,
+                alignment: Alignment.topCenter,
+                errorBuilder: (context, _, _) => _placeholder(context),
+              ),
+      ),
     );
   }
+
+  Widget _placeholder(BuildContext context) => ColoredBox(
+    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+    child: Center(child: Icon(Icons.person, size: radius)),
+  );
 }
