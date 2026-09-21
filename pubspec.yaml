@@ -78,6 +78,25 @@ dev_dependencies:
   mocktail: ^1.0.5
   drift_dev: 2.31.0
   json_serializable: ^6.13.0
+  flutter_launcher_icons: ^0.14.4
+
+# Launcher icon generation (`dart run flutter_launcher_icons`).
+#
+# macOS icons were authored by hand in
+# macos/Runner/Assets.xcassets/AppIcon.appiconset, so Android was left with the
+# stock 1.4 KB Flutter icon. Generating from the same 1024px source keeps both
+# platforms in sync; re-run the command after replacing the source art.
+#
+# The source art is already a finished square tile with a purple gradient
+# background (only the rounded corners use alpha), so the adaptive-icon
+# background is set to the brand seed colour (lib/app/theme/app_theme.dart's
+# kSeedColor) to blend with the artwork inside the circular/squircle mask.
+flutter_launcher_icons:
+  android: "ic_launcher"
+  ios: false
+  image_path: "macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_1024.png"
+  adaptive_icon_background: "#4F378B"
+  adaptive_icon_foreground: "macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_1024.png"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
