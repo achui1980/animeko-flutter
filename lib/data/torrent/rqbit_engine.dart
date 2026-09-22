@@ -38,6 +38,26 @@ class AddTorrentResult {
   }
 }
 
+/// Thrown when no usable `rqbit` executable can be located.
+///
+/// Carries a user-actionable message: the raw
+/// `ProcessException: No such file or directory` that `Process.start` throws
+/// says nothing about *which* binary is missing or how to install it, and it
+/// is surfaced verbatim in the player's "播放失败" panel.
+class RqbitBinaryNotFoundException implements Exception {
+  const RqbitBinaryNotFoundException(this.searchedPaths);
+
+  /// Every path that was probed, in resolution order.
+  final List<String> searchedPaths;
+
+  @override
+  String toString() =>
+      '未找到 rqbit 可执行文件，BT/磁力链接无法播放。\n'
+      '请先安装：brew install rqbit\n'
+      '若已安装在非标准位置，可设置环境变量 ANIMEKO_RQBIT_PATH 指向该可执行文件。\n'
+      '已尝试以下路径：${searchedPaths.join(', ')}';
+}
+
 /// Manages a single `rqbit` sidecar process and talks to its JSON HTTP API.
 ///
 /// v1 scope: online stream-only. [deleteTorrent] always forgets the torrent
@@ -162,12 +182,88 @@ class RqbitEngine {
   Dio get _dioClient => _dio!;
   String get _base => 'http://127.0.0.1:${_port!}';
 
-  String _rqbitBinaryPath() {
-    // TODO(实施阶段): 确定 rqbit 二进制在打包后的 macOS .app 内的实际路径
-    // （例如 macos/Runner/Resources/rqbit），当前返回占位路径，供 ensureStarted()
-    // 在未打包环境下于 PATH 中查找同名可执行文件。
-    return 'rqbit';
+  String _rqbitBinaryPath() => resolveBinaryPath(
+    environment: Platform.environment,
+    resolvedExecutable: Platform.resolvedExecutable,
+    isExecutable: _isExecutableFile,
+  );
+
+  static bool _isExecutableFile(String path) {
+    final file = File(path);
+    if (!file.existsSync()) return false;
+    // Directories report existsSync() == false through File, so an existing
+    // File here is either a regular file or a symlink to one. We do not check
+    // the exec bit: a present-but-not-executable binary should surface
+    // rqbit's own ProcessException rather than be silently skipped in favour
+    // of a different install.
+    return true;
   }
+
+  /// Locates the `rqbit` sidecar executable.
+  ///
+  /// A bare `Process.start('rqbit')` only works when the app inherits a
+  /// developer shell's PATH (i.e. `flutter run` from a terminal). A macOS
+  /// `.app` launched from Finder/Dock gets the minimal launchd PATH
+  /// (`/usr/bin:/bin:/usr/sbin:/sbin`) which excludes `/opt/homebrew/bin`,
+  /// so the same call fails with "ProcessException: No such file or
+  /// directory" and every BT/magnet source becomes unplayable.
+  ///
+  /// Resolution order (first hit wins):
+  /// 1. `ANIMEKO_RQBIT_PATH` env var — escape hatch for custom installs.
+  /// 2. A binary bundled in the app (`Contents/Resources/rqbit` on macOS,
+  ///    or next to the executable elsewhere) — for future self-contained
+  ///    distribution.
+  /// 3. Entries of `PATH`.
+  /// 4. Well-known package-manager locations, since PATH is unreliable for
+  ///    GUI launches.
+  ///
+  /// Throws [RqbitBinaryNotFoundException] with an actionable message when
+  /// nothing is found. Exposed for testing; inject [isExecutable] to avoid
+  /// touching the real filesystem.
+  static String resolveBinaryPath({
+    required Map<String, String> environment,
+    required String resolvedExecutable,
+    required bool Function(String path) isExecutable,
+  }) {
+    final executableName = Platform.isWindows ? 'rqbit.exe' : 'rqbit';
+    final override = environment['ANIMEKO_RQBIT_PATH'];
+    final candidates = <String>[
+      if (override != null && override.isNotEmpty) override,
+      // macOS bundle layout: Contents/MacOS/<exe> -> Contents/Resources/<exe>.
+      _join([
+        _dirname(_dirname(resolvedExecutable)),
+        'Resources',
+        executableName,
+      ]),
+      _join([_dirname(resolvedExecutable), executableName]),
+      for (final dir in (environment['PATH'] ?? '').split(
+        Platform.isWindows ? ';' : ':',
+      ))
+        if (dir.isNotEmpty) _join([dir, executableName]),
+      '/opt/homebrew/bin/$executableName',
+      '/usr/local/bin/$executableName',
+      '/opt/local/bin/$executableName',
+    ];
+
+    for (final candidate in candidates) {
+      if (isExecutable(candidate)) return candidate;
+    }
+    throw RqbitBinaryNotFoundException(candidates);
+  }
+
+  static String _dirname(String path) {
+    final index = path.lastIndexOf(Platform.pathSeparator);
+    if (index <= 0) return path;
+    return path.substring(0, index);
+  }
+
+  static String _join(List<String> parts) => parts
+      .map(
+        (part) => part.endsWith(Platform.pathSeparator)
+            ? part.substring(0, part.length - 1)
+            : part,
+      )
+      .join(Platform.pathSeparator);
 
   Future<String> _downloadDir() async {
     final dir = await Directory.systemTemp.createTemp('animeko_bt_');

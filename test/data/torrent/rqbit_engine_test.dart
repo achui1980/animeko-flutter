@@ -115,4 +115,84 @@ void main() {
       },
     );
   });
+
+  group('RqbitEngine.resolveBinaryPath', () {
+    // A GUI-launched macOS .app inherits a minimal PATH that does NOT
+    // include /opt/homebrew/bin, so a bare 'rqbit' lookup fails with
+    // "ProcessException: No such file or directory".
+    const guiPath = '/usr/bin:/bin:/usr/sbin:/sbin';
+    const appExecutable = '/Applications/AniMeow.app/Contents/MacOS/AniMeow';
+    const bundled = '/Applications/AniMeow.app/Contents/Resources/rqbit';
+
+    String resolve({
+      Map<String, String> environment = const {'PATH': guiPath},
+      String resolvedExecutable = appExecutable,
+      required Set<String> existing,
+    }) => RqbitEngine.resolveBinaryPath(
+      environment: environment,
+      resolvedExecutable: resolvedExecutable,
+      isExecutable: existing.contains,
+    );
+
+    test('prefers the binary bundled inside the .app Resources dir', () {
+      expect(resolve(existing: {bundled, '/opt/homebrew/bin/rqbit'}), bundled);
+    });
+
+    test('honours the ANIMEKO_RQBIT_PATH override above everything else', () {
+      expect(
+        resolve(
+          environment: const {'PATH': guiPath, 'ANIMEKO_RQBIT_PATH': '/tmp/rq'},
+          existing: {'/tmp/rq', bundled, '/opt/homebrew/bin/rqbit'},
+        ),
+        '/tmp/rq',
+      );
+    });
+
+    test('falls back to entries of PATH when nothing is bundled', () {
+      expect(
+        resolve(
+          environment: const {'PATH': '/usr/bin:/my/tools'},
+          existing: {'/my/tools/rqbit'},
+        ),
+        '/my/tools/rqbit',
+      );
+    });
+
+    test('finds a Homebrew install even when it is absent from PATH', () {
+      expect(
+        resolve(existing: {'/opt/homebrew/bin/rqbit'}),
+        '/opt/homebrew/bin/rqbit',
+      );
+    });
+
+    test('finds an Intel-Homebrew / MacPorts install', () {
+      expect(
+        resolve(existing: {'/usr/local/bin/rqbit'}),
+        '/usr/local/bin/rqbit',
+      );
+      expect(
+        resolve(existing: {'/opt/local/bin/rqbit'}),
+        '/opt/local/bin/rqbit',
+      );
+    });
+
+    test('throws an actionable error listing where it looked', () {
+      Object? error;
+      try {
+        resolve(existing: const {});
+      } catch (e) {
+        error = e;
+      }
+      expect(error, isA<RqbitBinaryNotFoundException>());
+      final message = error.toString();
+      // Must tell the user how to fix it, not just "No such file or directory".
+      expect(message, contains('brew install rqbit'));
+      expect(message, contains('ANIMEKO_RQBIT_PATH'));
+      expect(message, contains('/opt/homebrew/bin/rqbit'));
+      expect(
+        (error as RqbitBinaryNotFoundException).searchedPaths,
+        contains(bundled),
+      );
+    });
+  });
 }
