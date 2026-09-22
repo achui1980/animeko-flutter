@@ -87,16 +87,20 @@ dev_dependencies:
 # stock 1.4 KB Flutter icon. Generating from the same 1024px source keeps both
 # platforms in sync; re-run the command after replacing the source art.
 #
-# The source art is already a finished square tile with a purple gradient
-# background (only the rounded corners use alpha), so the adaptive-icon
-# background is set to the brand seed colour (lib/app/theme/app_theme.dart's
-# kSeedColor) to blend with the artwork inside the circular/squircle mask.
+# The source art is already a finished square tile (navy gradient panel inside a
+# light-blue rounded frame; only the rounded corners use alpha), so it is reused
+# as the adaptive-icon foreground rather than a cut-out. The foreground is inset
+# so the whole tile — including the 「追番」 lettering in the bottom-right corner —
+# stays inside Android's 66% safe zone instead of being clipped by the
+# circular/squircle mask, and the background is the deep navy sampled from the
+# artwork itself so the two blend.
 flutter_launcher_icons:
   android: "ic_launcher"
   ios: false
   image_path: "macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_1024.png"
-  adaptive_icon_background: "#4F378B"
+  adaptive_icon_background: "#192650"
   adaptive_icon_foreground: "macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_1024.png"
+  adaptive_icon_foreground_inset: 14
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
