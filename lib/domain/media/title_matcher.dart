@@ -9,20 +9,29 @@ const matchThreshold = 0.6;
 
 /// Picks the best-matching candidate for [subjectName] out of
 /// [candidates], or `null` if none scores at or above [matchThreshold].
-/// Pure function, directly testable with no mocking. Deliberately uses
-/// title-string similarity only, with no year/season filtering (see
-/// design doc "标题匹配策略"). Generic over any concrete [MediaCandidate]
-/// subtype so both anime1.me and 稀饭动漫 (and any future source) share
-/// this exact same logic.
+/// Pure function, directly testable with no mocking. Generic over any
+/// concrete [MediaCandidate] subtype so both anime1.me and 稀饭动漫 (and
+/// any future source) share this exact same logic.
+///
+/// Before scoring, candidates whose *series identity* conflicts with
+/// [subjectName]'s are discarded outright (see [_SeriesIdentity]).
+/// Similarity alone cannot tell "第四季 夺还篇" from "第四季 丧失篇" --
+/// those differ by two characters out of nineteen, so every scoring
+/// function rates them as a near-perfect match, and a site that carries
+/// only the other cour would otherwise serve the wrong episodes.
 T? matchBest<T extends MediaCandidate>(List<T> candidates, String subjectName) {
   final normalizedTarget = _normalize(subjectName);
+  final targetIdentity = _SeriesIdentity.parse(normalizedTarget);
   T? best;
   var bestScore = 0.0;
   for (final candidate in candidates) {
-    final score = _bestSimilarity(
-      _normalize(candidate.title),
-      normalizedTarget,
-    );
+    final normalizedCandidate = _normalize(candidate.title);
+    if (targetIdentity.conflictsWith(
+      _SeriesIdentity.parse(normalizedCandidate),
+    )) {
+      continue;
+    }
+    final score = _bestSimilarity(normalizedCandidate, normalizedTarget);
     if (score > bestScore) {
       bestScore = score;
       best = candidate;
@@ -30,6 +39,86 @@ T? matchBest<T extends MediaCandidate>(List<T> candidates, String subjectName) {
   }
   return bestScore >= matchThreshold ? best : null;
 }
+
+/// Which entry of a series a title refers to: its season number and any
+/// story-arc ("cour") markers. Used purely as a veto in [matchBest] --
+/// two titles with conflicting identities are never the same entry, no
+/// matter how similar their strings are.
+class _SeriesIdentity {
+  const _SeriesIdentity({required this.season, required this.arcs});
+
+  /// Season number, defaulting to 1 when the title carries no season
+  /// marker at all: a bare base title *is* the first season, which is
+  /// what makes "葬送的芙莉蓮" vs "葬送的芙莉蓮 第二季" a conflict.
+  final int season;
+
+  /// Story-arc names stripped of their trailing 篇, e.g. `{'夺還'}` for
+  /// "第四季 夺還篇". Empty when the title names no arc.
+  final Set<String> arcs;
+
+  static _SeriesIdentity parse(String normalized) => _SeriesIdentity(
+    season: _parseSeason(normalized),
+    arcs: _arcPattern.allMatches(normalized).map((m) => m.group(1)!).toSet(),
+  );
+
+  /// Conflicts when the seasons differ, or when both sides name arcs and
+  /// share none of them. A one-sided arc marker is deliberately *not* a
+  /// conflict: sources routinely omit an arc name the Bangumi title
+  /// carries (and vice versa), and dropping those candidates would lose
+  /// real matches -- the cost is that "葬送的芙莉蓮 特別篇" still
+  /// competes for "葬送的芙莉蓮".
+  bool conflictsWith(_SeriesIdentity other) {
+    if (season != other.season) return true;
+    if (arcs.isEmpty || other.arcs.isEmpty) return false;
+    return arcs.intersection(other.arcs).isEmpty;
+  }
+}
+
+/// Season markers this recognizes: "第4季"/"第四期"/"第2部",
+/// "season2" and "2ndseason" (whitespace is already stripped by
+/// [_normalize]).
+///
+/// Bare trailing numerals ("... 2") and Roman numerals ("... Ⅱ") are
+/// deliberately *not* recognized: a trailing digit is often part of the
+/// name itself ("Fate/Zero 2" style), and treating it as a season would
+/// produce false vetoes -- the failure mode this whole veto exists to
+/// prevent, just in the other direction.
+final RegExp _seasonPattern = RegExp(
+  r'第([0-9一二三四五六七八九十]{1,3})[季期部]'
+  r'|season([0-9]{1,2})'
+  r'|([0-9]{1,2})(?:st|nd|rd|th)season',
+);
+
+const _chineseNumerals = <String, int>{
+  '一': 1,
+  '二': 2,
+  '三': 3,
+  '四': 4,
+  '五': 5,
+  '六': 6,
+  '七': 7,
+  '八': 8,
+  '九': 9,
+  '十': 10,
+};
+
+int _parseSeason(String normalized) {
+  final match = _seasonPattern.firstMatch(normalized);
+  if (match == null) return 1;
+  final raw = match.group(1) ?? match.group(2) ?? match.group(3)!;
+  final arabic = int.tryParse(raw);
+  if (arabic != null) return arabic;
+  if (raw.length == 1) return _chineseNumerals[raw] ?? 1;
+  // "十一".."十九"
+  if (raw.startsWith('十')) {
+    return 10 + (_chineseNumerals[raw.substring(1, 2)] ?? 0);
+  }
+  return _chineseNumerals[raw.substring(0, 1)] ?? 1;
+}
+
+/// A story-arc name: up to four CJK characters followed by 篇, stopping
+/// at 季/期/部 so that "第四季夺還篇" yields "夺還" rather than "四季夺還".
+final RegExp _arcPattern = RegExp(r'((?:(?![季期部])[\u4e00-\u9fa5]){1,4})篇');
 
 /// A small, deliberately non-exhaustive map of common Simplified Chinese
 /// characters to their Traditional Chinese counterpart. Bangumi titles
@@ -227,14 +316,22 @@ final RegExp _segmentDelimiters = RegExp(
   '\u3008\u3009\u3014\u3015\u3007\u25CB\u30FB]+',
 );
 
-/// The full [normalized] string plus each non-empty piece produced by
-/// splitting on [_segmentDelimiters] -- always includes the whole string
-/// so callers never lose the plain whole-title comparison.
+/// Derived segments shorter than this are dropped. A two-character
+/// fragment like the "Re" of "Re：从零开始的异世界生活" carries no
+/// identifying information, yet [titleSimilarity] scores it 1.0 against
+/// any other title with the same prefix -- which used to make every
+/// "Re：..." series a perfect match for every other one.
+const _minSegmentLength = 3;
+
+/// The full [normalized] string plus each piece produced by splitting on
+/// [_segmentDelimiters] that is at least [_minSegmentLength] runes long.
+/// The whole string is always included regardless of length, so callers
+/// never lose the plain whole-title comparison.
 Set<String> _segments(String normalized) {
   final parts = normalized
       .split(_segmentDelimiters)
       .map((s) => s.trim())
-      .where((s) => s.isNotEmpty);
+      .where((s) => s.runes.length >= _minSegmentLength);
   return {normalized, ...parts};
 }
 
