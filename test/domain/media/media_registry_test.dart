@@ -8,6 +8,8 @@ import 'package:animeko_flutter/data/anime1/anime1_models.dart';
 import 'package:animeko_flutter/data/dilidili/dilidili_api.dart';
 import 'package:animeko_flutter/data/dilidili/dilidili_models.dart';
 import 'package:animeko_flutter/data/local_database.dart';
+import 'package:animeko_flutter/data/omofun/omofun_api.dart';
+import 'package:animeko_flutter/data/omofun/omofun_models.dart';
 import 'package:animeko_flutter/data/rss/mikan_subject_mapping_repository.dart';
 import 'package:animeko_flutter/data/rss/rss_media_source.dart';
 import 'package:animeko_flutter/data/xifan/xifan_api.dart';
@@ -30,6 +32,8 @@ class MockYinghuaApi extends Mock implements YinghuaApi {}
 class MockDilidiliApi extends Mock implements DilidiliApi {}
 
 class MockAgedmApi extends Mock implements AgedmApi {}
+
+class MockOmofunApi extends Mock implements OmofunApi {}
 
 class MockDio extends Mock implements Dio {}
 
@@ -363,6 +367,45 @@ void main() {
     });
   });
 
+  group('OmofunMediaSource', () {
+    late MockOmofunApi api;
+    late OmofunMediaSource source;
+
+    setUp(() {
+      api = MockOmofunApi();
+      source = OmofunMediaSource(api);
+    });
+
+    test('id and displayName', () {
+      expect(source.id, 'omofun');
+      expect(source.displayName, 'OmoFun');
+    });
+
+    test('search delegates to the api', () async {
+      const hit = OmofunCandidate(vodId: '1', title: '葬送的芙莉莲');
+      when(() => api.search('葬送的芙莉莲')).thenAnswer((_) async => [hit]);
+      expect(await source.search('葬送的芙莉莲', subjectId: 1), [hit]);
+    });
+
+    test('listEpisodes passes the vodId', () async {
+      const ep = OmofunEpisode(vodId: '1', ep: 1, title: '第01集');
+      when(() => api.listEpisodes('1')).thenAnswer((_) async => [ep]);
+      expect(
+        await source.listEpisodes(
+          const OmofunCandidate(vodId: '1', title: 'x'),
+        ),
+        [ep],
+      );
+    });
+
+    test('resolvePlayback delegates the episode', () async {
+      const ep = OmofunEpisode(vodId: '1', ep: 1, title: '第01集');
+      const line = OmofunPlaybackSource(url: 'https://a/i.m3u8', label: 'gszy');
+      when(() => api.resolvePlayback(ep)).thenAnswer((_) async => [line]);
+      expect(await source.resolvePlayback(ep), [line]);
+    });
+  });
+
   test('mediaSourcesProvider returns the registered sources '
       '(yinghua and dilidili are intentionally disabled -- see '
       'mediaSources doc comment)', () {
@@ -373,7 +416,13 @@ void main() {
     );
     addTearDown(container.dispose);
     final sources = container.read(mediaSourcesProvider);
-    expect(sources.map((s) => s.id), ['anime1', 'xifan', 'agedm', 'mikan']);
+    expect(sources.map((s) => s.id), [
+      'anime1',
+      'xifan',
+      'agedm',
+      'omofun',
+      'mikan',
+    ]);
   });
 
   // Guards the *production wiring*, not RssMediaSource itself: dropping

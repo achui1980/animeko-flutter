@@ -7,6 +7,8 @@ import '../../data/anime1/anime1_api.dart';
 import '../../data/anime1/anime1_models.dart';
 import '../../data/dilidili/dilidili_api.dart';
 import '../../data/dilidili/dilidili_models.dart';
+import '../../data/omofun/omofun_api.dart';
+import '../../data/omofun/omofun_models.dart';
 import '../../data/rss/mikan_subject_mapping_repository.dart';
 import '../../data/rss/rss_media_source.dart';
 import '../../data/torrent/rqbit_engine.dart';
@@ -149,6 +151,31 @@ class AgedmMediaSource implements MediaSource {
       _api.resolvePlayback(episode as AgedmEpisode);
 }
 
+/// Adapts [OmofunApi] to the shared [MediaSource] interface. See
+/// [Anime1MediaSource]'s doc comment for the downcast-safety rationale.
+class OmofunMediaSource implements MediaSource {
+  OmofunMediaSource(this._api);
+  final OmofunApi _api;
+
+  @override
+  String get id => omofunSourceId;
+
+  @override
+  String get displayName => 'OmoFun';
+
+  @override
+  Future<List<MediaCandidate>> search(String title, {int? subjectId}) =>
+      _api.search(title);
+
+  @override
+  Future<List<MediaEpisode>> listEpisodes(MediaCandidate candidate) =>
+      _api.listEpisodes((candidate as OmofunCandidate).vodId);
+
+  @override
+  Future<List<MediaPlaybackSource>> resolvePlayback(MediaEpisode episode) =>
+      _api.resolvePlayback(episode as OmofunEpisode);
+}
+
 /// Every registered [MediaSource], queried concurrently by
 /// `SubjectEpisodesController`. Add a new source here (and nowhere else)
 /// to make it participate in the merged search/episode-list flow.
@@ -179,6 +206,7 @@ List<MediaSource> mediaSources(Ref ref) => [
   Anime1MediaSource(ref.watch(anime1ApiProvider)),
   XifanMediaSource(ref.watch(xifanApiProvider)),
   AgedmMediaSource(ref.watch(agedmApiProvider)),
+  OmofunMediaSource(ref.watch(omofunApiProvider)),
   RssMediaSource(
     mikanRssSourceConfig,
     ref.watch(mikanRssDioProvider),
