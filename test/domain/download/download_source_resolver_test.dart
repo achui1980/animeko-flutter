@@ -54,6 +54,13 @@ void main() {
       expect(options.single.preferred!.sourceId, 'xifan');
     });
 
+    test('an episode with only agedm is downloadable', () {
+      final options = resolveDownloadOptions([_e('agedm', '第1集')]);
+
+      expect(options.single.isDownloadable, isTrue);
+      expect(options.single.preferred!.sourceId, 'agedm');
+    });
+
     test('an episode available on no HTTP source is not downloadable', () {
       final options = resolveDownloadOptions([_e('mikan', '第1集')]);
 

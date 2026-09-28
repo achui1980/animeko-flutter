@@ -142,7 +142,9 @@ class DownloadWorker {
   Future<void> get whenIdle => _idle?.future ?? Future.value();
 
   void enqueue(DownloadRequest request) {
-    if (request.sourceId != 'anime1' && request.sourceId != 'xifan') {
+    if (request.sourceId != 'anime1' &&
+        request.sourceId != 'xifan' &&
+        request.sourceId != 'agedm') {
       unawaited(_failUnsupportedSource(request));
       return;
     }

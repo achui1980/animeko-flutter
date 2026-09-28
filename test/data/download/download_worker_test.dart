@@ -304,6 +304,28 @@ void main() {
     },
   );
 
+  test('accepts an AGE download request', () async {
+    final worker = DownloadWorker(
+      dio: _dio({
+        'https://cdn.example/age.mp4': const _HttpResponse(
+          statusCode: 200,
+          body: [1, 2, 3],
+          headers: {'content-length': '3'},
+        ),
+      }),
+      sourceForId: (_) => _Source('agedm', const [
+        _PlaybackSource('https://cdn.example/age.mp4'),
+      ]),
+      repository: repository,
+    );
+    final request = _request('agedm', 1, downloadRoot: root.path);
+
+    worker.enqueue(request);
+    await worker.whenIdle;
+
+    expect(await repository.findCompleted(request.episodeKey), isNotNull);
+  });
+
   test(
     'fails with a friendly message when sourceForId finds no registered '
     'source for the request (design doc 5.3 -- no longer an uncaught '

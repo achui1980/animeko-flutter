@@ -6,7 +6,7 @@ import '../play/subject_episodes_controller.dart';
 /// allow-list (`lib/data/download/download_worker.dart`) -- BT/RSS sources
 /// (e.g. `'mikan'`) are deliberately excluded (see the design spec's
 /// explicit out-of-scope list).
-const downloadableSourcePriority = ['anime1', 'xifan'];
+const downloadableSourcePriority = ['anime1', 'xifan', 'agedm'];
 
 /// One episode (identified by [title], the join key across sources --
 /// mirrors how `EpisodeNumberGrid` already groups [MergedEpisode]s) and
