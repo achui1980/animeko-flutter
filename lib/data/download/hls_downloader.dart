@@ -10,6 +10,42 @@ class HlsDownloadResult {
   final int fileSizeBytes;
 }
 
+final _keyUriPattern = RegExp(r'URI="([^"]*)"');
+
+/// Downloads the AES-128 key referenced by a `#EXT-X-KEY` line (if any)
+/// and returns the rewritten line pointing at the local key file, or
+/// `null` if [line] isn't a `#EXT-X-KEY` line or has no `URI=` attribute.
+///
+/// OmoFun's HLS streams are AES-128 encrypted with a fixed all-zero IV
+/// (confirmed by hand against a live stream during design -- the key
+/// never rotates, so a downloaded key stays valid for the episode's
+/// full runtime). `METHOD=`/`IV=` attributes are preserved verbatim;
+/// only `URI=` is rewritten, so decryption still works against the
+/// locally saved key file.
+Future<String?> _rewriteKeyLine(
+  String line,
+  Uri playlistUrl,
+  Map<String, String> headers,
+  Directory targetDirectory,
+  Dio dio,
+) async {
+  if (!line.startsWith('#EXT-X-KEY')) return null;
+  final match = _keyUriPattern.firstMatch(line);
+  if (match == null) return null;
+  final keyUri = playlistUrl.resolve(match.group(1)!);
+  final keyFile = File('${targetDirectory.path}/key_0000.key');
+  final alreadyDownloaded =
+      await keyFile.exists() && await keyFile.length() > 0;
+  if (!alreadyDownloaded) {
+    await dio.downloadUri(
+      keyUri,
+      keyFile.path,
+      options: Options(headers: headers),
+    );
+  }
+  return line.replaceFirst(_keyUriPattern, 'URI="key_0000.key"');
+}
+
 class HlsDownloader {
   HlsDownloader(this._dio);
 
@@ -33,6 +69,16 @@ class HlsDownloader {
 
     final lines = playlistText.split(RegExp(r'\r?\n'));
     final output = List<String>.from(lines);
+    for (var index = 0; index < output.length; index++) {
+      final rewritten = await _rewriteKeyLine(
+        output[index],
+        playlistUrl,
+        headers,
+        targetDirectory,
+        _dio,
+      );
+      if (rewritten != null) output[index] = rewritten;
+    }
     final segmentLineIndexes = <int>[];
     for (var index = 0; index < lines.length; index++) {
       if (lines[index].isNotEmpty && !lines[index].startsWith('#')) {
@@ -70,10 +116,7 @@ class HlsDownloader {
 
     final playlist = File(p.join(targetDirectory.path, 'playlist.m3u8'));
     await playlist.writeAsString(output.join('\n'));
-    return HlsDownloadResult(
-      playlist,
-      totalBytes + await playlist.length(),
-    );
+    return HlsDownloadResult(playlist, totalBytes + await playlist.length());
   }
 
   Future<String> _getText(Uri url, Map<String, String> headers) async =>
