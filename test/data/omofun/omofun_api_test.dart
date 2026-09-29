@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:animeko_flutter/data/omofun/omofun_api.dart';
 import 'package:animeko_flutter/data/omofun/omofun_models.dart';
 import 'package:dio/dio.dart';
@@ -34,12 +32,6 @@ const _playsJson = '''
 
 const _episode = OmofunEpisode(vodId: '2023103093', ep: 1, title: '第01集');
 const _playsUrl = 'https://omofun.in/_dyn_plays/2023103093/ep1';
-
-class _ProxyEverything extends HttpOverrides {
-  @override
-  HttpClient createHttpClient(SecurityContext? context) =>
-      super.createHttpClient(context)..findProxy = (_) => 'PROXY 127.0.0.1:1';
-}
 
 void main() {
   late MockDio siteDio;
@@ -122,23 +114,6 @@ void main() {
       ),
     );
     expect(api.resolvePlayback(_episode), throwsStateError);
-  });
-
-  test('directHttpClientAdapter bypasses a global proxy override', () async {
-    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-    addTearDown(() => server.close(force: true));
-    server.listen((req) {
-      req.response.write('#EXTM3U');
-      req.response.close();
-    });
-    final url = 'http://127.0.0.1:${server.port}/index.m3u8';
-
-    await HttpOverrides.runWithHttpOverrides(() async {
-      final direct = Dio()..httpClientAdapter = directHttpClientAdapter();
-      expect((await direct.get<String>(url)).data, '#EXTM3U');
-
-      await expectLater(Dio().get<String>(url), throwsA(isA<DioException>()));
-    }, _ProxyEverything());
   });
 
   test('omofunApiProvider wires up', () {

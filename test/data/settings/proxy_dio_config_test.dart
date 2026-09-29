@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:animeko_flutter/data/settings/proxy_dio_config.dart';
 import 'package:animeko_flutter/data/settings/settings_storage.dart';
 import 'package:animeko_flutter/domain/settings/proxy_settings_controller.dart';
+import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:riverpod/riverpod.dart';
@@ -163,6 +166,41 @@ void main() {
       );
     });
   });
+
+  group('directHttpClientAdapter', () {
+    test('bypasses a global proxy override', () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(server.close);
+      unawaited(
+        server.forEach((request) {
+          request.response.write('#EXTM3U\n#EXTINF:1,\nseg.ts');
+          request.response.close();
+        }),
+      );
+      final loopbackUrl = 'http://127.0.0.1:${server.port}/playlist.m3u8';
+
+      await HttpOverrides.runWithHttpOverrides(() async {
+        final direct = Dio()..httpClientAdapter = directHttpClientAdapter();
+        final response = await direct.get<String>(loopbackUrl);
+        expect(response.data, contains('#EXTM3U'));
+
+        final plain = Dio();
+        await expectLater(
+          plain.get<String>(loopbackUrl),
+          throwsA(isA<DioException>()),
+        );
+      }, _ProxyEverything());
+    });
+  });
+
+  group('downloadDirectDioProvider', () {
+    test('is configured with the direct-connection adapter', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final dio = container.read(downloadDirectDioProvider);
+      expect(dio.httpClientAdapter, isA<IOHttpClientAdapter>());
+    });
+  });
 }
 
 /// Captures the `findProxy` callback that [ProxyHttpOverrides] installs.
@@ -176,4 +214,10 @@ class _RecordingHttpClient implements HttpClient {
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _ProxyEverything extends HttpOverrides {
+  @override
+  HttpClient createHttpClient(SecurityContext? context) =>
+      super.createHttpClient(context)..findProxy = (_) => 'PROXY 127.0.0.1:1';
 }

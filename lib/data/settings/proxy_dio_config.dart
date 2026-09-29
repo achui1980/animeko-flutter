@@ -1,9 +1,13 @@
 // lib/data/settings/proxy_dio_config.dart
 import 'dart:io';
 
+import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../domain/settings/proxy_settings_controller.dart';
+
+part 'proxy_dio_config.g.dart';
 
 /// Pure decision function for [HttpClient.findProxy]. Kept separate from
 /// [ProxyHttpOverrides] so it can be unit-tested without a real [HttpClient]
@@ -91,6 +95,16 @@ class ProxyHttpOverrides extends HttpOverrides {
   }
 }
 
+/// Builds a Dio [IOHttpClientAdapter] whose underlying [HttpClient] always
+/// forces `findProxy` to `'DIRECT'`, unconditionally bypassing whatever
+/// [HttpOverrides.global] set (e.g. [ProxyHttpOverrides]). Used for CDNs
+/// that only work when accessed directly -- see
+/// `MediaPlaybackSource.prefersDirectConnection` on `AgedmPlaybackSource`
+/// and `OmofunPlaybackSource`.
+IOHttpClientAdapter directHttpClientAdapter() => IOHttpClientAdapter(
+  createHttpClient: () => HttpClient()..findProxy = (_) => 'DIRECT',
+);
+
 /// Installs [ProxyHttpOverrides] process-wide, backed by [container]'s
 /// [proxySettingsControllerProvider].
 ///
@@ -104,3 +118,15 @@ void installProxyHttpOverrides(ProviderContainer container) {
     () => container.read(proxySettingsControllerProvider).value,
   );
 }
+
+const _directDownloadUserAgent =
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 '
+    '(KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36';
+
+/// A [Dio] instance for the download pipeline that bypasses the user's
+/// configured proxy, for use with MediaPlaybackSource candidates whose
+/// `prefersDirectConnection` is `true`.
+@riverpod
+Dio downloadDirectDio(Ref ref) =>
+    Dio(BaseOptions(headers: {'User-Agent': _directDownloadUserAgent}))
+      ..httpClientAdapter = directHttpClientAdapter();

@@ -1,9 +1,7 @@
-import 'dart:io';
-
 import 'package:dio/dio.dart';
-import 'package:dio/io.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../settings/proxy_dio_config.dart';
 import 'm3u8_line_prober.dart';
 import 'omofun_models.dart';
 
@@ -82,12 +80,6 @@ class OmofunApi {
     }
   }
 }
-
-/// An adapter whose clients never use a proxy, overriding whatever
-/// `HttpOverrides.global` (the app proxy setting) configured.
-IOHttpClientAdapter directHttpClientAdapter() => IOHttpClientAdapter(
-  createHttpClient: () => HttpClient()..findProxy = (_) => 'DIRECT',
-);
 
 @riverpod
 Dio omofunDio(Ref ref) => Dio(
