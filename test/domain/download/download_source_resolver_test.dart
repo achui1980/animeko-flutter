@@ -41,10 +41,10 @@ void main() {
       final options = resolveDownloadOptions(merged);
 
       expect(options.single.preferred!.sourceId, 'anime1');
-      expect(
-        options.single.candidates.map((c) => c.sourceId),
-        ['anime1', 'xifan'],
-      );
+      expect(options.single.candidates.map((c) => c.sourceId), [
+        'anime1',
+        'xifan',
+      ]);
     });
 
     test('an episode with only xifan is still downloadable', () {
@@ -59,6 +59,29 @@ void main() {
 
       expect(options.single.isDownloadable, isTrue);
       expect(options.single.preferred!.sourceId, 'agedm');
+    });
+
+    test('an episode with only omofun is downloadable', () {
+      final options = resolveDownloadOptions([_e('omofun', '第1集')]);
+      expect(options.single.isDownloadable, isTrue);
+      expect(options.single.preferred!.sourceId, 'omofun');
+    });
+
+    test('prefers agedm over omofun when both are available', () {
+      final options = resolveDownloadOptions([
+        _e('omofun', '第1集'),
+        _e('agedm', '第1集'),
+      ]);
+      expect(options.single.preferred!.sourceId, 'agedm');
+    });
+
+    test('prefers omofun over a non-downloadable source like mikan', () {
+      final options = resolveDownloadOptions([
+        _e('mikan', '第1集'),
+        _e('omofun', '第1集'),
+      ]);
+      expect(options.single.isDownloadable, isTrue);
+      expect(options.single.preferred!.sourceId, 'omofun');
     });
 
     test('an episode available on no HTTP source is not downloadable', () {

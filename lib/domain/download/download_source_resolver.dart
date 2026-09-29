@@ -6,7 +6,7 @@ import '../play/subject_episodes_controller.dart';
 /// allow-list (`lib/data/download/download_worker.dart`) -- BT/RSS sources
 /// (e.g. `'mikan'`) are deliberately excluded (see the design spec's
 /// explicit out-of-scope list).
-const downloadableSourcePriority = ['anime1', 'xifan', 'agedm'];
+const downloadableSourcePriority = ['anime1', 'xifan', 'agedm', 'omofun'];
 
 /// One episode (identified by [title], the join key across sources --
 /// mirrors how `EpisodeNumberGrid` already groups [MergedEpisode]s) and
@@ -40,9 +40,7 @@ int _priorityOf(String sourceId) {
 /// function -- no network, no Flutter import -- shared by the episode
 /// selection tab, batch "download selected", the player's single-episode
 /// download button, and `DownloadQueueController.retry`.
-List<EpisodeDownloadOption> resolveDownloadOptions(
-  List<MergedEpisode> merged,
-) {
+List<EpisodeDownloadOption> resolveDownloadOptions(List<MergedEpisode> merged) {
   final byTitle = <String, List<MergedEpisode>>{};
   for (final episode in merged) {
     byTitle.putIfAbsent(episode.title, () => []).add(episode);
@@ -51,12 +49,15 @@ List<EpisodeDownloadOption> resolveDownloadOptions(
       .map(
         (entry) => EpisodeDownloadOption(
           title: entry.key,
-          candidates: entry.value
-              .where(
-                (e) => downloadableSourcePriority.contains(e.sourceId),
-              )
-              .toList()
-            ..sort((a, b) => _priorityOf(a.sourceId).compareTo(_priorityOf(b.sourceId))),
+          candidates:
+              entry.value
+                  .where((e) => downloadableSourcePriority.contains(e.sourceId))
+                  .toList()
+                ..sort(
+                  (a, b) => _priorityOf(
+                    a.sourceId,
+                  ).compareTo(_priorityOf(b.sourceId)),
+                ),
         ),
       )
       .toList();
@@ -72,13 +73,16 @@ MergedEpisode? resolvePreferredDownloadSource(
   List<MergedEpisode> merged,
   String episodeTitle,
 ) {
-  final matches = merged
-      .where(
-        (e) =>
-            e.title == episodeTitle &&
-            downloadableSourcePriority.contains(e.sourceId),
-      )
-      .toList()
-    ..sort((a, b) => _priorityOf(a.sourceId).compareTo(_priorityOf(b.sourceId)));
+  final matches =
+      merged
+          .where(
+            (e) =>
+                e.title == episodeTitle &&
+                downloadableSourcePriority.contains(e.sourceId),
+          )
+          .toList()
+        ..sort(
+          (a, b) => _priorityOf(a.sourceId).compareTo(_priorityOf(b.sourceId)),
+        );
   return matches.isEmpty ? null : matches.first;
 }
