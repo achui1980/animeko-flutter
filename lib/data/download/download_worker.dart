@@ -147,7 +147,8 @@ class DownloadWorker {
   void enqueue(DownloadRequest request) {
     if (request.sourceId != 'anime1' &&
         request.sourceId != 'xifan' &&
-        request.sourceId != 'agedm') {
+        request.sourceId != 'agedm' &&
+        request.sourceId != 'omofun') {
       unawaited(_failUnsupportedSource(request));
       return;
     }

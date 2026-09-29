@@ -336,6 +336,28 @@ void main() {
     expect(await repository.findCompleted(request.episodeKey), isNotNull);
   });
 
+  test('accepts an OmoFun download request', () async {
+    final worker = DownloadWorker(
+      dio: _dio({
+        'https://cdn.example/omofun.mp4': const _HttpResponse(
+          statusCode: 200,
+          body: [1, 2, 3],
+          headers: {'content-length': '3'},
+        ),
+      }),
+      sourceForId: (_) => _Source('omofun', const [
+        _PlaybackSource('https://cdn.example/omofun.mp4'),
+      ]),
+      repository: repository,
+    );
+    final request = _request('omofun', 1, downloadRoot: root.path);
+
+    worker.enqueue(request);
+    await worker.whenIdle;
+
+    expect(await repository.findCompleted(request.episodeKey), isNotNull);
+  });
+
   test(
     'uses directDio for candidates that prefer a direct connection',
     () async {
