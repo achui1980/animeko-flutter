@@ -249,9 +249,12 @@ void main() {
         'hls_downloader_test_',
       );
       addTearDown(() => targetDirectory.delete(recursive: true));
+      // A valid AES-128 key is always exactly 16 bytes -- the sentinel
+      // below is 16 bytes so it's treated as "already downloaded".
+      final sentinelKey = List<int>.filled(16, 42);
       await File(
         '${targetDirectory.path}/key_0000.key',
-      ).writeAsBytes(<int>[42, 42]);
+      ).writeAsBytes(sentinelKey);
 
       await HlsDownloader(dio).download(
         manifestUrl: Uri.parse('https://cdn.example/episode/playlist.m3u8'),
@@ -260,7 +263,7 @@ void main() {
 
       expect(
         await File('${targetDirectory.path}/key_0000.key').readAsBytes(),
-        <int>[42, 42],
+        sentinelKey,
       );
     },
   );

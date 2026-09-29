@@ -12,9 +12,17 @@ class HlsDownloadResult {
 
 final _keyUriPattern = RegExp(r'URI="([^"]*)"');
 
+/// AES-128 keys are always exactly 16 bytes. Used to validate a
+/// previously-downloaded key file rather than just checking it's
+/// non-empty, so a key truncated by an abrupt process kill mid-write
+/// gets re-downloaded instead of being silently reused for decryption.
+const _aes128KeyLengthBytes = 16;
+
 /// Downloads the AES-128 key referenced by a `#EXT-X-KEY` line (if any)
 /// and returns the rewritten line pointing at the local key file, or
 /// `null` if [line] isn't a `#EXT-X-KEY` line or has no `URI=` attribute.
+/// If a valid (exactly 16-byte) key file already exists locally, it is
+/// left untouched and not re-downloaded.
 ///
 /// OmoFun's HLS streams are AES-128 encrypted with a fixed all-zero IV
 /// (confirmed by hand against a live stream during design -- the key
@@ -33,9 +41,9 @@ Future<String?> _rewriteKeyLine(
   final match = _keyUriPattern.firstMatch(line);
   if (match == null) return null;
   final keyUri = playlistUrl.resolve(match.group(1)!);
-  final keyFile = File('${targetDirectory.path}/key_0000.key');
+  final keyFile = File(p.join(targetDirectory.path, 'key_0000.key'));
   final alreadyDownloaded =
-      await keyFile.exists() && await keyFile.length() > 0;
+      await keyFile.exists() && await keyFile.length() == _aes128KeyLengthBytes;
   if (!alreadyDownloaded) {
     await dio.downloadUri(
       keyUri,
