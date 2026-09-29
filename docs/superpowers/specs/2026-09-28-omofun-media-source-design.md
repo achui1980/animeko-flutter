@@ -11,6 +11,23 @@
 - 只做在线播放。不接入离线下载，所以 `downloadableSourcePriority` 和 `download_worker.dart` 的允许列表都不改。
 - 不做多域名切换。基址写成常量 `https://omofun.in`（站点公告说最新域名是 omofun.tv，以后需要时再加）。
 - 不做通用的网页选择器系统，仍沿用“每个站点手写一个抓取器”的现有做法。
+- 不支持剧场版/电影页面（见下方“已知限制”）。
+
+## 已知限制（2026-09-29 补充）
+
+omofun 对“剧场版/电影”类条目用的详情页选集结构和电视动画不一样：
+
+- 电视动画（如芙莉莲）：`/vod/play/<vodId>/ep<N>.html`（`parseOmofunEpisodes` 按此格式解析）。
+- 电影（如《名侦探柯南 高速公路的堕天使》，vodId `2026341892`）：`/vod/play/<vodId>/movie.html?vod=<变体>`，
+  例如 `?vod=ep720p`、`?vod=qiang_xian_ban`（枪版）、`?vod=tc`（台配）、`?vod=zheng_pian`（正片）——
+  这些看起来是同一部电影的不同版本/清晰度，不是顺序剧集。
+
+当前实现的正则是锚定在 `ep(\d+)\.html` 上的，遇到电影页面会匹配不到任何链接，`parseOmofunEpisodes` 静默返回空列表。
+效果：该条目在 OmoFun 这个源上显示“暂无播放源”，但不会抛异常、不会影响其他已注册的数据源（anime1/xifan/agedm/mikan）对同一条目的播放。
+
+用户决定：暂不实现电影支持（2026-09-29 决定，跳过）。如果以后要做，需要先确认电影播放页对应的 `_dyn_plays` 端点路径
+（可能是 `/_dyn_plays/<vodId>/movie` 或按变体区分），并决定“多个 `vod=` 变体”要建模成一个 episode 的多条播放线路，
+还是拆成多个 episode。
 
 ## 站点分析（2026-09-28 用 curl 验证）
 
