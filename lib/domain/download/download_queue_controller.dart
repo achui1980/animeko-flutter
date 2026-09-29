@@ -5,6 +5,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../data/download/download_worker.dart';
 import '../../data/download/downloaded_episode_repository.dart';
+import '../../data/settings/proxy_dio_config.dart';
 import '../media/media_registry.dart';
 import '../play/subject_episodes_controller.dart';
 import '../settings/download_settings_controller.dart';
@@ -62,6 +63,7 @@ class DownloadQueueController extends _$DownloadQueueController {
     _repository = ref.read(downloadedEpisodeRepositoryProvider);
     _worker = DownloadWorker(
       dio: ref.read(downloadDioProvider),
+      directDio: ref.read(downloadDirectDioProvider),
       sourceForId: (id) => sources.firstWhere((source) => source.id == id),
       repository: _repository,
     );

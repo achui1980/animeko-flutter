@@ -101,6 +101,7 @@ enum _AttemptResult { done, stalledRetry }
 class DownloadWorker {
   DownloadWorker({
     required Dio dio,
+    Dio? directDio,
     required MediaSource Function(String sourceId) sourceForId,
     required DownloadedEpisodeRepository repository,
     this.stallTimeout = const Duration(seconds: 30),
@@ -108,11 +109,13 @@ class DownloadWorker {
     this.stallCheckInterval = const Duration(seconds: 1),
     DateTime Function() now = DateTime.now,
   }) : _dio = dio,
+       _directDio = directDio ?? dio,
        _sourceForId = sourceForId,
        _repository = repository,
        _now = now;
 
   final Dio _dio;
+  final Dio _directDio;
   final MediaSource Function(String) _sourceForId;
   final DownloadedEpisodeRepository _repository;
   final DateTime Function() _now;
@@ -340,15 +343,22 @@ class DownloadWorker {
       final localPath = isHls
           ? p.join(directory.path, 'playlist.m3u8')
           : p.join(directory.path, 'video.mp4');
+      final activeDio = selected.prefersDirectConnection ? _directDio : _dio;
       final size = isHls
-          ? (await HlsDownloader(_dio).download(
+          ? (await HlsDownloader(activeDio).download(
               manifestUrl: Uri.parse(url),
               targetDirectory: directory,
               headers: selected.headers,
               cancelToken: _cancelToken,
               onProgress: onProgress,
             )).fileSizeBytes
-          : await _downloadFile(url, localPath, selected.headers, onProgress);
+          : await _downloadFile(
+              url,
+              localPath,
+              selected.headers,
+              onProgress,
+              dio: activeDio,
+            );
       await _repository.upsert(
         DownloadedEpisodeWrite(
           sourceId: request.sourceId,
@@ -424,9 +434,10 @@ class DownloadWorker {
     String url,
     String path,
     Map<String, String> headers,
-    void Function(int received, int total) onProgress,
-  ) async {
-    final response = await _dio.download(
+    void Function(int received, int total) onProgress, {
+    required Dio dio,
+  }) async {
+    final response = await dio.download(
       url,
       path,
       cancelToken: _cancelToken,

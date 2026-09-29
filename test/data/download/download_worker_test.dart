@@ -34,6 +34,16 @@ class _PlaybackSource extends MediaPlaybackSource {
   Future<String> prepare() => onPrepare?.call() ?? super.prepare();
 }
 
+class _DirectPlaybackSource extends MediaPlaybackSource {
+  const _DirectPlaybackSource(this.url);
+  @override
+  final String url;
+  @override
+  Map<String, String> get headers => const {};
+  @override
+  bool get prefersDirectConnection => true;
+}
+
 class _Source implements MediaSource {
   _Source(this.id, this.playbackSources, {this.onResolve});
 
@@ -327,27 +337,52 @@ void main() {
   });
 
   test(
-    'fails with a friendly message when sourceForId finds no registered '
-    'source for the request (design doc 5.3 -- no longer an uncaught '
-    'StateError)',
+    'uses directDio for candidates that prefer a direct connection',
     () async {
-      final events = <DownloadEvent>[];
+      final directDio = _dio({
+        'https://cdn.example/direct.mp4': const _HttpResponse(
+          statusCode: 200,
+          body: [1, 2, 3],
+          headers: {'content-length': '3'},
+        ),
+      });
+      final regularDio = _dio({});
       final worker = DownloadWorker(
-        dio: _dio({}),
-        sourceForId: (_) => throw StateError('No element'),
+        dio: regularDio,
+        directDio: directDio,
+        sourceForId: (_) => _Source('agedm', const [
+          _DirectPlaybackSource('https://cdn.example/direct.mp4'),
+        ]),
         repository: repository,
-      )..events.listen(events.add);
-      final request = _request('anime1', 1, downloadRoot: root.path);
+      );
+      final request = _request('agedm', 1, downloadRoot: root.path);
 
       worker.enqueue(request);
       await worker.whenIdle;
 
-      final record = await repository.findByKey(request.episodeKey);
-      expect(record!.status, DownloadStatus.failed.name);
-      expect(record.errorMessage, '来源已不可用');
-      expect(events.whereType<DownloadFailed>().single.message, '来源已不可用');
+      expect(await repository.findCompleted(request.episodeKey), isNotNull);
     },
   );
+
+  test('fails with a friendly message when sourceForId finds no registered '
+      'source for the request (design doc 5.3 -- no longer an uncaught '
+      'StateError)', () async {
+    final events = <DownloadEvent>[];
+    final worker = DownloadWorker(
+      dio: _dio({}),
+      sourceForId: (_) => throw StateError('No element'),
+      repository: repository,
+    )..events.listen(events.add);
+    final request = _request('anime1', 1, downloadRoot: root.path);
+
+    worker.enqueue(request);
+    await worker.whenIdle;
+
+    final record = await repository.findByKey(request.episodeKey);
+    expect(record!.status, DownloadStatus.failed.name);
+    expect(record.errorMessage, '来源已不可用');
+    expect(events.whereType<DownloadFailed>().single.message, '来源已不可用');
+  });
 
   test('prefers an MP4 candidate for a Xifan request', () async {
     final events = <DownloadEvent>[];
