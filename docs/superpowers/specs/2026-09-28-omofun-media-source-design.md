@@ -8,7 +8,7 @@
 把 omofun.in 接入为一个新的在线播放媒体源（id `omofun`，显示名 `OmoFun`）。
 
 **范围**
-- 只做在线播放。不接入离线下载，所以 `downloadableSourcePriority` 和 `download_worker.dart` 的允许列表都不改。
+- v1（2026-09-28）只做在线播放，不接入离线下载。**2026-09-29 补充**：离线下载支持已设计并加入范围，见下方“离线下载支持（2026-09-29 补充）”一节。
 - 不做多域名切换。基址写成常量 `https://omofun.in`（站点公告说最新域名是 omofun.tv，以后需要时再加）。
 - 不做通用的网页选择器系统，仍沿用“每个站点手写一个抓取器”的现有做法。
 - 不支持剧场版/电影页面（见下方“已知限制”）。
@@ -137,3 +137,54 @@ dio 配置：
 
 - `flutter analyze` 没有新增错误；`flutter test` 全部通过。
 - 手动运行 `flutter run -d macos`：《葬送的芙莉莲》第 1 集能通过 OmoFun 播放，线路列表里只出现存活线路。
+
+## 离线下载支持（2026-09-29 补充）
+
+在线播放功能上线后用户要求补充离线下载。调研发现 OmoFun 的 HLS 流是 AES-128 加密的（固定全零 IV，key 不轮换/不过期），且现有下载管线（`lib/data/download/hls_downloader.dart`、`lib/data/download/download_worker.dart`）完全没有下载/改写加密 key 文件的能力，也完全不读取 `MediaPlaybackSource.prefersDirectConnection`（这个字段目前只被 libmpv 在线播放路径用到）。因此这不是简单地把 `omofun` 加进允许列表就能完事，需要三处配套改动。同时发现 `agedm`（同样 `prefersDirectConnection == true`）在下载路径里也有一样的直连缺口，属于既有 bug，本次一并修复（不局限于 omofun）。
+
+### §1 HlsDownloader 支持 AES-128 key 下载与改写
+
+文件：`lib/data/download/hls_downloader.dart`
+
+- 在已经确定的媒体播放列表文本（可能是从主播放列表跳转过来的那个变体）里，解析形如 `#EXT-X-KEY:METHOD=AES-128,URI="enc.key",IV=0x...` 的行。
+- 如果存在这样的行：把 `URI="<uri>"` 里的地址相对当前播放列表 URL 解析成绝对地址，用和分片相同的 `headers` 下载，保存到本地（例如 `key_0000.key`，和 `segment_NNNN.ts` 放在同一目录）。
+- 改写这一行，把 `URI="<uri>"` 换成 `URI="key_0000.key"`，`METHOD=`/`IV=` 等其它属性原样保留（`IV` 是解密必需的）。
+- 没有 `#EXT-X-KEY` 行的情况（现有 anime1/xifan/agedm 播放列表）：这段逻辑不会触发，完全向后兼容。
+- key 下载失败：走现有 `DownloadWorker` 的失败/`failed` 记录路径，不需要新的特殊处理。
+- 本地已存在非空的 key 文件：跳过重新下载（和现有分片的“断点续传跳过”逻辑一致）。
+
+### §2 共享的直连 Dio + DownloadWorker 接入
+
+- 把 `directHttpClientAdapter()`（目前只在 `lib/data/omofun/omofun_api.dart:88-90`）搬到 `lib/data/settings/proxy_dio_config.dart`（这个文件本来就放 `decideProxy()`/`ProxyHttpOverrides`/`installProxyHttpOverrides()`，是网络配置的自然归属地）。`omofun_api.dart` 改成从新位置 import，行为不变。
+- 在 `proxy_dio_config.dart` 新增 `@riverpod Dio downloadDirectDio(Ref ref)`：桌面 UA + 15s 超时（和 `downloadDio` 一致）+ `directHttpClientAdapter()`。
+- `DownloadWorker` 构造函数新增 `directDio` 参数（和现有的 `dio` 并存）。在 `_attempt()` 里，解析出 `selected`（最终选中的 `MediaPlaybackSource`）之后，如果 `selected.prefersDirectConnection == true`，就把 `directDio` 而不是默认的 `dio` 传给 `HlsDownloader`/`_downloadFile`。
+- `DownloadQueueController` 相应改成同时用 `dio: ref.read(downloadDioProvider)` 和 `directDio: ref.read(downloadDirectDioProvider)` 构造 `DownloadWorker`。
+- 效果：`agedm` 和 `omofun` 的下载都会绕过用户配置的全局代理，和它们在线播放时的行为（`_configureProxy()` 清空 libmpv 代理）保持一致。
+
+### §3 mpv 侧支持播放本地加密 HLS（demuxer 开关）
+
+文件：`lib/ui/player/player_screen.dart`
+
+问题（已用真实 mpv 验证）：本地 `.m3u8`（即使已经正确改写）默认会被 mpv 自带的“文件列表播放列表”解析器接管，尝试把每个仍处于加密状态的 `.ts` 当独立媒体文件打开，失败。即使强制走 `--demuxer=lavf`，ffmpeg 的 `allowed_extensions` 白名单也会拒绝打开本地 `.key` 文件。
+
+验证过的修复：只需设置 mpv 属性 `demuxer-lavf-o=allowed_extensions=ALL`（不需要额外强制 `--demuxer=lavf`），mpv 的默认探测就会正确选中 lavf/HLS 解封装器，并允许打开本地 key 文件。（已用 `mpv --no-config --vo=null --ao=null --length=3 --demuxer-lavf-o=allowed_extensions=ALL playlist.m3u8` 实测：正常输出 AV 进度并正常 EOF 退出。）
+
+改动：仿照现有 `_configureProxy()`（第 272-296 行，按 `prefersDirectConnection`/回环地址决定是否清空 `http-proxy`）的模式，新增一个只在打开本地下载文件时才生效的开关：
+
+- 判断“是本地下载文件”的依据：复用已有的 `LocalFilePlaybackSource` 类型判断（标签 `本地下载`），不判断具体 source id——这样以后任何加密离线源都能自动受益。
+- 打开本地下载源时：`NativePlayer.setProperty('demuxer-lavf-o', 'allowed_extensions=ALL')`。
+- 打开任何其它（网络）候选源时：重置为空字符串 `''`（mpv 默认值），和 `_configureProxy()` 每次切换候选源都重新设置的写法一致。
+- 理由：把“允许任意扩展名”这个会轻微弱化 ffmpeg 本地文件读取保护的开关，严格限定在“我们自己下载生成的本地文件”场景，不影响正常在线播放未知来源 m3u8 时的安全边界。
+
+### §4 允许列表更新与测试
+
+改动：
+- `lib/domain/download/download_source_resolver.dart:9`：`downloadableSourcePriority` 追加 `'omofun'` → `['anime1', 'xifan', 'agedm', 'omofun']`（排最后，优先级最低）。
+- `lib/data/download/download_worker.dart:144-150`：`enqueue()` 的硬编码判断加入 `omofun`。
+
+测试（沿用现有各文件的既有测试风格，不引入新的 mocking 库）：
+1. `test/domain/download/download_source_resolver_test.dart`：新增 omofun-only 可下载、omofun 在 anime1/xifan/agedm 都存在时优先级最低、omofun 优先于非允许列表源（如 mikan）等用例，镜像现有 agedm 用例（第 57-62 行）。
+2. `test/data/download/hls_downloader_test.dart`：新增含 `#EXT-X-KEY` 的播放列表用例——key 被下载到本地文件、本地播放列表里 `URI=` 被重写为本地文件名、`METHOD=`/`IV=` 保持原样；key 下载失败时的错误传播；已存在 key 文件时跳过重复下载。沿用现有 `_FakeAdapter`（按 URL 精确匹配）风格。
+3. `test/data/settings/proxy_dio_config_test.dart`：把原来在 `omofun_api_test.dart` 里的“绕过全局代理”回环 HttpServer 集成测试搬到这里（针对搬迁后的 `directHttpClientAdapter()`），并新增 `downloadDirectDioProvider` 的等效验证。`omofun_api_test.dart` 相应精简，改为 import 新位置的函数。
+4. `test/data/download/download_worker_test.dart`：新增“accepts an OmoFun download request”用例（镜像第 307-327 行现有 agedm 用例），并新增一个用例验证 `prefersDirectConnection=true` 的候选源确实使用了 `directDio`（例如给 `directDio` 单独一个 fake adapter，断言走的是这个而不是默认 dio 的 adapter）。
+5. **手动验证**（无法自动化）：`flutter run -d macos`，用 OmoFun 源下载《葬送的芙莉莲》第 1 集，确认下载成功、离线播放正常（画面+声音），且过程不受本机代理设置影响。
