@@ -16,6 +16,7 @@ import '../../data/download/downloaded_episode_repository.dart';
 import '../../data/play/playback_position_storage.dart';
 import '../../domain/download/download_queue_controller.dart';
 import '../../domain/download/download_source_resolver.dart';
+import '../../domain/download/local_file_playback_source.dart';
 import '../../domain/media/media_registry.dart';
 import '../../domain/media/media_source.dart';
 import '../../domain/play/episode_play_controller.dart';
@@ -282,6 +283,22 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final proxyUrl = await ref.read(proxySettingsControllerProvider.future);
     if (proxyUrl == null || proxyUrl.isEmpty) return;
     await platform.setProperty('http-proxy', proxyUrl);
+  }
+
+  /// Relaxes ffmpeg's local-file-read whitelist so mpv's HLS demuxer can
+  /// open a key file saved alongside a downloaded playlist (see
+  /// `HlsDownloader`'s `#EXT-X-KEY` handling). Scoped to only apply when
+  /// opening a [LocalFilePlaybackSource] -- never for network playback of
+  /// a third-party-hosted m3u8, since this option weakens a security
+  /// boundary and downloaded files are the only ones this app writes
+  /// (and therefore fully trusts) itself.
+  Future<void> _configureDemuxerOptions(MediaPlaybackSource source) async {
+    final platform = _player.platform;
+    if (platform is! NativePlayer) return;
+    await platform.setProperty(
+      'demuxer-lavf-o',
+      source is LocalFilePlaybackSource ? 'allowed_extensions=ALL' : '',
+    );
   }
 
   /// Whether [url]'s host is a loopback address. Used to detect BT
@@ -608,6 +625,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     if (mounted) setState(() => _isBuffering = true);
     final playableUrl = await source.prepare();
     await _configureProxy(source, playableUrl);
+    await _configureDemuxerOptions(source);
     await _player.open(Media(playableUrl, httpHeaders: source.headers));
     final speed = await ref.read(playbackSpeedControllerProvider.future);
     await _player.setRate(speed);
