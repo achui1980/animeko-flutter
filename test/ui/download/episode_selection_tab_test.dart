@@ -3,6 +3,7 @@ import 'package:animeko_flutter/data/local_database.dart';
 import 'package:animeko_flutter/domain/download/download_queue_controller.dart';
 import 'package:animeko_flutter/domain/media/media_source.dart';
 import 'package:animeko_flutter/domain/play/subject_episodes_controller.dart';
+import 'package:animeko_flutter/ui/download/download_source_picker_sheet.dart';
 import 'package:animeko_flutter/ui/download/episode_selection_tab.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -66,14 +67,21 @@ void main() {
     episode: _FakeEpisode('mikan', '第3集'),
     sourceId: 'mikan',
   );
+  // Two competing downloadable sources for the same episode title, so the
+  // picker sheet has something to choose between. `downloadableSourcePriority`
+  // ranks xifan above agedm, so xifan is the auto-`preferred` choice.
+  const xifanEp1 = MergedEpisode(
+    episode: _FakeEpisode('xifan', '第1集'),
+    sourceId: 'xifan',
+  );
+  const agedmEp1 = MergedEpisode(
+    episode: _FakeEpisode('agedm', '第1集'),
+    sourceId: 'agedm',
+  );
 
   Future<_RecordingQueueController> pumpTab(
     WidgetTester tester, {
-    List<MergedEpisode> episodes = const [
-      anime1Ep1,
-      anime1Ep2,
-      mikanEp3,
-    ],
+    List<MergedEpisode> episodes = const [anime1Ep1, anime1Ep2, mikanEp3],
     Map<String, DownloadQueueItem> queueItems = const {},
   }) async {
     late _RecordingQueueController queue;
@@ -192,4 +200,68 @@ void main() {
 
     expect(find.text('已选 0 集'), findsOneWidget);
   });
+
+  testWidgets('a single-source episode label is not tappable', (tester) async {
+    await pumpTab(tester);
+
+    // anime1Ep1 has exactly one candidate, so tapping its source label must
+    // not open the picker sheet.
+    await tester.tap(find.text('anime1').first);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(DownloadSourcePickerSheet), findsNothing);
+  });
+
+  testWidgets('tapping a multi-source label opens the picker sheet', (
+    tester,
+  ) async {
+    await pumpTab(tester, episodes: const [xifanEp1, agedmEp1]);
+
+    await tester.tap(find.text('xifan / agedm'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(DownloadSourcePickerSheet), findsOneWidget);
+    expect(find.text('xifan'), findsWidgets);
+    expect(find.text('agedm'), findsOneWidget);
+  });
+
+  testWidgets('downloads the auto-preferred source when no manual override '
+      'is made', (tester) async {
+    final queue = await pumpTab(tester, episodes: const [xifanEp1, agedmEp1]);
+
+    // xifan/agedm both list this title, so the label is tappable, but we
+    // don't tap it here -- the download must fall back to
+    // EpisodeDownloadOption.preferred, which ranks xifan first.
+    await tester.tap(find.byType(Checkbox).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('下载选中 1 集'));
+    await tester.pumpAndSettle();
+
+    expect(queue.enqueued.single.sourceId, 'xifan');
+  });
+
+  testWidgets(
+    'tapping the source label and choosing agedm downloads from agedm '
+    'instead of the auto-preferred xifan',
+    (tester) async {
+      final queue = await pumpTab(tester, episodes: const [xifanEp1, agedmEp1]);
+
+      await tester.tap(find.byType(Checkbox).first);
+      await tester.pumpAndSettle();
+
+      // Open the picker sheet by tapping the source label.
+      await tester.tap(find.text('xifan / agedm'));
+      await tester.pumpAndSettle();
+
+      // Pick agedm from the sheet (its ListTile's Text data is exactly
+      // 'agedm', unlike the label's 'xifan / agedm').
+      await tester.tap(find.text('agedm'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('下载选中 1 集'));
+      await tester.pumpAndSettle();
+
+      expect(queue.enqueued.single.sourceId, 'agedm');
+    },
+  );
 }

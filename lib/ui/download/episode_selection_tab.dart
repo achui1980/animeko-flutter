@@ -5,6 +5,7 @@ import '../../data/download/downloaded_episode_repository.dart';
 import '../../domain/download/download_queue_controller.dart';
 import '../../domain/download/download_source_resolver.dart';
 import '../../domain/play/subject_episodes_controller.dart';
+import 'download_source_picker_sheet.dart';
 
 /// One tab of [DownloadPanel]: every episode of one subject, with a
 /// checkbox per downloadable episode and a primary "下载选中 N 集" action.
@@ -30,6 +31,12 @@ class EpisodeSelectionTab extends ConsumerStatefulWidget {
 class _EpisodeSelectionTabState extends ConsumerState<EpisodeSelectionTab> {
   final _selected = <String>{};
 
+  /// Manual per-episode source override, keyed by episode title. Not
+  /// persisted -- resets when this tab is recreated. Falls back to
+  /// [EpisodeDownloadOption.preferred] (the auto-priority choice) for any
+  /// title not present here.
+  final _sourceOverride = <String, MergedEpisode>{};
+
   @override
   Widget build(BuildContext context) {
     final episodesAsync = ref.watch(
@@ -50,8 +57,7 @@ class _EpisodeSelectionTabState extends ConsumerState<EpisodeSelectionTab> {
             Expanded(
               child: ListView.builder(
                 itemCount: options.length,
-                itemBuilder: (context, index) =>
-                    _row(options[index], queue),
+                itemBuilder: (context, index) => _row(options[index], queue),
               ),
             ),
             _bottomBar(options, queue),
@@ -61,17 +67,22 @@ class _EpisodeSelectionTabState extends ConsumerState<EpisodeSelectionTab> {
     );
   }
 
-  Widget _row(EpisodeDownloadOption option, Map<String, DownloadQueueItem> queue) {
+  Widget _row(
+    EpisodeDownloadOption option,
+    Map<String, DownloadQueueItem> queue,
+  ) {
+    final effective = _sourceOverride[option.title] ?? option.preferred;
     final downloadedAsync = option.preferred == null
         ? null
         : ref.watch(
             downloadedEpisodeForEpisodeProvider(widget.subjectId, option.title),
           );
     final isDownloaded = downloadedAsync?.value ?? false;
-    final queueItem = option.preferred == null
+    final queueItem = effective == null
         ? null
-        : queue['${widget.subjectId}::${option.preferred!.sourceId}::${option.title}'];
-    final isDownloading = queueItem != null &&
+        : queue['${widget.subjectId}::${effective.sourceId}::${option.title}'];
+    final isDownloading =
+        queueItem != null &&
         (queueItem.status == DownloadQueueStatus.queued ||
             queueItem.status == DownloadQueueStatus.downloading);
     final selectable = option.isDownloadable && !isDownloaded && !isDownloading;
@@ -89,6 +100,7 @@ class _EpisodeSelectionTabState extends ConsumerState<EpisodeSelectionTab> {
     }
 
     final sourceLabel = option.candidates.map((e) => e.sourceId).join(' / ');
+    final canPickSource = option.candidates.length > 1;
 
     return CheckboxListTile(
       value: _selected.contains(option.title),
@@ -104,7 +116,20 @@ class _EpisodeSelectionTabState extends ConsumerState<EpisodeSelectionTab> {
       title: Text(option.title),
       subtitle: Row(
         children: [
-          if (option.isDownloadable) Text(sourceLabel),
+          if (option.isDownloadable)
+            canPickSource
+                ? InkWell(
+                    onTap: () => _pickSource(option, effective!),
+                    child: Text(
+                      sourceLabel,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        decoration: TextDecoration.underline,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                  )
+                : Text(sourceLabel),
           if (trailingText != null) ...[
             if (option.isDownloadable) const Text(' · '),
             Text(
@@ -119,15 +144,31 @@ class _EpisodeSelectionTabState extends ConsumerState<EpisodeSelectionTab> {
     );
   }
 
+  void _pickSource(EpisodeDownloadOption option, MergedEpisode current) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (context) => DownloadSourcePickerSheet(
+        candidates: option.candidates,
+        current: current,
+        onSelect: (chosen) {
+          setState(() => _sourceOverride[option.title] = chosen);
+          Navigator.of(context).pop();
+        },
+      ),
+    );
+  }
+
   Widget _bottomBar(
     List<EpisodeDownloadOption> options,
     Map<String, DownloadQueueItem> queue,
   ) {
     bool selectableNow(EpisodeDownloadOption option) {
       if (!option.isDownloadable) return false;
+      final effective = _sourceOverride[option.title] ?? option.preferred!;
       final queueItem =
-          queue['${widget.subjectId}::${option.preferred!.sourceId}::${option.title}'];
-      final isDownloading = queueItem != null &&
+          queue['${widget.subjectId}::${effective.sourceId}::${option.title}'];
+      final isDownloading =
+          queueItem != null &&
           (queueItem.status == DownloadQueueStatus.queued ||
               queueItem.status == DownloadQueueStatus.downloading);
       return !isDownloading;
@@ -164,7 +205,9 @@ class _EpisodeSelectionTabState extends ConsumerState<EpisodeSelectionTab> {
                             .enqueue(
                               subjectId: widget.subjectId,
                               subjectName: widget.subjectName,
-                              episode: option.preferred!,
+                              episode:
+                                  _sourceOverride[option.title] ??
+                                  option.preferred!,
                             );
                       }
                     }
