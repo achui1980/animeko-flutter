@@ -52,7 +52,7 @@ void main() {
   );
 
   group('SubjectMainEpisodesController', () {
-    test('keeps only MAIN episodes, dropping SPECIAL/OP/ED', () async {
+    test('keeps MAIN and SPECIAL episodes, dropping OP/ED', () async {
       when(() => api.getSubject(1)).thenAnswer(
         (_) async => detailWith([
           episode(id: 1, sort: 1),
@@ -65,7 +65,7 @@ void main() {
 
       final result = await read();
 
-      expect(result.map((e) => e.episodeId), [1, 5]);
+      expect(result.map((e) => e.episodeId), [1, 2, 5]);
     });
 
     // The backend interleaves MAIN and SPECIAL entries rather than grouping
@@ -75,14 +75,14 @@ void main() {
         (_) async => detailWith([
           episode(id: 3, sort: 3),
           episode(id: 1, sort: 1),
-          episode(id: 2, sort: 2, type: 'SPECIAL'),
+          episode(id: 20, sort: 2.5, type: 'SPECIAL'),
           episode(id: 2, sort: 2),
         ]),
       );
 
       final result = await read();
 
-      expect(result.map((e) => e.sort), [1, 2, 3]);
+      expect(result.map((e) => e.sort), [1, 2, 2.5, 3]);
     });
 
     test('sorts fractional sorts between their integer neighbours', () async {
@@ -109,10 +109,13 @@ void main() {
     );
 
     test(
-      'returns an empty list when every episode is a non-MAIN type',
+      'returns an empty list when every episode is a non-playable type',
       () async {
         when(() => api.getSubject(1)).thenAnswer(
-          (_) async => detailWith([episode(id: 1, sort: 1, type: 'SPECIAL')]),
+          (_) async => detailWith([
+            episode(id: 1, sort: 1, type: 'OP'),
+            episode(id: 2, sort: 2, type: 'ED'),
+          ]),
         );
 
         expect(await read(), isEmpty);

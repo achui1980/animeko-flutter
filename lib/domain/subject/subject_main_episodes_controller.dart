@@ -26,8 +26,12 @@ part 'subject_main_episodes_controller.g.dart';
 ///  * No more `limit=100` truncation -- 航海王 now yields all 1155 episodes
 ///    instead of 100. The grid renders these in segments; see
 ///    `EpisodeNumberGrid`.
-///  * The "is this a 正片" test is now `type == 'MAIN'` rather than Bangumi's
-///    numeric `type == 0`.
+///  * The "is this watchable" test is now `type == 'MAIN' || type ==
+///    'SPECIAL'` (see [SubjectEpisode.isPlayable]) rather than Bangumi's
+///    numeric `type == 0`. SPECIAL is where theatrical movies/剧场版 land,
+///    since this API has no dedicated movie type, so it merges into the
+///    grid alongside MAIN. OP/ED stay excluded -- they're theme songs, not
+///    watchable content.
 @riverpod
 class SubjectMainEpisodesController extends _$SubjectMainEpisodesController {
   @override
@@ -45,7 +49,7 @@ class SubjectMainEpisodesController extends _$SubjectMainEpisodesController {
 
     // The backend returns MAIN and SPECIAL entries interleaved and in no
     // guaranteed order, so sorting is required, not defensive polish.
-    return episodes.where((episode) => episode.isMain).toList()
+    return episodes.where((episode) => episode.isPlayable).toList()
       ..sort((a, b) => a.sort.compareTo(b.sort));
   }
 }
