@@ -55,8 +55,9 @@ class SubjectEpisode {
   /// can omit it.
   final String? ep;
 
-  /// `MAIN` | `SPECIAL` | `OP` | `ED`. Only [isMain] entries are shown in
-  /// the grid -- see `SubjectMainEpisodesController`.
+  /// `MAIN` | `SPECIAL` | `OP` | `ED`. [isPlayable] determines which
+  /// entries are intended to show in the grid -- see
+  /// `SubjectMainEpisodesController`.
   @JsonKey(defaultValue: '')
   final String type;
 
@@ -69,8 +70,17 @@ class SubjectEpisode {
   @JsonKey(defaultValue: '')
   final String airdate;
 
-  /// True for 正片 (main episodes) -- the only type the episode grid shows.
+  /// True for 正片 (main episodes). Used for [SubjectDetail.episodeCount]
+  /// (the "话数" count), which deliberately stays MAIN-only -- see
+  /// [isPlayable] for what the episode grid is intended to show.
   bool get isMain => type == 'MAIN';
+
+  /// True for episodes that should appear in the episode grid: 正片 (MAIN)
+  /// plus SPECIAL entries -- the bucket theatrical movies/剧场版 and extra
+  /// specials land in, since the backend's `type` enum has no dedicated
+  /// movie value. OP/ED remain excluded -- they're theme songs, not
+  /// watchable content.
+  bool get isPlayable => type == 'MAIN' || type == 'SPECIAL';
 
   /// Display title -- prefers the Chinese name per the design doc's
   /// Section 2, falling back to the original name when no Chinese name

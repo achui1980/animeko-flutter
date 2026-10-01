@@ -102,6 +102,31 @@ void main() {
     });
   });
 
+  group('SubjectEpisode.isPlayable', () {
+    test('is true for MAIN and SPECIAL, false for OP/ED/absent', () {
+      expect(
+        SubjectEpisode.fromJson(baseJson()..['type'] = 'MAIN').isPlayable,
+        isTrue,
+      );
+      expect(
+        SubjectEpisode.fromJson(baseJson()..['type'] = 'SPECIAL').isPlayable,
+        isTrue,
+      );
+      expect(
+        SubjectEpisode.fromJson(baseJson()..['type'] = 'OP').isPlayable,
+        isFalse,
+      );
+      expect(
+        SubjectEpisode.fromJson(baseJson()..['type'] = 'ED').isPlayable,
+        isFalse,
+      );
+      expect(
+        SubjectEpisode.fromJson(baseJson()..remove('type')).isPlayable,
+        isFalse,
+      );
+    });
+  });
+
   group('SubjectEpisode.displayName', () {
     test('prefers the Chinese name', () {
       final episode = SubjectEpisode.fromJson(baseJson());
