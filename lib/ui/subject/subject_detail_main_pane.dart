@@ -53,7 +53,12 @@ class SubjectDetailMainPane extends ConsumerWidget {
             padding: const EdgeInsets.only(bottom: 16),
             child: SubjectTitleBlock(
               subject: subject,
-              episodes: episodes,
+              // SubjectTitleBlock's episodes param has a MAIN-only contract
+              // (buildSubjectMetaLine's aired/total counting) -- `episodes`
+              // here is MAIN+SPECIAL, so filter before passing it down.
+              // SubjectEpisodesSection below manages its own list and has
+              // its own MAIN-only filter at its progress-text call site.
+              episodes: episodes.where((e) => e.isMain).toList(),
               now: now,
             ),
           ),

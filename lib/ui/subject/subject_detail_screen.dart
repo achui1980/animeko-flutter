@@ -143,7 +143,11 @@ class SubjectDetailScreen extends ConsumerWidget {
                 children: [
                   SubjectTitleBlock(
                     subject: subject,
-                    episodes: episodes,
+                    // SubjectTitleBlock's episodes param has a MAIN-only
+                    // contract (buildSubjectMetaLine's aired/total counting)
+                    // -- `episodes` here is MAIN+SPECIAL, so filter before
+                    // passing it down.
+                    episodes: episodes.where((e) => e.isMain).toList(),
                     now: now,
                   ),
                   const SizedBox(height: 12),

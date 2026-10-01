@@ -153,6 +153,89 @@ void main() {
       expect(find.byType(ExpandableSummary), findsOneWidget);
       expect(find.text('选集'), findsOneWidget);
     });
+
+    // Regression test for the bug where SubjectMainEpisodesController was
+    // widened to MAIN+SPECIAL (isPlayable) so SPECIAL episodes show up in
+    // the grid, but that merged list then silently reached the MAIN-only
+    // progress-text contracts in subject_meta_text.dart's
+    // formatEpisodeProgress -- both at the SubjectTitleBlock call site
+    // (inside this pane) and at SubjectEpisodesSection's own progress-text
+    // call site (also rendered by this pane). A SPECIAL airing alongside
+    // an unfinished main story must not flip "连载至 NN" to "全放送" early.
+    testWidgets(
+      'keeps the progress text MAIN-only when a SPECIAL has aired but not '
+      'all MAIN episodes have',
+      (tester) async {
+        const mixedEpisodes = [
+          SubjectEpisode(
+            episodeId: 1,
+            sort: 1,
+            ep: '1',
+            type: 'MAIN',
+            name: 'E1',
+            nameCn: '第1集',
+            airdate: '2026-07-01', // aired
+          ),
+          SubjectEpisode(
+            episodeId: 2,
+            sort: 2,
+            ep: '2',
+            type: 'MAIN',
+            name: 'E2',
+            nameCn: '第2集',
+            airdate: '2026-07-08', // aired
+          ),
+          SubjectEpisode(
+            episodeId: 3,
+            sort: 3,
+            ep: '3',
+            type: 'MAIN',
+            name: 'E3',
+            nameCn: '第3集',
+            airdate: '2099-01-01', // not aired -- main story is unfinished
+          ),
+          SubjectEpisode(
+            episodeId: 4,
+            sort: 1.5,
+            ep: null,
+            type: 'SPECIAL',
+            name: 'SP1',
+            nameCn: '特典1',
+            airdate: '2026-07-05', // aired
+          ),
+        ];
+        when(() => api.getSubject(1)).thenAnswer(
+          (_) async => SubjectDetail(
+            id: 1,
+            name: 'Mixed Subject',
+            nameCn: '混合剧集',
+            summary: '',
+            airDate: '2026-07-01',
+            tags: const [],
+            selfRating: const SelfRating(score: 0, tags: [], isPrivate: false),
+            episodes: mixedEpisodes,
+          ),
+        );
+
+        await tester.pumpWidget(
+          _wrap(
+            SubjectDetailMainPane(
+              subjectId: 1,
+              subjectName: '混合剧集',
+              now: DateTime(2026, 7, 20),
+            ),
+            overrides: overrides,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Buggy behaviour (merged MAIN+SPECIAL aired count of 3 meeting the
+        // MAIN-only episodeCount of 3) would drop "连载至" entirely and show
+        // only "预定全 3 话" in both places below.
+        expect(find.text('2026年7月 · 连载至 02 · 预定全 3 话'), findsOneWidget);
+        expect(find.text('连载至 02 · 预定全 3 话'), findsOneWidget);
+      },
+    );
   });
 
   group('SubjectDetailSidePane', () {

@@ -28,10 +28,10 @@ part 'subject_main_episodes_controller.g.dart';
 ///    `EpisodeNumberGrid`.
 ///  * The "is this watchable" test is now `type == 'MAIN' || type ==
 ///    'SPECIAL'` (see [SubjectEpisode.isPlayable]) rather than Bangumi's
-///    numeric `type == 0`. SPECIAL is where theatrical movies/剧场版 land,
-///    since this API has no dedicated movie type, so it merges into the
-///    grid alongside MAIN. OP/ED stay excluded -- they're theme songs, not
-///    watchable content.
+///    numeric `type == 0`. SPECIAL is where theatrical movies/剧场版 and
+///    extra specials land, since this API has no dedicated movie type, so
+///    it merges into the grid alongside MAIN. OP/ED stay excluded --
+///    they're theme songs, not watchable content.
 @riverpod
 class SubjectMainEpisodesController extends _$SubjectMainEpisodesController {
   @override

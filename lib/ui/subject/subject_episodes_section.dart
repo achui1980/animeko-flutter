@@ -63,8 +63,14 @@ class SubjectEpisodesSection extends ConsumerWidget {
       ),
       data: (episodes) {
         if (episodes.isEmpty) return const SizedBox.shrink();
+        // `episodes` here is MAIN+SPECIAL (subjectMainEpisodesControllerProvider
+        // widened to isPlayable), but formatEpisodeProgress's aired/total
+        // counting has a MAIN-only contract (see subject_meta_text.dart) --
+        // filter separately so EpisodeNumberGrid below still gets the merged
+        // list.
+        final mainEpisodes = episodes.where((e) => e.isMain).toList();
         final progress = formatEpisodeProgress(
-          episodes: episodes,
+          episodes: mainEpisodes,
           episodeCount: episodeCount,
           now: now,
         );
