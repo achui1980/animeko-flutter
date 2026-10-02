@@ -28,8 +28,12 @@ part of 'subject_main_episodes_controller.dart';
 ///  * No more `limit=100` truncation -- 航海王 now yields all 1155 episodes
 ///    instead of 100. The grid renders these in segments; see
 ///    `EpisodeNumberGrid`.
-///  * The "is this a 正片" test is now `type == 'MAIN'` rather than Bangumi's
-///    numeric `type == 0`.
+///  * The "is this watchable" test is now `type == 'MAIN' || type ==
+///    'SPECIAL'` (see [SubjectEpisode.isPlayable]) rather than Bangumi's
+///    numeric `type == 0`. SPECIAL is where theatrical movies/剧场版 and
+///    extra specials land, since this API has no dedicated movie type, so
+///    it merges into the grid alongside MAIN. OP/ED stay excluded --
+///    they're theme songs, not watchable content.
 
 @ProviderFor(SubjectMainEpisodesController)
 final subjectMainEpisodesControllerProvider =
@@ -55,8 +59,12 @@ final subjectMainEpisodesControllerProvider =
 ///  * No more `limit=100` truncation -- 航海王 now yields all 1155 episodes
 ///    instead of 100. The grid renders these in segments; see
 ///    `EpisodeNumberGrid`.
-///  * The "is this a 正片" test is now `type == 'MAIN'` rather than Bangumi's
-///    numeric `type == 0`.
+///  * The "is this watchable" test is now `type == 'MAIN' || type ==
+///    'SPECIAL'` (see [SubjectEpisode.isPlayable]) rather than Bangumi's
+///    numeric `type == 0`. SPECIAL is where theatrical movies/剧场版 and
+///    extra specials land, since this API has no dedicated movie type, so
+///    it merges into the grid alongside MAIN. OP/ED stay excluded --
+///    they're theme songs, not watchable content.
 final class SubjectMainEpisodesControllerProvider
     extends
         $AsyncNotifierProvider<
@@ -83,8 +91,12 @@ final class SubjectMainEpisodesControllerProvider
   ///  * No more `limit=100` truncation -- 航海王 now yields all 1155 episodes
   ///    instead of 100. The grid renders these in segments; see
   ///    `EpisodeNumberGrid`.
-  ///  * The "is this a 正片" test is now `type == 'MAIN'` rather than Bangumi's
-  ///    numeric `type == 0`.
+  ///  * The "is this watchable" test is now `type == 'MAIN' || type ==
+  ///    'SPECIAL'` (see [SubjectEpisode.isPlayable]) rather than Bangumi's
+  ///    numeric `type == 0`. SPECIAL is where theatrical movies/剧场版 and
+  ///    extra specials land, since this API has no dedicated movie type, so
+  ///    it merges into the grid alongside MAIN. OP/ED stay excluded --
+  ///    they're theme songs, not watchable content.
   SubjectMainEpisodesControllerProvider._({
     required SubjectMainEpisodesControllerFamily super.from,
     required int super.argument,
@@ -123,7 +135,7 @@ final class SubjectMainEpisodesControllerProvider
 }
 
 String _$subjectMainEpisodesControllerHash() =>
-    r'3e15e29ede44f07b2b5d7fa1f564416dc05748a1';
+    r'b8e48e85209f3d5424947b3de5dff991a473fbae';
 
 /// The 主线剧集 (main episode) list that drives the episode grid on the
 /// subject detail screen.
@@ -145,8 +157,12 @@ String _$subjectMainEpisodesControllerHash() =>
 ///  * No more `limit=100` truncation -- 航海王 now yields all 1155 episodes
 ///    instead of 100. The grid renders these in segments; see
 ///    `EpisodeNumberGrid`.
-///  * The "is this a 正片" test is now `type == 'MAIN'` rather than Bangumi's
-///    numeric `type == 0`.
+///  * The "is this watchable" test is now `type == 'MAIN' || type ==
+///    'SPECIAL'` (see [SubjectEpisode.isPlayable]) rather than Bangumi's
+///    numeric `type == 0`. SPECIAL is where theatrical movies/剧场版 and
+///    extra specials land, since this API has no dedicated movie type, so
+///    it merges into the grid alongside MAIN. OP/ED stay excluded --
+///    they're theme songs, not watchable content.
 
 final class SubjectMainEpisodesControllerFamily extends $Family
     with
@@ -186,8 +202,12 @@ final class SubjectMainEpisodesControllerFamily extends $Family
   ///  * No more `limit=100` truncation -- 航海王 now yields all 1155 episodes
   ///    instead of 100. The grid renders these in segments; see
   ///    `EpisodeNumberGrid`.
-  ///  * The "is this a 正片" test is now `type == 'MAIN'` rather than Bangumi's
-  ///    numeric `type == 0`.
+  ///  * The "is this watchable" test is now `type == 'MAIN' || type ==
+  ///    'SPECIAL'` (see [SubjectEpisode.isPlayable]) rather than Bangumi's
+  ///    numeric `type == 0`. SPECIAL is where theatrical movies/剧场版 and
+  ///    extra specials land, since this API has no dedicated movie type, so
+  ///    it merges into the grid alongside MAIN. OP/ED stay excluded --
+  ///    they're theme songs, not watchable content.
 
   SubjectMainEpisodesControllerProvider call({required int subjectId}) =>
       SubjectMainEpisodesControllerProvider._(argument: subjectId, from: this);
@@ -216,8 +236,12 @@ final class SubjectMainEpisodesControllerFamily extends $Family
 ///  * No more `limit=100` truncation -- 航海王 now yields all 1155 episodes
 ///    instead of 100. The grid renders these in segments; see
 ///    `EpisodeNumberGrid`.
-///  * The "is this a 正片" test is now `type == 'MAIN'` rather than Bangumi's
-///    numeric `type == 0`.
+///  * The "is this watchable" test is now `type == 'MAIN' || type ==
+///    'SPECIAL'` (see [SubjectEpisode.isPlayable]) rather than Bangumi's
+///    numeric `type == 0`. SPECIAL is where theatrical movies/剧场版 and
+///    extra specials land, since this API has no dedicated movie type, so
+///    it merges into the grid alongside MAIN. OP/ED stay excluded --
+///    they're theme songs, not watchable content.
 
 abstract class _$SubjectMainEpisodesController
     extends $AsyncNotifier<List<SubjectEpisode>> {
