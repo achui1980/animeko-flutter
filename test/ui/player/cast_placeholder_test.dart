@@ -63,4 +63,24 @@ void main() {
 
     expect(seekedTo, isNotNull);
   });
+
+  testWidgets('disables the progress bar when duration is not yet known', (
+    tester,
+  ) async {
+    Duration? seekedTo;
+    await tester.pumpWidget(
+      buildPlaceholder(
+        duration: Duration.zero,
+        onSeek: (value) => seekedTo = value,
+      ),
+    );
+
+    final sliderWidget = tester.widget<Slider>(find.byType(Slider));
+    expect(sliderWidget.onChanged, isNull);
+    expect(sliderWidget.value, 0);
+    expect(sliderWidget.max, 1);
+
+    await tester.drag(find.byType(Slider), const Offset(50, 0));
+    expect(seekedTo, isNull);
+  });
 }
