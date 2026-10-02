@@ -92,6 +92,19 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   int _candidateIndex = 0;
   bool _isSwitchingCandidate = false;
 
+  /// Optimistic local mirror of the native cast `AVPlayer`'s play/pause
+  /// state, toggled on each `CastPlaceholder` tap. `CastEvent` has no
+  /// "playing changed" event type -- the native side only ever reports
+  /// `activated`/`deactivated`/`failed` -- so there is no ground truth
+  /// to read this from; `_player.state.playing` is NOT a valid
+  /// substitute, since the local player is unconditionally paused for
+  /// the entire duration of a cast session (see the
+  /// `castControllerProvider` listener in `build()`), making it
+  /// permanently `false` while casting. Reset to `true` whenever a
+  /// cast session (re)starts, since `startCast`/a takeover both begin
+  /// playback immediately on the native side.
+  bool _castIsPlaying = true;
+
   StreamSubscription<bool>? _completedSubscription;
   StreamSubscription<bool>? _bufferingSubscription;
 
@@ -857,6 +870,29 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         if (mounted) setState(() => _playbackError = null);
         try {
           await _openCandidate(candidates[_candidateIndex]);
+          // The native cast `AVPlayer` is a single shared instance, not
+          // scoped per `PlayerScreen` -- so if a previous episode's
+          // screen left a cast session active (the user navigated away
+          // without disconnecting AirPlay, which this app has no
+          // `stopCast` method to force anyway), that session is still
+          // playing the *old* episode's URL when this new screen opens.
+          // `ref.listen(castControllerProvider, ...)` below only reacts
+          // to *transitions*, so it would never fire here (global status
+          // stays `casting` throughout) and this episode would silently
+          // never be cast. Mirroring how Chromecast-enabled apps keep
+          // casting whatever just started playing locally, this screen
+          // takes over the still-active session with its own candidate.
+          if (mounted &&
+              ref.read(castControllerProvider).status == CastStatus.casting) {
+            setState(() => _castIsPlaying = true);
+            unawaited(
+              _startCasting(
+                candidates[_candidateIndex],
+                ref.read(airPlayCastChannelProvider),
+              ),
+            );
+            unawaited(_player.pause());
+          }
         } catch (e) {
           // Without this, a failure here (e.g. `_player.open()` itself
           // throwing for candidate 0) would become an unobserved async
@@ -872,6 +908,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           previous?.status != CastStatus.casting) {
         final candidates = _candidates;
         if (candidates == null) return;
+        if (mounted) setState(() => _castIsPlaying = true);
         unawaited(_startCasting(candidates[_candidateIndex], channel));
         unawaited(_player.pause());
       } else if (previous?.status == CastStatus.casting &&
@@ -958,18 +995,19 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                         : castState.status == CastStatus.casting
                         ? CastPlaceholder(
                             deviceName: castState.deviceName ?? 'AirPlay 设备',
-                            isPlaying: _player.state.playing,
+                            isPlaying: _castIsPlaying,
                             position: _player.state.position,
                             duration: _player.state.duration,
                             onPlayPause: () {
                               final channel = ref.read(
                                 airPlayCastChannelProvider,
                               );
-                              if (_player.state.playing) {
+                              if (_castIsPlaying) {
                                 unawaited(channel.pause());
                               } else {
                                 unawaited(channel.play());
                               }
+                              setState(() => _castIsPlaying = !_castIsPlaying);
                             },
                             onSeek: (value) => unawaited(
                               ref
@@ -1042,7 +1080,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                         castButtonVisible: castButtonVisible,
                       ),
                     ),
-                  if (_controlsVisible)
+                  // Hidden while casting: it drives the local, paused
+                  // `_player` directly (`onPlayPause: _player.playOrPause`
+                  // below), so showing it alongside `CastPlaceholder`'s own
+                  // controls would risk a tap resuming local playback (and
+                  // local audio) concurrently with the AirPlay cast.
+                  if (_controlsVisible &&
+                      castState.status != CastStatus.casting)
                     Positioned(
                       left: 0,
                       right: 0,
