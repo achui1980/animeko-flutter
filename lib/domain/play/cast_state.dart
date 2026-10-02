@@ -1,5 +1,5 @@
 /// Which phase of the AirPlay cast lifecycle the app is currently in.
-/// See `docs/superpowers/specs/2026-10-02-airplay-casting-design.md` §4.
+/// See `docs/superpowers/specs/2026-10-02-airplay-casting-design.md` §7.
 enum CastStatus { idle, casting, failed }
 
 /// Current AirPlay cast state, driven entirely by native

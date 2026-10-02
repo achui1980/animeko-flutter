@@ -9,7 +9,7 @@ part 'cast_controller.g.dart';
 /// Reacts to native `AirPlayCastEngine` lifecycle events (via
 /// [airPlayCastChannelProvider]) and exposes the current [CastState] to
 /// `PlayerScreen`. See
-/// `docs/superpowers/specs/2026-10-02-airplay-casting-design.md` §4
+/// `docs/superpowers/specs/2026-10-02-airplay-casting-design.md` §7
 /// "状态同步与交互流程" for the full state-transition narrative this
 /// implements.
 @riverpod
@@ -22,7 +22,10 @@ class CastController extends _$CastController {
     // down by the default autoDispose behavior.
     ref.keepAlive();
     final channel = ref.watch(airPlayCastChannelProvider);
-    final subscription = channel.events.listen(_handleEvent);
+    final subscription = channel.events.listen(
+      _handleEvent,
+      onError: _handleStreamError,
+    );
     ref.onDispose(subscription.cancel);
     return const CastState(status: CastStatus.idle);
   }
@@ -42,5 +45,16 @@ class CastController extends _$CastController {
           errorMessage: event.reason,
         );
     }
+  }
+
+  /// Converts a stream error (e.g. [CastEvent.fromMap] throwing
+  /// [FormatException] on a malformed native payload) into a user-visible
+  /// [CastStatus.failed] state, instead of letting it become an unhandled
+  /// stream error swallowed by the zone.
+  void _handleStreamError(Object error, StackTrace stackTrace) {
+    state = CastState(
+      status: CastStatus.failed,
+      errorMessage: error.toString(),
+    );
   }
 }

@@ -80,5 +80,18 @@ void main() {
       expect(state.status, CastStatus.failed);
       expect(state.errorMessage, '播放失败');
     });
+
+    test('a stream error (e.g. malformed native payload) transitions to failed '
+        'instead of being silently swallowed', () async {
+      container.read(castControllerProvider);
+      eventController.addError(
+        const FormatException('CastEvent.fromMap: missing "type" field'),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      final state = container.read(castControllerProvider);
+      expect(state.status, CastStatus.failed);
+      expect(state.errorMessage, contains('missing "type" field'));
+    });
   });
 }
