@@ -21,7 +21,9 @@ void main() {
   group('isCastable', () {
     test('returns true for xifan', () {
       expect(
-        isCastable(const XifanPlaybackSource(url: 'https://example.com/a.m3u8')),
+        isCastable(
+          const XifanPlaybackSource(url: 'https://example.com/a.m3u8'),
+        ),
         isTrue,
       );
     });
@@ -29,7 +31,10 @@ void main() {
     test('returns true for agedm', () {
       expect(
         isCastable(
-          const AgedmPlaybackSource(url: 'https://example.com/a.m3u8', label: null),
+          const AgedmPlaybackSource(
+            url: 'https://example.com/a.m3u8',
+            label: null,
+          ),
         ),
         isTrue,
       );
@@ -38,7 +43,10 @@ void main() {
     test('returns true for omofun', () {
       expect(
         isCastable(
-          const OmofunPlaybackSource(url: 'https://example.com/a.m3u8', label: null),
+          const OmofunPlaybackSource(
+            url: 'https://example.com/a.m3u8',
+            label: null,
+          ),
         ),
         isTrue,
       );
@@ -46,21 +54,27 @@ void main() {
 
     test('returns true for yinghua', () {
       expect(
-        isCastable(const YinghuaPlaybackSource(url: 'https://example.com/a.m3u8')),
+        isCastable(
+          const YinghuaPlaybackSource(url: 'https://example.com/a.m3u8'),
+        ),
         isTrue,
       );
     });
 
     test('returns true for dilidili', () {
       expect(
-        isCastable(const DilidiliPlaybackSource(url: 'https://example.com/a.m3u8')),
+        isCastable(
+          const DilidiliPlaybackSource(url: 'https://example.com/a.m3u8'),
+        ),
         isTrue,
       );
     });
 
     test('returns false for anime1 (confirmed cookie-blocked)', () {
       expect(
-        isCastable(const Anime1PlaybackSource(url: 'https://example.com/a.mp4')),
+        isCastable(
+          const Anime1PlaybackSource(url: 'https://example.com/a.mp4'),
+        ),
         isFalse,
       );
     });
