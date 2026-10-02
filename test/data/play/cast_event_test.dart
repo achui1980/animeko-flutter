@@ -29,5 +29,19 @@ void main() {
       expect(event.type, CastEventType.failed);
       expect(event.reason, 'The requested URL was not found');
     });
+
+    test('throws a FormatException when "type" is missing', () {
+      expect(
+        () => CastEvent.fromMap({'reason': 'oops'}),
+        throwsFormatException,
+      );
+    });
+
+    test('throws a FormatException when "type" is not a recognized value', () {
+      expect(
+        () => CastEvent.fromMap({'type': 'something_new'}),
+        throwsFormatException,
+      );
+    });
   });
 }

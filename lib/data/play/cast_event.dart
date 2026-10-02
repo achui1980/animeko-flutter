@@ -30,9 +30,32 @@ class CastEvent {
   final String? reason;
 
   /// Parses the raw map payload delivered by the `EventChannel`.
+  ///
+  /// Throws a [FormatException] with a descriptive message if `'type'` is
+  /// missing or not a recognized [CastEventType] value, since this parses
+  /// data crossing the Dart/Swift boundary where schema drift (e.g. a new
+  /// event type added natively before the Dart side is updated) is a real
+  /// risk and should fail loudly rather than with a bare [TypeError] or
+  /// [StateError].
   factory CastEvent.fromMap(Map<Object?, Object?> map) {
-    final rawType = map['type'] as String;
-    final type = CastEventType.values.firstWhere((v) => v.name == rawType);
+    final rawType = map['type'];
+    if (rawType is! String) {
+      throw FormatException(
+        'CastEvent.fromMap: missing or non-string "type" field: $rawType',
+      );
+    }
+    CastEventType? type;
+    for (final value in CastEventType.values) {
+      if (value.name == rawType) {
+        type = value;
+        break;
+      }
+    }
+    if (type == null) {
+      throw FormatException(
+        'CastEvent.fromMap: unrecognized "type" value: $rawType',
+      );
+    }
     return CastEvent(
       type: type,
       deviceName: map['deviceName'] as String?,
