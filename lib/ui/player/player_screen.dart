@@ -134,6 +134,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   /// in `initState` instead avoids ever needing `ref` again for this.
   late final Future<PlaybackPositionStorage> _storageFuture;
 
+  /// Same caching rationale as [_storageFuture]: `dispose()`'s
+  /// `setButtonVisible(false)` safety net (see below) needs this, and
+  /// `ref` is unsafe to touch by the time `dispose()` runs. Caching the
+  /// resolved channel in `initState` -- rather than calling
+  /// `ref.read(airPlayCastChannelProvider)` directly from `dispose()` --
+  /// avoids the same `StateError` this pattern was already introduced
+  /// to prevent (see `AirPlayButton`'s identical `_channel` field for
+  /// the same reasoning).
+  late final AirPlayCastChannel _castChannel;
+
   /// Identifies `_currentEpisode` (the actually-playing episode, which
   /// may have advanced past [PlayerScreen.episode]) for
   /// [PlaybackPositionStorage]. Episodes have no other stable identity
@@ -147,6 +157,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     super.initState();
     _currentEpisode = widget.episode;
     _storageFuture = ref.read(playbackPositionStorageProvider.future);
+    _castChannel = ref.read(airPlayCastChannelProvider);
     _bufferingSubscription = _player.stream.buffering.listen((buffering) {
       if (mounted) setState(() => _isBuffering = buffering);
       if (buffering) {
@@ -588,7 +599,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     // pubspec.lock as of this fix).
     //
     // `State.dispose()` cannot be `async`, so this is fire-and-forget.
-    unawaited(ref.read(airPlayCastChannelProvider).setButtonVisible(false));
+    unawaited(_castChannel.setButtonVisible(false));
     unawaited(_disposePlayer());
     super.dispose();
   }
@@ -637,6 +648,36 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     await _player.setRate(speed);
     await _maybeResumePosition();
     if (mounted) _hasAdvancedToNextEpisode = false;
+  }
+
+  /// Starts native AirPlay playback for [source], called when
+  /// `CastController` transitions into `CastStatus.casting`. Wrapped in
+  /// try/catch for the same reason the `ref.listen(provider, ...)`
+  /// listener above wraps `_openCandidate` in one: `startCast` is a
+  /// bare `MethodChannel.invokeMethod` call, and a synchronous
+  /// rejection from the native side here has no other path back to
+  /// `CastController`'s event-stream-driven state machine (that stream
+  /// only reacts to events the native side later *pushes*, not to this
+  /// call's own immediate failure) -- without this, the local player
+  /// would be left paused with no recovery and no feedback.
+  Future<void> _startCasting(
+    MediaPlaybackSource source,
+    AirPlayCastChannel channel,
+  ) async {
+    try {
+      final playableUrl = await source.prepare();
+      await channel.startCast(
+        url: playableUrl,
+        headers: source.headers,
+        positionMs: _player.state.position.inMilliseconds,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('投屏失败：$e')));
+      unawaited(_player.play());
+    }
   }
 
   /// Manually switches to a different playback candidate at [newIndex]
@@ -831,15 +872,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           previous?.status != CastStatus.casting) {
         final candidates = _candidates;
         if (candidates == null) return;
-        final current = candidates[_candidateIndex];
-        unawaited(() async {
-          final playableUrl = await current.prepare();
-          await channel.startCast(
-            url: playableUrl,
-            headers: current.headers,
-            positionMs: _player.state.position.inMilliseconds,
-          );
-        }());
+        unawaited(_startCasting(candidates[_candidateIndex], channel));
         unawaited(_player.pause());
       } else if (previous?.status == CastStatus.casting &&
           next.status == CastStatus.idle) {
