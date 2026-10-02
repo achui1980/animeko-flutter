@@ -19,8 +19,21 @@ class AirPlayButtonOverlay {
     contentView.addSubview(routePickerView)
   }
 
+  /// `x`/`y` are expected in **top-left-origin** coordinates, matching
+  /// Flutter's own coordinate space (e.g. what `RenderBox.localToGlobal()`
+  /// produces on the Dart side -- see `AirPlayButton`'s frame reporting).
+  /// AppKit views default to a **bottom-left-origin** coordinate system
+  /// (`isFlipped == false`), so this converts `y` accordingly unless the
+  /// superview itself is flipped (already top-left-origin), to avoid the
+  /// overlay landing vertically mirrored relative to the Flutter-side
+  /// placeholder it's meant to track.
   func setFrame(x: CGFloat, y: CGFloat, width: CGFloat, height: CGFloat) {
-    routePickerView.frame = NSRect(x: x, y: y, width: width, height: height)
+    guard let superview = routePickerView.superview else {
+      routePickerView.frame = NSRect(x: x, y: y, width: width, height: height)
+      return
+    }
+    let adjustedY = superview.isFlipped ? y : superview.bounds.height - y - height
+    routePickerView.frame = NSRect(x: x, y: adjustedY, width: width, height: height)
   }
 
   func setVisible(_ visible: Bool) {
