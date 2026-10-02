@@ -13,6 +13,9 @@ import FlutterMacOS
 /// so AirPlay casting requires this standalone `AVPlayer`-based path.
 class AirPlayCastEngine: NSObject, FlutterStreamHandler {
   private let player = AVPlayer()
+  // Retained to keep the channel (and its registered `setMethodCallHandler`
+  // closure, owned by `MainFlutterWindow.swift`/Task 6) alive for as long as
+  // this engine is alive; never called directly after `init`.
   private let methodChannel: FlutterMethodChannel
   private var eventSink: FlutterEventSink?
   private var statusObservation: NSKeyValueObservation?
@@ -21,17 +24,22 @@ class AirPlayCastEngine: NSObject, FlutterStreamHandler {
   init(methodChannel: FlutterMethodChannel) {
     self.methodChannel = methodChannel
     super.init()
+    // AVFoundation does not guarantee which thread KVO notifications are
+    // delivered on, but `FlutterEventSink` must only be invoked on the
+    // main/platform thread — hop to main before touching it.
     externalPlaybackObservation = player.observe(\.isExternalPlaybackActive, options: [.new]) {
       [weak self] player, change in
       guard let self = self, let isActive = change.newValue else { return }
       if isActive {
-        self.eventSink?([
-          "type": "activated",
-          "deviceName": self.resolveActiveOutputDeviceName(),
-        ])
+        let deviceName = self.resolveActiveOutputDeviceName()
+        DispatchQueue.main.async {
+          self.eventSink?(["type": "activated", "deviceName": deviceName])
+        }
       } else {
         let positionMs = Int(player.currentTime().seconds * 1000)
-        self.eventSink?(["type": "deactivated", "lastPositionMs": positionMs])
+        DispatchQueue.main.async {
+          self.eventSink?(["type": "deactivated", "lastPositionMs": positionMs])
+        }
       }
     }
   }
@@ -77,13 +85,19 @@ class AirPlayCastEngine: NSObject, FlutterStreamHandler {
     statusObservation?.invalidate()
     let options: [String: Any] = headers.isEmpty
       ? [:]
+      // "AVURLAssetHTTPHeaderFieldsKey" is passed as a raw string because the
+      // real `AVURLAssetHTTPHeaderFieldsKey` symbol is unavailable in this
+      // SDK (resolution failure confirmed via `flutter build macos`); the
+      // string value is stable, documented AVFoundation API regardless.
       : ["AVURLAssetHTTPHeaderFieldsKey": headers]
     let asset = AVURLAsset(url: url, options: options)
     let item = AVPlayerItem(asset: asset)
     statusObservation = item.observe(\.status, options: [.new]) { [weak self] item, _ in
       guard item.status == .failed else { return }
       let reason = item.error?.localizedDescription ?? "未知错误"
-      self?.eventSink?(["type": "failed", "reason": reason])
+      DispatchQueue.main.async {
+        self?.eventSink?(["type": "failed", "reason": reason])
+      }
     }
     player.replaceCurrentItem(with: item)
     player.seek(to: CMTime(seconds: Double(positionMs) / 1000, preferredTimescale: 1000)) { [weak self] _ in
@@ -109,16 +123,18 @@ class AirPlayCastEngine: NSObject, FlutterStreamHandler {
     )
     guard status == noErr else { return "AirPlay 设备" }
 
-    var name: CFString = "" as CFString
-    var nameSize = UInt32(MemoryLayout<CFString>.size)
+    var name: Unmanaged<CFString>?
+    var nameSize = UInt32(MemoryLayout<CFString?>.size)
     var nameAddress = AudioObjectPropertyAddress(
       mSelector: kAudioObjectPropertyName,
       mScope: kAudioObjectPropertyScopeGlobal,
       mElement: kAudioObjectPropertyElementMain
     )
-    status = AudioObjectGetPropertyData(deviceId, &nameAddress, 0, nil, &nameSize, &name)
-    guard status == noErr else { return "AirPlay 设备" }
-    return name as String
+    status = withUnsafeMutablePointer(to: &name) { ptr in
+      AudioObjectGetPropertyData(deviceId, &nameAddress, 0, nil, &nameSize, ptr)
+    }
+    guard status == noErr, let cfName = name?.takeRetainedValue() else { return "AirPlay 设备" }
+    return cfName as String
   }
 
   // MARK: FlutterStreamHandler (EventChannel)
