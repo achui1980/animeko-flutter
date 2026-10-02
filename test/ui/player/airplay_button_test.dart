@@ -81,4 +81,28 @@ void main() {
 
     verify(() => channel.setButtonVisible(false)).called(1);
   });
+
+  testWidgets(
+    'reports updated visibility via didUpdateWidget when visible changes',
+    (tester) async {
+      await tester.pumpWidget(buildButton(visible: true));
+      await tester.pumpAndSettle();
+      clearInteractions(channel);
+
+      await tester.pumpWidget(buildButton(visible: false));
+      await tester.pumpAndSettle();
+
+      verify(
+        () => channel.setButtonVisible(false),
+      ).called(greaterThanOrEqualTo(1));
+      verifyNever(
+        () => channel.setButtonFrame(
+          x: any(named: 'x'),
+          y: any(named: 'y'),
+          width: any(named: 'width'),
+          height: any(named: 'height'),
+        ),
+      );
+    },
+  );
 }

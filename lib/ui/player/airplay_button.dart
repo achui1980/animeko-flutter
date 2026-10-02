@@ -50,6 +50,14 @@ class _AirPlayButtonState extends ConsumerState<AirPlayButton> {
   }
 
   void _report() {
+    // Guard against a postFrameCallback firing after this widget has
+    // already been removed from the tree within the same frame it was
+    // scheduled in (e.g. a parent conditionally stops including
+    // AirPlayButton): dispose() will already have reported
+    // setButtonVisible(false) by then, and without this guard the stale
+    // callback would re-report the pre-dispose visibility right after,
+    // undermining the "always hidden on unmount" invariant.
+    if (!mounted) return;
     unawaited(_channel.setButtonVisible(widget.visible));
     if (!widget.visible) return;
     final renderObject = _key.currentContext?.findRenderObject();
