@@ -13,12 +13,16 @@ import 'package:screen_brightness/screen_brightness.dart';
 
 import '../../app/theme/app_theme.dart';
 import '../../data/download/downloaded_episode_repository.dart';
+import '../../data/play/airplay_cast_channel.dart';
 import '../../data/play/playback_position_storage.dart';
 import '../../domain/download/download_queue_controller.dart';
 import '../../domain/download/download_source_resolver.dart';
 import '../../domain/download/local_file_playback_source.dart';
 import '../../domain/media/media_registry.dart';
 import '../../domain/media/media_source.dart';
+import '../../domain/play/cast_controller.dart';
+import '../../domain/play/cast_eligibility.dart';
+import '../../domain/play/cast_state.dart';
 import '../../domain/play/episode_play_controller.dart';
 import '../../domain/play/subject_episodes_controller.dart';
 import '../../domain/settings/playback_speed_controller.dart';
@@ -27,6 +31,7 @@ import '../common/error_retry_view.dart';
 import '../download/download_badge_button.dart';
 import '../home/trending_carousel.dart' show isDesktopPlatform;
 import '../subject/episode_source_grid.dart';
+import 'cast_placeholder.dart';
 import 'line_switch_sheet.dart';
 import 'player_bottom_bar.dart';
 import 'player_top_bar.dart';
@@ -583,6 +588,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     // pubspec.lock as of this fix).
     //
     // `State.dispose()` cannot be `async`, so this is fire-and-forget.
+    unawaited(ref.read(airPlayCastChannelProvider).setButtonVisible(false));
     unawaited(_disposePlayer());
     super.dispose();
   }
@@ -819,6 +825,44 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         }
       });
     });
+    ref.listen(castControllerProvider, (previous, next) {
+      final channel = ref.read(airPlayCastChannelProvider);
+      if (next.status == CastStatus.casting &&
+          previous?.status != CastStatus.casting) {
+        final candidates = _candidates;
+        if (candidates == null) return;
+        final current = candidates[_candidateIndex];
+        unawaited(() async {
+          final playableUrl = await current.prepare();
+          await channel.startCast(
+            url: playableUrl,
+            headers: current.headers,
+            positionMs: _player.state.position.inMilliseconds,
+          );
+        }());
+        unawaited(_player.pause());
+      } else if (previous?.status == CastStatus.casting &&
+          next.status == CastStatus.idle) {
+        final resumeMs = next.lastKnownPositionMs;
+        if (resumeMs != null) {
+          unawaited(_player.seek(Duration(milliseconds: resumeMs)));
+        }
+        unawaited(_player.play());
+      } else if (next.status == CastStatus.failed) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(next.errorMessage ?? '投屏失败，该来源可能不支持投屏，可尝试切换片源'),
+          ),
+        );
+        unawaited(_player.play());
+      }
+    });
+    final currentCandidate = _candidates != null && _candidates!.isNotEmpty
+        ? _candidates![_candidateIndex]
+        : null;
+    final castButtonVisible =
+        currentCandidate != null && isCastable(currentCandidate);
+    final castState = ref.watch(castControllerProvider);
     final playback = ref.watch(provider);
     final downloadQueue =
         ref.watch(downloadQueueControllerProvider).value ??
@@ -877,6 +921,28 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                         ? ErrorRetryView(
                             message: '播放失败：$_playbackError',
                             onRetry: _retry,
+                          )
+                        : castState.status == CastStatus.casting
+                        ? CastPlaceholder(
+                            deviceName: castState.deviceName ?? 'AirPlay 设备',
+                            isPlaying: _player.state.playing,
+                            position: _player.state.position,
+                            duration: _player.state.duration,
+                            onPlayPause: () {
+                              final channel = ref.read(
+                                airPlayCastChannelProvider,
+                              );
+                              if (_player.state.playing) {
+                                unawaited(channel.pause());
+                              } else {
+                                unawaited(channel.play());
+                              }
+                            },
+                            onSeek: (value) => unawaited(
+                              ref
+                                  .read(airPlayCastChannelProvider)
+                                  .seek(value.inMilliseconds),
+                            ),
                           )
                         // media_kit_video's default AdaptiveVideoControls is
                         // disabled (controls: NoVideoControls) -- this app
@@ -940,6 +1006,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                             '${widget.subjectName} · ${_currentEpisode.title}',
                         onBack: () => Navigator.of(context).pop(),
                         onScreenshot: _takeScreenshot,
+                        castButtonVisible: castButtonVisible,
                       ),
                     ),
                   if (_controlsVisible)
