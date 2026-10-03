@@ -37,15 +37,47 @@ import AppKit
 /// `AirPlayCastEngine`'s sibling wiring in `MainFlutterWindow.swift`).
 class AirPlayButtonOverlay {
   private let routePickerView: AVRoutePickerView
+  private let labelView: NSTextField
+  private let containerView: NSView
   private let overlayWindow: NSWindow
   private weak var flutterView: NSView?
 
   init(parentWindow: NSWindow, flutterView: NSView) {
     self.flutterView = flutterView
-    routePickerView = AVRoutePickerView(frame: NSRect(x: 0, y: 0, width: 44, height: 44))
+
+    let initialFrame = NSRect(x: 0, y: 0, width: 44, height: 44)
+
+    // `AVRoutePickerView`'s own built-in icon can't be restyled (Apple
+    // doesn't expose an API to swap its glyph), and its default rendering
+    // at this icon's small size looked garbled/unclear in testing. So the
+    // *visible* control here is a plain "TV" text label we draw ourselves
+    // (matching the other player-bar icons' white-on-transparent look),
+    // while the real `AVRoutePickerView` is layered on top at a near-zero
+    // (but nonzero) alpha so it still receives the real mouse-down needed
+    // to open the system AirPlay device picker -- `NSView.alphaValue`
+    // only affects rendering, not hit-testing, so clicks still land on it.
+    labelView = NSTextField(labelWithString: "TV")
+    labelView.frame = initialFrame
+    labelView.alignment = .center
+    labelView.font = NSFont.boldSystemFont(ofSize: 15)
+    labelView.textColor = .white
+    labelView.backgroundColor = .clear
+    labelView.isBezeled = false
+    labelView.isEditable = false
+    labelView.isSelectable = false
+    // NSTextField's content is vertically top-aligned by default; nudge
+    // the baseline down so "TV" sits centered in the 44pt-tall button.
+    labelView.frame.origin.y += (initialFrame.height - labelView.font!.pointSize) / 2 - 4
+
+    routePickerView = AVRoutePickerView(frame: initialFrame)
+    routePickerView.alphaValue = 0.011
+
+    containerView = NSView(frame: initialFrame)
+    containerView.addSubview(labelView)
+    containerView.addSubview(routePickerView)
 
     let window = NSWindow(
-      contentRect: NSRect(x: 0, y: 0, width: 44, height: 44),
+      contentRect: initialFrame,
       styleMask: .borderless,
       backing: .buffered,
       defer: false
@@ -55,7 +87,7 @@ class AirPlayButtonOverlay {
     window.hasShadow = false
     window.isReleasedWhenClosed = false
     window.ignoresMouseEvents = false
-    window.contentView = routePickerView
+    window.contentView = containerView
 
     overlayWindow = window
     parentWindow.addChildWindow(overlayWindow, ordered: .above)
@@ -76,7 +108,11 @@ class AirPlayButtonOverlay {
     let windowRect = flutterView.convert(localRect, to: nil)
     let screenRect = parentWindow.convertToScreen(windowRect)
     overlayWindow.setFrame(screenRect, display: true)
-    routePickerView.frame = NSRect(origin: .zero, size: screenRect.size)
+    let bounds = NSRect(origin: .zero, size: screenRect.size)
+    containerView.frame = bounds
+    routePickerView.frame = bounds
+    labelView.frame = bounds
+    labelView.frame.origin.y += (bounds.height - labelView.font!.pointSize) / 2 - 4
   }
 
   func setVisible(_ visible: Bool) {

@@ -26,6 +26,22 @@
 	<string>$(PRODUCT_COPYRIGHT)</string>
 	<key>NSMainNibFile</key>
 	<string>MainMenu</string>
+	<!--
+	Required for AirPlay device discovery (AVRoutePickerView). macOS
+	gates Bonjour/mDNS-based local network discovery behind a system
+	privacy permission, and will only prompt for -- or grant -- it if
+	NSLocalNetworkUsageDescription is present; without it, discovery
+	silently finds zero devices with no error. NSBonjourServices lists
+	the specific service types AirPlay uses so the system permission
+	prompt can scope access correctly.
+	-->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>需要访问本地网络以发现并连接 AirPlay 设备进行投屏播放。</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_airplay._tcp</string>
+		<string>_raop._tcp</string>
+	</array>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 </dict>
