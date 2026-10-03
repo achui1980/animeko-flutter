@@ -19,7 +19,7 @@ class MainFlutterWindow: NSWindow {
     let eventChannel = FlutterEventChannel(name: "animeko/airplay_cast_events", binaryMessenger: messenger)
 
     let engine = AirPlayCastEngine(methodChannel: methodChannel)
-    let overlay = AirPlayButtonOverlay(contentView: flutterViewController.view)
+    let overlay = AirPlayButtonOverlay(parentWindow: self, flutterView: flutterViewController.view)
 
     // `setButtonFrame`/`setButtonVisible` control the native floating AirPlay
     // overlay (Task 5) and are intercepted here rather than forwarded to
