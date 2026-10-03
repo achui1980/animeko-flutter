@@ -86,5 +86,28 @@ void main() {
     test('returns false for any other/unknown source type', () {
       expect(isCastable(const _FakeUnknownSource()), isFalse);
     });
+
+    test(
+      'returns false for an otherwise-castable source when not on macOS',
+      () {
+        expect(
+          isCastable(
+            const XifanPlaybackSource(url: 'https://example.com/a.m3u8'),
+            isMacOS: () => false,
+          ),
+          isFalse,
+        );
+      },
+    );
+
+    test('returns true for a castable source when on macOS', () {
+      expect(
+        isCastable(
+          const XifanPlaybackSource(url: 'https://example.com/a.m3u8'),
+          isMacOS: () => true,
+        ),
+        isTrue,
+      );
+    });
   });
 }
