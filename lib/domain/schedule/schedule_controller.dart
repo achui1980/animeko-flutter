@@ -44,9 +44,17 @@ class ScheduleController extends _$ScheduleController {
       timeZone: timeZoneOffsetString(now.timeZoneOffset),
     );
 
-    // The server can return more than a week of days; the UI only wants
-    // "this week" of data (per user feedback), so cap it client-side.
-    return schedule.list
+    // The server's response isn't guaranteed to be sorted or anchored
+    // exactly at `today` (observed in practice: it can include trailing
+    // days from before today). Sort ascending, drop anything before
+    // today, then cap to a week so the UI always shows "today through
+    // the next 6 days" regardless of what the server actually returns.
+    final todayStr = todayDateString(now);
+    final sorted = schedule.list.toList()
+      ..sort((a, b) => a.date.compareTo(b.date));
+    final fromToday = sorted.where((day) => day.date.compareTo(todayStr) >= 0);
+
+    return fromToday
         .take(7)
         .map(
           (day) => ScheduleDay(

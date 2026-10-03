@@ -52,17 +52,18 @@ void main() {
     });
 
     test('groups subjects by date', () async {
+      final today = todayDateString(DateTime.now());
       when(
         () => api.getLatestAiringSchedule(
           today: any(named: 'today'),
           timeZone: any(named: 'timeZone'),
         ),
       ).thenAnswer(
-        (_) async => const LatestAiringSchedule(
+        (_) async => LatestAiringSchedule(
           list: [
             AiringScheduleForDate(
-              date: '2026-08-28',
-              list: [
+              date: today,
+              list: const [
                 ScheduledAnimeEpisode(
                   subject: ScheduledAnimeSubject(
                     subjectId: 100,
@@ -88,33 +89,83 @@ void main() {
       final result = await container.read(scheduleControllerProvider.future);
 
       expect(result, hasLength(1));
-      expect(result.single.date, '2026-08-28');
+      expect(result.single.date, today);
       expect(result.single.subjects.single.nameCn, '芙莉莲');
       expect(result.single.subjects.single.id, 100);
       expect(result.single.subjects.single.episodeSort, '1');
       expect(result.single.subjects.single.airingTime, '2026-08-28T22:00:00Z');
     });
 
-    test('limits the result to at most 7 days', () async {
-      final days = List.generate(
-        10,
-        (i) => AiringScheduleForDate(
-          date: '2026-08-${(20 + i).toString().padLeft(2, '0')}',
-          list: const [],
-        ),
-      );
-      when(
-        () => api.getLatestAiringSchedule(
-          today: any(named: 'today'),
-          timeZone: any(named: 'timeZone'),
-        ),
-      ).thenAnswer((_) async => LatestAiringSchedule(list: days));
+    test(
+      'drops days before today, sorts, and caps the result to 7 days starting today',
+      () async {
+        final now = DateTime.now();
+        // 3 days before today (must be dropped) + 10 days from today onward
+        // (must be sorted ascending and capped to the first 7), all fed in
+        // shuffled order to verify the controller sorts rather than trusting
+        // server ordering.
+        final allDates = List.generate(
+          13,
+          (i) => todayDateString(now.add(Duration(days: i - 3))),
+        );
+        final shuffled = allDates.reversed.toList();
+        final days = shuffled
+            .map((date) => AiringScheduleForDate(date: date, list: const []))
+            .toList();
 
-      final result = await container.read(scheduleControllerProvider.future);
+        when(
+          () => api.getLatestAiringSchedule(
+            today: any(named: 'today'),
+            timeZone: any(named: 'timeZone'),
+          ),
+        ).thenAnswer((_) async => LatestAiringSchedule(list: days));
 
-      expect(result, hasLength(7));
-      expect(result.first.date, '2026-08-20');
-      expect(result.last.date, '2026-08-26');
-    });
+        final result = await container.read(scheduleControllerProvider.future);
+
+        expect(result, hasLength(7));
+        expect(result.first.date, todayDateString(now));
+        expect(
+          result.last.date,
+          todayDateString(now.add(const Duration(days: 6))),
+        );
+        for (var i = 1; i < result.length; i++) {
+          expect(result[i].date.compareTo(result[i - 1].date) > 0, isTrue);
+        }
+      },
+    );
+
+    test(
+      'shows fewer than 7 days when the server has less than a week left',
+      () async {
+        final now = DateTime.now();
+        final days = [
+          // Yesterday: must be dropped.
+          AiringScheduleForDate(
+            date: todayDateString(now.subtract(const Duration(days: 1))),
+            list: const [],
+          ),
+          AiringScheduleForDate(date: todayDateString(now), list: const []),
+          AiringScheduleForDate(
+            date: todayDateString(now.add(const Duration(days: 1))),
+            list: const [],
+          ),
+        ];
+        when(
+          () => api.getLatestAiringSchedule(
+            today: any(named: 'today'),
+            timeZone: any(named: 'timeZone'),
+          ),
+        ).thenAnswer((_) async => LatestAiringSchedule(list: days));
+
+        final result = await container.read(scheduleControllerProvider.future);
+
+        expect(result, hasLength(2));
+        expect(result.first.date, todayDateString(now));
+        expect(
+          result.last.date,
+          todayDateString(now.add(const Duration(days: 1))),
+        );
+      },
+    );
   });
 }
