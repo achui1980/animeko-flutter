@@ -11,7 +11,7 @@ part of 'cast_controller.dart';
 /// Reacts to native `AirPlayCastEngine` lifecycle events (via
 /// [airPlayCastChannelProvider]) and exposes the current [CastState] to
 /// `PlayerScreen`. See
-/// `docs/superpowers/specs/2026-10-02-airplay-casting-design.md` §4
+/// `docs/superpowers/specs/2026-10-02-airplay-casting-design.md` §7
 /// "状态同步与交互流程" for the full state-transition narrative this
 /// implements.
 
@@ -21,7 +21,7 @@ final castControllerProvider = CastControllerProvider._();
 /// Reacts to native `AirPlayCastEngine` lifecycle events (via
 /// [airPlayCastChannelProvider]) and exposes the current [CastState] to
 /// `PlayerScreen`. See
-/// `docs/superpowers/specs/2026-10-02-airplay-casting-design.md` §4
+/// `docs/superpowers/specs/2026-10-02-airplay-casting-design.md` §7
 /// "状态同步与交互流程" for the full state-transition narrative this
 /// implements.
 final class CastControllerProvider
@@ -29,7 +29,7 @@ final class CastControllerProvider
   /// Reacts to native `AirPlayCastEngine` lifecycle events (via
   /// [airPlayCastChannelProvider]) and exposes the current [CastState] to
   /// `PlayerScreen`. See
-  /// `docs/superpowers/specs/2026-10-02-airplay-casting-design.md` §4
+  /// `docs/superpowers/specs/2026-10-02-airplay-casting-design.md` §7
   /// "状态同步与交互流程" for the full state-transition narrative this
   /// implements.
   CastControllerProvider._()
@@ -59,12 +59,12 @@ final class CastControllerProvider
   }
 }
 
-String _$castControllerHash() => r'cf2ba5d2b961668cfbfcf8cb2e10e729668a66fa';
+String _$castControllerHash() => r'b3e6a9f898566e0195cb79d06076a5e84caab07e';
 
 /// Reacts to native `AirPlayCastEngine` lifecycle events (via
 /// [airPlayCastChannelProvider]) and exposes the current [CastState] to
 /// `PlayerScreen`. See
-/// `docs/superpowers/specs/2026-10-02-airplay-casting-design.md` §4
+/// `docs/superpowers/specs/2026-10-02-airplay-casting-design.md` §7
 /// "状态同步与交互流程" for the full state-transition narrative this
 /// implements.
 
